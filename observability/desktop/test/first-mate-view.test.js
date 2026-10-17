@@ -65,8 +65,6 @@ test("a snapshot with filed entries renders no Filed section (#402)", () => {
 // it set were removed (#1751); there is no per-session override any more.
 // ---------------------------------------------------------------------------
 
-const { ModelBar, modelLabel } = require("../dist/first-mate.cjs");
-
 const strip = (tier, over = {}) => draw(React.createElement(FirstMate, {
   snapshot: snap({ filed: [], tier, ...over }),
   draft: "", onDraft: () => {}, onSend: () => {}, onFile: () => {},
@@ -79,28 +77,9 @@ const walk = (el, out = []) => {
   return out;
 };
 
-test("modelLabel", () => {
-  assert.equal(modelLabel({ model: "opus", effort: "medium" }), "Opus medium");
-  assert.equal(modelLabel({ model: "fable", effort: "low" }), "Fable low");
-});
-
-test("the strip shows the standing model, no Override control", () => {
-  const html = strip({ tier: 8, model: "fable", effort: "low", source: "standing" });
-  assert.match(html, /class="fmModelName"[^>]*>Fable low<\/span>/);
-  assert.doesNotMatch(html, /Override/);
-  assert.doesNotMatch(html, /class="fmModelClear"/);
-});
-
-test("the fallback is labelled", () => {
+test("the strip draws no model line, and no Override control (#100107)", () => {
   const html = strip({ tier: 5, model: "opus", effort: "medium", source: "fallback" });
-  assert.match(html, />Opus medium · Fable-limit fallback<\/span>/);
-});
-
-test("ModelBar draws no Override control at all", () => {
-  const html = renderToStaticMarkup(React.createElement(ModelBar,
-    { tier: { tier: 8, model: "fable", effort: "low", source: "standing" } }));
-  assert.doesNotMatch(html, /Override/);
-  assert.doesNotMatch(html, /fmModelForm|fmModelClear|fmModelToggle|fmModelCancel/);
+  assert.doesNotMatch(html, /class="fmModel|Opus medium|Fable-limit fallback|Override/);
 });
 
 test("the strip draws main's tier notices: the uncached re-read, and the Fable-limit fallback's reason", () => {
@@ -147,8 +126,7 @@ test("historyOpen with historyList renders each entry's start time and first mes
   assert.doesNotMatch(html, /fmFileCard|fmFileButton/);
   assert.doesNotMatch(html, /fmTierSelect|fmModelForm/);
   assert.doesNotMatch(html, /fmModelToggle|fmModelClear/);
-  // The list keeps a non-interactive model display, not the full ModelBar.
-  assert.match(html, /class="fmModel"/);
+  assert.doesNotMatch(html, /class="fmModel"/);
 });
 
 test("viewingConversation renders that conversation's rows read-only, with no input/send/File/ModelBar", () => {
@@ -621,18 +599,18 @@ test("the chat repo chip shows No repo yet or the repo, and picks call onSetRepo
   assert.deepEqual(picks, ["o/a", null]);
 });
 
-test("a kubernetes conversation draws its mode line, and resuming… with the pod-status as its tooltip (#2523)", () => {
+test("a kubernetes conversation draws no mode line, and resuming… with the pod-status as its tooltip (#2523)", () => {
   const html = draw(React.createElement(FirstMate, { snapshot: snap({
-    runtime: "kubernetes", chat_repo: "acme/widgets", mode_line: "runs in a pod on the cluster",
+    runtime: "kubernetes", chat_repo: "acme/widgets", 
     remoteState: "resuming…", remote_detail: "ContainerCreating",
   }) }));
-  assert.match(html, /class="fmModeLine">acme\/widgets: runs in a pod on the cluster</);
+  assert.doesNotMatch(html, /fmModeLine|runs in a pod on the cluster/);
   assert.match(html, /class="fmRemoteState" title="ContainerCreating">resuming…</);
   const local = draw(React.createElement(FirstMate, { snapshot: snap() }));
   assert.doesNotMatch(local, /fmModeLine|fmRemoteState/);
 });
 
-test("Start new conversation names the new chat's repo, the chip below it is this chat's, and a differing switcher is called out (#2551)", () => {
+test("Start new conversation names the new chat's repo, the chip below it is this chat's, and a differing switcher draws no note (#2551, #100107)", () => {
   const one = draw(React.createElement(FirstMate, { snapshot: snap({ chat_repo_on: true, chat_repo: "o/a" }), selection: { repo: "o/a", repos: ["o/a"] } }));
   assert.match(one, />Start new conversation<span class="fmNewConversationRepo"> · in o\/a<\/span>/);
   assert.match(one, /This chat&#x27;s repo:/);
@@ -640,9 +618,9 @@ test("Start new conversation names the new chat's repo, the chip below it is thi
   assert.doesNotMatch(one, /fmChatRepoMismatch/);
   const all = draw(React.createElement(FirstMate, { snapshot: snap({ chat_repo_on: true, chat_repo: "o/a" }), selection: { repo: null, repos: ["o/a"] } }));
   assert.match(all, / · no repo yet</);
-  assert.match(all, /class="fmChatRepoMismatch">\(switcher: All repos — applies to new chats only\)</);
+  assert.doesNotMatch(all, /fmChatRepoMismatch|applies to new chats only/);
   const other = draw(React.createElement(FirstMate, { snapshot: snap({ chat_repo_on: true, chat_repo: null }), selection: { repo: "o/b", repos: ["o/b"] } }));
-  assert.match(other, /\(switcher: o\/b — applies to new chats only\)/);
+  assert.doesNotMatch(other, /applies to new chats only/);
   const off = draw(React.createElement(FirstMate, { snapshot: snap() }));
   assert.match(off, />Start new conversation<\/button>/);
 });

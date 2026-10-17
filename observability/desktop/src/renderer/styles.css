@@ -670,9 +670,6 @@ body.rowResizing iframe, body.rowResizing webview { pointer-events: none; }
 .fmChatScreenRow { display: flex; }
 .fmNotice { font-size: 10.5px; color: var(--sev-warn); }
 /* First mate's model line (#240): what runs next. */
-.fmModel { display: flex; flex-direction: column; gap: 4px; }
-.fmModelLine { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.fmModelName { font-size: 10.5px; color: #c8ccd2; }
 
 /* Config > First mate model (#240): the standing tier picker. */
 .fmm .fmmHint, .fleet-root .acSetting .fmmHint { color: var(--muted); margin: 0 0 10px; }
@@ -1485,7 +1482,6 @@ ul.ecProse { padding-left: 18px; }
 
 /* The chat's repo chip in First mate's header (#2343); amber with none chosen. */
 .fmChatRepoRow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
-.fmChatRepoMismatch { font-size: 11px; color: #c90; }
 .fmNewConversationRepo { opacity: 0.8; }
 .fmChatRepo { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; padding: 1px 6px;
   border: 1px solid var(--border, #555); border-radius: 10px; margin: 2px 0; }

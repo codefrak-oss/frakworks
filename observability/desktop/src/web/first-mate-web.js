@@ -41,7 +41,6 @@ const OMITTED = "not in the web version: this needs the desktop app (observabili
 
 const LOCAL_HOSTING_NOTICE = "First mate hosting is local: local First mate runs a `claude` process on the desktop's machine, " +
   "which a browser cannot start. Use the desktop app, or set First mate hosting to kubernetes (Config > frakworks).";
-const REMOTE_MODE_LINE = "runs in a pod on the cluster";
 const REMOTE_TIER_NOTE = "applies to the next conversation";
 const REMOTE_CANCEL_ROW = "Cancelled here: the pod finishes the turn on its own, and its answer is not shown.";
 const REMOTE_EXPIRED_ROW = "The session pod expired (404): a new session starts in this strip with the next message.";
@@ -171,7 +170,6 @@ function createWebFirstMate({ store, storage, login, bearer, engineEvents, hosti
       session_generation: session.session_generation,
       has_session: false,
       runtime: session.runtime || null,
-      mode_line: remote() ? REMOTE_MODE_LINE : null,
       remoteState: rt.remoteState || null,
       remote_detail: rt.remoteDetail || null,
       running: Boolean(rt.child && rt.child.alive),

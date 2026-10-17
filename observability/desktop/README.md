@@ -3941,12 +3941,11 @@ string/number id in, nothing else; no write path) — and added the strip's
 **History** panels. The strip's header no longer has a History button (issue
 #100095), so nothing in the strip opens them; when open, they swap the transcript area for an `fmHistoryList`
 panel — each past conversation's start time and first message
-(`fmHistoryRow`), a non-interactive model line (`ModelStatic`, the same
-label `ModelBar` shows) still drawn above it, and nothing else interactive:
+(`fmHistoryRow`), and nothing else interactive:
 no input, send or File card anywhere in that panel. Selecting a row
 swaps in an `fmHistoryView` panel instead — that
 conversation's messages as read-only rows (the same `Row` component the live
-transcript uses), with no ModelBar, compose, File card or FiledList. Both
+transcript uses), with no compose, File card or FiledList. Both
 panels keep the strip's header, fixed width and position — this is not a
 modal or a full-screen view. An `fmHistoryClose` control in either panel calls
 `onCloseHistory`, which always returns straight to the live conversation;
@@ -4049,7 +4048,7 @@ While First mate is busy, Escape (focus in the strip, or dropped to the page) or
 The strip looks like Claude Code running in the user's iTerm2. The
 transcript (user and assistant rows, the streaming reply), the `File:`
 card's ask text and the compose box are set in the user's iTerm2 font; the
-header, model line and buttons stay in the app's sans-serif.
+header and buttons stay in the app's sans-serif.
 
 - **Where the font comes from.** Main runs `defaults export
   com.googlecode.iterm2 -` once (`src/iterm-font.js`; `plutil -convert xml1`
@@ -4089,8 +4088,6 @@ switcher. The pane makes the order plain (#2551):
   changes the current chat's repo. Its dropdown lists the target repos and
   **No repo yet**. A pick there right after starting, before the first
   message, still moves the chat's cwd and MCP servers (#2363).
-- **When they differ,** the chip row says `(switcher: X — applies to new
-  chats only)`, so the two controls never disagree silently.
 
 - **A new chat** takes the switcher's repo, or none in All repos. With one
   repo selected the chip shows it and the chat behaves as before.
@@ -4136,7 +4133,7 @@ Each feature that lives on the desktop's machine, per hosting (#2523):
 
 | Feature | `local` | `kubernetes` |
 | --- | --- | --- |
-| Fresh clones under `userData` (#960) | The conversation's cwd | Not used: the pod clones `/work/repo`; the strip's repo line reads `runs in a pod on the cluster` (`snapshot.mode_line`) |
+| Fresh clones under `userData` (#960) | The conversation's cwd | Not used: the pod clones `/work/repo`; the strip shows no repo line or pod notice for it (#100107) |
 | The checkout named by `AGENT_ARMY_REPO_DIR` | The legacy cwd | Unavailable: the prompt's fresh-code paragraph is the engine's; the strip's notice says so in one line |
 | Desktop-only MCP servers (a `stdio` command not in the image, a loopback URL) | Loaded | Dropped by the engine; its `firstLine` is the chat's first `system` row |
 | Pasted images | Image blocks on the turn | Carried as `images` on `POST /messages`; the thumbnails and the images marker as local |
@@ -4701,14 +4698,14 @@ timed-tier control. A stale `first_mate.override` key left in an existing
   conversation uncached on the new model.
 - **The Fable fallback.** Only when a Fable turn actually fails with "You've
   reached your Fable limit" is the same turn retried once at **tier 5**; the
-  strip labels the model line "Fable-limit fallback" and shows the reason.
+  strip shows the reason.
   The saved tier is untouched, so the next turn tries the standing tier
   again. There is **no usage pre-check**: the account meter is never
   consulted before a turn, only the failure itself triggers it.
 
 The renderer side is `src/renderer/first-mate-model.jsx` (the Config
-picker, drawing only) and `ModelBar` in `src/renderer/first-mate.jsx` (the
-strip's model line and notices, nothing clickable); `FirstMateModelScreen`
+picker, drawing only) and `src/renderer/first-mate.jsx` (the strip's
+notices, nothing clickable; it draws no model line since #100107); `FirstMateModelScreen`
 and `FirstMateStrip` in `src/renderer/index.jsx` own the bridge calls.
 
 ### First mate's account

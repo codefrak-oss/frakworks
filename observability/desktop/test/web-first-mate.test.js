@@ -96,7 +96,7 @@ test("send on kubernetes hosting starts a session with POST /first-mate/sessions
     const mid = fm.snapshot();
     assert.equal(mid.busy, true);
     assert.equal(mid.runtime, "kubernetes");
-    assert.equal(mid.mode_line, "runs in a pod on the cluster");
+    assert.equal(mid.mode_line, undefined);
     assert.deepEqual(mid.history.map((m) => [m.role, m.text]), [["user", "hello pod"], ["system", "Pod up: dropped no servers."]]);
     // a frame of another session is ignored; the session's own echo then result answers the turn
     events.frame(frame("other-session", { type: "result", result: "not yours" }));
