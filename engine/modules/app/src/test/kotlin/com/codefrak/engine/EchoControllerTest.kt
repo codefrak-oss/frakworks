@@ -21,3 +21,5 @@ class EchoControllerTest(@Autowired val mvc: MockMvc) {
         mvc.get("/echo").andExpect { status { isBadRequest() } }
     }
 }
+
+// build-time measurement 1
