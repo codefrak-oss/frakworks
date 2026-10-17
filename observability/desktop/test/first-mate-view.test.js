@@ -624,3 +624,10 @@ test("Start new conversation names the new chat's repo, the chip below it is thi
   const off = draw(React.createElement(FirstMate, { snapshot: snap() }));
   assert.match(off, />Start new conversation<\/button>/);
 });
+
+test("the chip tags a carried-over repo \"last used\" (#100116)", () => {
+  const sticky = draw(React.createElement(FirstMate, { snapshot: snap({ chat_repo_on: true, chat_repo: "o/a", chat_repo_sticky: true }), selection: { repo: null, repos: ["o/a"] } }));
+  assert.match(sticky, /fmChatRepoSticky[^>]*>last used</);
+  const picked = draw(React.createElement(FirstMate, { snapshot: snap({ chat_repo_on: true, chat_repo: "o/a" }), selection: { repo: null, repos: ["o/a"] } }));
+  assert.doesNotMatch(picked, /last used/);
+});

@@ -334,7 +334,11 @@ export const newConversationRepoText = (selection) =>
   selection && selection.repo ? ` · in ${selection.repo}` : " · no repo yet";
 export const NEW_CONVERSATION_TITLE =
   "Starts a new chat in the repo switcher's repo (none in All repos); change it afterwards with \"This chat's repo\"";
-export const ChatRepoChip = ({ chatRepo, repos, onSetRepo, disabled }) => {
+// Issue #100116: a new chat in All repos starts with the repo last used, and
+// the chip tags it until the user picks one, so the guess is never silent.
+export const CHAT_REPO_STICKY_TAG = "last used";
+export const CHAT_REPO_STICKY_TITLE = "Carried over from your last chat; change it here before the first message if this chat is about another repo";
+export const ChatRepoChip = ({ chatRepo, repos, onSetRepo, disabled, sticky }) => {
   const list = [...new Set([...(repos || []), ...(chatRepo ? [chatRepo] : [])])];
   return (
     <label className={chatRepo ? "fmChatRepo" : "fmChatRepo fmChatRepoNone"}
@@ -345,6 +349,7 @@ export const ChatRepoChip = ({ chatRepo, repos, onSetRepo, disabled }) => {
         <option value="">{NO_CHAT_REPO}</option>
         {list.map((r) => <option key={r} value={r}>{r}</option>)}
       </select>
+      {sticky && chatRepo ? <span className="fmChatRepoSticky" title={CHAT_REPO_STICKY_TITLE}>{CHAT_REPO_STICKY_TAG}</span> : null}
     </label>
   );
 };
@@ -542,7 +547,7 @@ export const FirstMate = ({ snapshot, font, onOpenTicket, onOpenFile, draft, onD
       </div>
       {s.chat_repo_on ? (
         <div className="fmChatRepoRow">
-          <ChatRepoChip chatRepo={s.chat_repo || null} repos={selection && selection.repos}
+          <ChatRepoChip chatRepo={s.chat_repo || null} sticky={Boolean(s.chat_repo_sticky)} repos={selection && selection.repos}
                         onSetRepo={onSetChatRepo} disabled={busy} />
         </div>
       ) : null}
