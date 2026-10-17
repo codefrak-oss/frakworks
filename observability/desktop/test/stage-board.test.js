@@ -91,6 +91,13 @@ test("a running card shows the progress bar with an estimate, the sweep without,
   assert.match(none, /sbRunning/);
   assert.match(none, /sbSweep/);
   assert.doesNotMatch(none, /progressbar/);
+  // the open step's bar, not the whole ticket's: 10 of 20 minutes is 50%
+  assert.match(est, /aria-valuenow="50"/);
+  assert.match(est, /est\. 20m/);
+  const late = draw(row("chore", "call-do-work", { flow: { ...flow, stageStartedAt: "2026-10-17T11:00:00Z", stageEstimateMs: 1200000 } }));
+  assert.match(late, /isProgressStep sbProgress hold/);
+  const waits = draw(row("chore", "user-task-answer", { flow: { ...flow, stage: "user-task-answer", stageStartedAt: "2026-10-17T11:50:00Z", stageEstimateMs: 1200000 } }));
+  if (/sbRunning/.test(waits)) assert.doesNotMatch(waits, /progressbar/);
   const idle = draw(row("chore", "call-do-work", { flow: { ...flow, ended: true, stageEstimateMs: 1200000, stageStartedAt: "2026-10-17T11:50:00Z" } }));
   assert.doesNotMatch(idle, /sbSweep|progressbar/);
 });

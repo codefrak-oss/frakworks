@@ -10,7 +10,8 @@
 // so the pane's width decides, not the window's. A card whose ticket has a
 // Smith running (isSmithRunning, from the row's own fields: no request per
 // card) carries a stripe sweeping along its bottom edge.
-import { STAGE_SEGMENTS, HOLDS, stateOf, childrenSummary, TicketAge, ProgressBar, progressOf } from "./issues.jsx";
+import { STAGE_SEGMENTS, HOLDS, stateOf, childrenSummary, TicketAge } from "./issues.jsx";
+import { stepProgress } from "./flow.jsx";
 
 export const STAGE_COLUMNS = [
   { id: "intake", label: "Intake" },
@@ -65,16 +66,32 @@ const holdOf = (row) => {
   return null;
 };
 
-/** A running row's bar has something to show: merged parts, or the open stage's estimate. */
-const hasEstimate = (row, now) => {
-  const p = progressOf(row, now || undefined);
-  return !!(p && (p.estimateMs != null || (row.children || []).some((c) => c.state !== "dropped")));
+/**
+ * A running card's bar (#100122): the open step's, as the detail view draws it
+ * (flow.jsx, stepProgress). The board row's flow already carries that step:
+ * `stage`, `stageStartedAt`, `stageEstimateMs` (GET /issues). Null with no bar
+ * to show (a waiting step, no start, no estimate): the card keeps its sweep.
+ */
+export const boardStepProgress = (row, now) => {
+  const f = row && row.flow;
+  if (!f || !f.stage) return null;
+  const step = { activity: f.stage, startedAt: f.stageStartedAt, estimateMs: f.stageEstimateMs,
+    estimateBasis: f.stageEstimateBasis, estimateRuns: f.stageEstimateRuns, label: stateOf(row).text };
+  return stepProgress(step, f, now || undefined);
 };
+
+const StepBar = ({ bar }) => (
+  <div className={"isProgress isProgressStep sbProgress" + (bar.overdue ? " hold" : "")} title={bar.title}
+       role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(bar.pct)}>
+    <div className="isProgressFill" style={{ width: `${bar.pct.toFixed(1)}%` }} />
+  </div>
+);
 
 const Card = ({ row, onOpenTicket, showRepo, now }) => {
   const state = stateOf(row);
   const running = isSmithRunning(row);
   const hold = holdOf(row);
+  const bar = running ? boardStepProgress(row, now) : null;
   const open = (e) => {
     if (!onOpenTicket || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
     e.preventDefault();
@@ -96,9 +113,7 @@ const Card = ({ row, onOpenTicket, showRepo, now }) => {
       </div>
       {childrenSummary(row) && <div className="sbParts muted">{childrenSummary(row)}</div>}
       <div className="sbState muted">{state.text}</div>
-      {running && (hasEstimate(row, now)
-        ? <ProgressBar issue={row} now={now} className="sbProgress" />
-        : <span className="sbSweep" aria-hidden="true" />)}
+      {running && (bar ? <StepBar bar={bar} /> : <span className="sbSweep" aria-hidden="true" />)}
     </a>
   );
 };
