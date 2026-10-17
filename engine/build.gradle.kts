@@ -71,9 +71,11 @@ configure(subprojects.filter { it.name.startsWith("engine-") }) {
         // ~3.3 GiB of test JVMs), and two builds on one buildkitd were OOM-killed (2026-10-12, every
         // buildkitd's memory.peak at the limit). Gradle hands classes to forks in turn, and the orderer
         // still groups each fork's classes by context. -Pengine.test.forks=<n> overrides either.
+        // Experiment (build-time series, 2026-10-17): 4 forks with the Gradle JVM at -Xmx3g, the same
+        // ~7.5 GiB footprint as the 3-fork run above; measured on the engine check, not yet judged.
         maxHeapSize = "768m"
         val ciBuild = !System.getenv("GRADLE_REMOTE_CACHE_URL").isNullOrBlank()
-        maxParallelForks = (findProperty("engine.test.forks") as String?)?.toInt() ?: if (ciBuild) 2 else 1
+        maxParallelForks = (findProperty("engine.test.forks") as String?)?.toInt() ?: if (ciBuild) 4 else 1
         systemProperty("spring.test.context.cache.maxSize", "2")
         // The engine refuses an engine.* property it does not declare (UnknownEngineProperties), and the
         // test JVM's contexts would inherit the build's environment: a Smith sandbox's ENGINE_URL (local
