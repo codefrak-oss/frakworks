@@ -41,10 +41,10 @@ number, state, why)` is how a flow closes its ticket: done or cancelled (GitHub'
 `TicketState.ofReason`), nothing for one already ended. Every close goes through it (the chore, bug, feature, intake,
 research and refactor-scan close steps, the canceller, First mate's `close_ticket` and the SDK's `Tickets.close`).
 The interface and its value types
-(`WorkItem`, `TicketState`, `TicketStateListener`) live in engine-github, package `com.codefrak.engine.workitems`, so
+(`WorkItem`, `TicketState`, `TicketStateListener`) live in engine-github-api, package `com.codefrak.engine.workitems`, so
 the flow modules reach it. Each `TicketStateListener` is told of every state change after it commits: engine-events'
 `IssueCloseFrames` publishes the `ticket` `closed` frame for a ticket ended done or cancelled. Tests use the in-memory
-`FakeTickets` (engine-github's test fixtures; the app's flow fakes record what it does in a `TicketRecorder`, engine-smith's
+`FakeTickets` (engine-github-api's test fixtures; the app's flow fakes record what it does in a `TicketRecorder`, engine-smith's
 test fixtures).
 
 A PR body's `Closes #<n>` names no GitHub issue for an item: the engine's own close step closes it after the merge.
