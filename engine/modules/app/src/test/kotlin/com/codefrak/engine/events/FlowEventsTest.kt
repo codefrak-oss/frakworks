@@ -93,7 +93,7 @@ class FlowEventsTest {
         error("no $state frame within 5 s; saw $seen")
     }
 
-    private fun nothing(within: Duration = Duration.ofMillis(400)) = assertNull(sub.next(within), "no frame expected")
+    private fun nothing(within: Duration = Duration.ofMillis(250)) = assertNull(sub.next(within), "no frame expected")
 
     private fun runJob(instance: String) = management.executeJob(management.createJobQuery().processInstanceId(instance).singleResult().id)
 

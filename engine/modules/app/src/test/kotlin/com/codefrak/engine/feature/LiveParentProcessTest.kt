@@ -527,7 +527,7 @@ class LiveParentProcessTest {
         val cursor = childWatch.await(repo, emptySet(), children.toSet(), null, java.time.Duration.ZERO).cursor
 
         itemGate.finish(children[0])
-        val first = childWatch.await(repo, emptySet(), children.toSet(), cursor, java.time.Duration.ofSeconds(5))
+        val first = childWatch.await(repo, emptySet(), children.toSet(), cursor, java.time.Duration.ofMillis(500))
         assertTrue(first.changes.any { it.item == children[0] && it.data["state"] == "done" }, first.changes.toString())
         assertEquals(com.codefrak.engine.workitems.WorkItem.BLOCKED, itemStore.get(parent)!!.state)
 
@@ -537,7 +537,7 @@ class LiveParentProcessTest {
         assertTrue(tools.call("read_ticket", mapOf("item" to "wi-elsewhere"), caller).isError)
 
         itemGate.finish(children[1])
-        val second = childWatch.await(repo, emptySet(), children.toSet(), first.cursor, java.time.Duration.ofSeconds(5))
+        val second = childWatch.await(repo, emptySet(), children.toSet(), first.cursor, java.time.Duration.ofMillis(500))
         assertTrue(second.changes.any { it.item == children[1] && it.data["state"] == "done" }, second.changes.toString())
         assertEquals(com.codefrak.engine.workitems.WorkItem.READY, itemStore.get(parent)!!.state, "the last child done readies the parent")
         assertTrue(github.comments.isEmpty(), github.comments.toString())

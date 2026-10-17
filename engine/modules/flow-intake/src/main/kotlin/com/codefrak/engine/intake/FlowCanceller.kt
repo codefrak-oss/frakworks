@@ -59,6 +59,7 @@ class FlowCanceller(
     private val jevCalls: JevCalls, private val events: EngineEvents, private val doctorBugs: DoctorBugLinks,
     private val doctorRuns: DoctorRunEnding, private val hitlp: HitlpAnswers,
     private val tickets: Tickets,
+    private val stopPauseMillis: Long = STOP_PAUSE_MILLIS,
 ) {
     private val log = LoggerFactory.getLogger(FlowCanceller::class.java)
     private val sandboxStopper = RunSandboxStopper(runtime, sandbox)
@@ -177,7 +178,7 @@ class FlowCanceller(
         .variableValueEquals(Vars.REPO, repo).variableValueEquals(Vars.ISSUE, number).list()
 
     /**
-     * [stop], retried on an [OptimisticLockingException] up to [STOP_ATTEMPTS] times in all, [STOP_PAUSE_MILLIS] apart:
+     * [stop], retried on an [OptimisticLockingException] up to [STOP_ATTEMPTS] times in all, [stopPauseMillis] apart ([STOP_PAUSE_MILLIS] by default):
      * each attempt re-reads the instance, which may have moved on. Any other exception is not retried.
      */
     private fun stopRetrying(id: String, kind: String, actor: Actor, reason: String): Stopped {
@@ -191,7 +192,7 @@ class FlowCanceller(
                     throw e
                 }
                 log.info("cancel {}: optimistic-locking conflict on attempt {}, retrying", id, attempt)
-                Thread.sleep(STOP_PAUSE_MILLIS)
+                Thread.sleep(stopPauseMillis)
                 attempt++
             }
         }

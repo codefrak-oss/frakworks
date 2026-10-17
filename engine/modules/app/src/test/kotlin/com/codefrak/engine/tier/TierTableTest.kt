@@ -8,7 +8,7 @@ import kotlin.test.assertTrue
 
 /** No Spring context: TierTable takes only a JdbcClient, over a fresh H2 migrated by Flyway (SeededTiers). */
 class TierTableTest {
-    private val table = SeededTiers.table()
+    private val table = SeededTiers.fresh()
 
     /** bots/tiers.toml's [claude] table and security_tier as main had them when V42 replaced the file (#1099). */
     @Test

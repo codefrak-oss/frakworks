@@ -14,6 +14,12 @@ object SeededTiers {
         return JdbcClient.create(db)
     }
 
-    /** A [TierTable] over a fresh, fully migrated database. */
-    fun table(): TierTable = TierTable(jdbc())
+    /** One migrated database for the JVM, shared by every [table] caller: they only read the map, so one migration serves them all. */
+    private val shared: TierTable by lazy { fresh() }
+
+    /** A [TierTable] over a fully migrated database, shared across tests: for callers that read the map and never write it. */
+    fun table(): TierTable = shared
+
+    /** A [TierTable] over its own fresh, fully migrated database, for a test that writes the map. */
+    fun fresh(): TierTable = TierTable(jdbc())
 }

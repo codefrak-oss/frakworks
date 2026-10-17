@@ -11,7 +11,7 @@ import java.time.Duration
 /** Which child frames end a live parent's wait, and how they are coalesced (#2591). */
 class ChildWatchTest {
     private val bus = EngineEvents(engineJson)
-    private val watch = ChildWatch(bus, { Duration.ofSeconds(5) }, Duration.ofMillis(300))
+    private val watch = ChildWatch(bus, { Duration.ofSeconds(5) }, Duration.ofMillis(60))
     private val repo = "acme/widgets"
     private val kids = setOf(21L, 22L)
 
@@ -87,15 +87,15 @@ class ChildWatchTest {
         val cursor = now()
         Thread.ofVirtual().start {
             push(21)
-            Thread.sleep(50); session("started", 22)
-            Thread.sleep(50); bus.publish(EngineEvent.Ticket(repo, 22, "closed"))
-            Thread.sleep(800); push(22)
+            Thread.sleep(10); session("started", 22)
+            Thread.sleep(10); bus.publish(EngineEvent.Ticket(repo, 22, "closed"))
+            Thread.sleep(200); push(22)
         }
         val started = System.nanoTime()
         val got = watch.await(repo, kids, cursor)
         assertEquals(listOf("push" to 21L, "session" to 22L, "ticket" to 22L), got.changes.map { it.event to it.number })
-        assertTrue(Duration.ofNanos(System.nanoTime() - started) < Duration.ofSeconds(3), "answered at the window, not the cap")
-        Thread.sleep(1000)
+        assertTrue(Duration.ofNanos(System.nanoTime() - started) < Duration.ofMillis(500), "answered at the window, not the cap")
+        Thread.sleep(300)
         assertEquals(listOf("push" to 22L), watch.await(repo, kids, got.cursor, Duration.ZERO).changes.map { it.event to it.number })
     }
 
@@ -105,7 +105,7 @@ class ChildWatchTest {
         run("call-do-work")
         assertTrue(watch.await(repo, kids, cursor, Duration.ofMillis(100)).changes.isEmpty())
         push()
-        val got = watch.await(repo, kids, cursor, Duration.ofSeconds(1))
+        val got = watch.await(repo, kids, cursor, Duration.ofMillis(300))
         assertEquals(listOf("session", "flow", "flow", "session", "push"), got.changes.map { it.event })
         assertEquals(listOf(false, false, false, false, true), got.changes.map { it.wakes })
     }
@@ -124,7 +124,7 @@ class ChildWatchTest {
         )
         for (phase in phases) {
             phase()
-            val got = watch.await(repo, kids, cursor, Duration.ofMillis(500))
+            val got = watch.await(repo, kids, cursor, Duration.ofMillis(150))
             cursor = got.cursor
             frames += got.changes.size
             if (got.changes.isNotEmpty()) answers++
@@ -143,11 +143,11 @@ class ChildWatchTest {
         watch.changed(item("wi-a", "running"))
         watch.changed(item("wi-other", "done"))
         watch.take(repo, "event: flow\ndata: {\"item\":\"wi-a\",\"state\":\"step\",\"stage\":\"call-do-work\"}")
-        assertTrue(watch.await(repo, kids, setOf("wi-a"), cursor, Duration.ofMillis(200)).changes.isEmpty(), "running is bookkeeping")
+        assertTrue(watch.await(repo, kids, setOf("wi-a"), cursor, Duration.ofMillis(100)).changes.isEmpty(), "running is bookkeeping")
         watch.changed(item("wi-a", "done"))
-        val got = watch.await(repo, kids, setOf("wi-a"), cursor, Duration.ofSeconds(2))
+        val got = watch.await(repo, kids, setOf("wi-a"), cursor, Duration.ofMillis(500))
         assertEquals(listOf("item", "flow", "item"), got.changes.map { it.event })
         assertTrue(got.changes.all { it.item == "wi-a" }, "${got.changes}")
-        assertTrue(watch.await(repo, kids, cursor, Duration.ofMillis(200)).changes.isEmpty(), "a numbered await sees no item")
+        assertTrue(watch.await(repo, kids, cursor, Duration.ofMillis(100)).changes.isEmpty(), "a numbered await sees no item")
     }
 }
