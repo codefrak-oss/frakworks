@@ -1113,6 +1113,7 @@ class FirstMateManager extends EventEmitter {
       return { turn: kind };
     }
     if (event && event.type === "assistant") {
+      if (!pending) return { ignored: "no pending turn" };
       const named = userMessageUuids(event);
       if (named.length && (!pending || !pending.uuid || !named.includes(pending.uuid))) {
         return { ignored: "not the pending turn" };

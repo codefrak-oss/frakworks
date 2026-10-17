@@ -595,7 +595,7 @@ export const FirstMate = ({ snapshot, font, onOpenTicket, onOpenFile, draft, onD
             <div className="fmText"><span className="fmThinking" role="status" aria-label="First mate is thinking"><span /><span /><span /></span></div>
           </div>
         ) : null}
-        {s.streaming ? <div className="fmRow fmRow-assistant fmStreaming"><Mark role="assistant" /><div className="fmText">{s.streaming}</div></div> : null}
+        {s.streaming ? <div className="fmRow fmRow-assistant fmStreaming"><Mark role="assistant" /><div className="fmText"><LinkedText text={s.streaming} onOpenTicket={onOpenTicket} /></div></div> : null}
       </div>
       {s.file ? (
         <FileCard file={s.file} fileBusy={s.file_busy} fileError={s.file_error}

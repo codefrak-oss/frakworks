@@ -284,6 +284,7 @@ function createWebFirstMate({ store, storage, login, bearer, engineEvents, hosti
       return;
     }
     if (event.type === "assistant") {
+      if (!pending) return;
       const named = userMessageUuids(event);
       if (named.length && (!pending || !pending.uuid || !named.includes(pending.uuid))) return;
       const text = assistantText(event);
