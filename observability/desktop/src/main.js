@@ -124,12 +124,16 @@ console.log(`[claude] ${CLAUDE_BIN.command} (${CLAUDE_BIN.source})`);
 // userData and computes the first default. "repo:changed" tells the window.
 // ---------------------------------------------------------------------------
 let selectedRepo = null;
+// The target repos as GET /repos last listed them (null until it answers):
+// First mate reuses a chat's last-used repo only while it is one (#100116).
+let knownRepos = null;
 let selectionNotice = null;
 let selectionReady = null;
 let selectionWin = null;
 const selectionFile = () => path.join(app.getPath("userData"), repoSelection.FILE_NAME);
 const ensureSelection = () => (selectionReady ||= (async () => {
   const r = await fetchRepoNames();
+  if (Array.isArray(r.repos)) knownRepos = r.repos;
   const persisted = repoSelection.load(selectionFile());
   const res = repoSelection.resolveSelection({ persisted, repos: r.repos });
   selectedRepo = res.repo;
@@ -158,6 +162,7 @@ const targetRepo = async (repo) => {
 ipcMain.handle("repo:get", async () => {
   await ensureSelection();
   const r = await fetchRepoNames();
+  if (Array.isArray(r.repos)) knownRepos = r.repos;
   const notice = selectionNotice;
   selectionNotice = null;
   return { repo: selectedRepo, title: repoSelection.titleFor(selectedRepo),
@@ -1137,6 +1142,7 @@ function registerFirstMateIpc(win) {
     // Files in the repo fileTicket names (#577), from the card or the selection.
     submitIntakeFn: (ask, repo) => submitIntake(ask, undefined, repo ? { repo } : {}),
     repoFn: () => selectedRepo,
+    reposFn: () => knownRepos,
     // The account a Smith on that model would get, and its long-lived token
     // (engine/README.md, "First mate's account"). Main-process only.
     pickAccountFn: (model) => pickAccount(model),

@@ -97,6 +97,10 @@ const serializeSession = (s) => ({
   conversation_key: strOrNull(s.conversation_key),
   cwd: strOrNull(s.cwd),
   ...chatRepoField(s),
+  // The repo the user last chose for a chat or sent a turn in (#100116): a
+  // new chat in All repos starts with it while it is still a target repo.
+  // Written only by the user's own choices, never from config.
+  last_repo: strOrNull(s.last_repo),
   ...runtimeField(s),
   // A restored saved chat whose Claude session is on another machine (#598):
   // the transcript preamble the next turn starts its fresh session with.
@@ -107,6 +111,18 @@ const serializeSession = (s) => ({
   next_conversation_id: Number(s.next_conversation_id) || 1,
   filed: (s.filed || []).slice(0, FILED_LIMIT).map(serializeFiled),
 });
+
+// The sticky repo a new chat in All repos starts with (#100116): the
+// session's `last_repo` while `repos` (the target repos) lists it. A
+// `last_repo` the list no longer has is cleared; with the list unknown
+// (null) nothing is reused, so a stale repo is never run in.
+function stickyRepo(session, repos) {
+  const last = session.last_repo || null;
+  if (!last || !Array.isArray(repos)) return null;
+  if (repos.includes(last)) return last;
+  session.last_repo = null;
+  return null;
+}
 
 const firstMatePath = (dir) => path.join(dir, FIRST_MATE_FILE);
 
@@ -127,7 +143,7 @@ function saveFirstMate(dir, session) {
 
 const freshSession = () => ({
   session_generation: 1, claude_session_id: null, saved_chat_id: null, conversation_key: null, cwd: null, seed: null, turns_since_filed: 0,
-  history: [], conversations: [], next_conversation_id: 1, filed: [],
+  history: [], conversations: [], next_conversation_id: 1, filed: [], last_repo: null,
 });
 
 // Moves a non-empty `history` into a new, newest-first past conversation and
@@ -219,6 +235,7 @@ function loadFirstMate(dir) {
 }
 
 module.exports = {
+  stickyRepo,
   FIRST_MATE_VERSION, FIRST_MATE_HISTORY_LIMIT, FIRST_MATE_FILE, FILED_LIMIT, NEW_CONVERSATION_MARKER,
   serializeSession, serializeFiled, firstMatePath, saveFirstMate, loadFirstMate, freshSession,
   archiveCurrentConversation, capTotal,

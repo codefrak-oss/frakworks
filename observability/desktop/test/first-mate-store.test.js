@@ -338,3 +338,22 @@ test("the chat's repo round-trips, and an entry without one loads without it (#2
   assert.equal("repo" in serializeSession(base), false);
   assert.equal(serializeSession({ ...base, repo: "o/n" }).repo, "o/n");
 });
+
+test("last_repo round-trips through first-mate.json (#100116)", () => {
+  const dir = tmpdir();
+  const s = freshSession();
+  assert.equal(s.last_repo, null);
+  s.last_repo = "acme/widgets";
+  saveFirstMate(dir, s);
+  assert.equal(loadFirstMate(dir).session.last_repo, "acme/widgets");
+});
+
+test("stickyRepo reuses last_repo only while it is a target repo (#100116)", () => {
+  const { stickyRepo } = require("../src/first-mate-store");
+  const s = { last_repo: "acme/widgets" };
+  assert.equal(stickyRepo(s, null), null, "unknown list: nothing reused");
+  assert.equal(s.last_repo, "acme/widgets");
+  assert.equal(stickyRepo(s, ["acme/widgets"]), "acme/widgets");
+  assert.equal(stickyRepo(s, ["acme/other"]), null);
+  assert.equal(s.last_repo, null, "a removed repo is forgotten");
+});

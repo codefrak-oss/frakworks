@@ -112,7 +112,7 @@ const { TurnLedger, userMessageUuids } = require("./pane-events");
 const { normalizeFileLine } = require("./file-line");
 const {
   FIRST_MATE_HISTORY_LIMIT, FILED_LIMIT, saveFirstMate, loadFirstMate, freshSession,
-  archiveCurrentConversation, capTotal,
+  archiveCurrentConversation, capTotal, stickyRepo,
 } = require("./first-mate-store");
 const { resolveTier: defaultResolveTier } = require("./engine-tiers");
 const { validateImages, buildContent } = require("./first-mate-images");
@@ -239,7 +239,7 @@ function kickStarterRepo(text) {
 class FirstMateManager extends EventEmitter {
   constructor({ dir, command, launchArgs, cwd, spawnFn, settingsPath, turnTimeoutMs,
                 submitIntakeFn, resolveTierFn, loadTiersFn, now, configFile, mcpConfigPath, engineEnvFn, pickAccountFn, mcpServersFn,
-                repoFn, hostname, iterm, detectItermFn, openInItermFn, writeHandoffFn, sweepHandoffDirFn,
+                repoFn, reposFn, hostname, iterm, detectItermFn, openInItermFn, writeHandoffFn, sweepHandoffDirFn,
                 sessionFileExistsFn, home, fetchFlowFn, engineEvents, freshCode, freshDir, checkoutDir, lineageFn,
                 hostingFn, bearer, sessionApi } = {}) {
     super();
@@ -325,6 +325,9 @@ class FirstMateManager extends EventEmitter {
     // repos. When given, each turn carries a line naming it, and the File
     // button files there unless the card was given a repo.
     this.repoFn = repoFn || null;
+    // The target repos (#100116), an array, or null while unknown: a sticky
+    // last-used repo is only reused when it is listed here.
+    this.reposFn = reposFn || null;
     this.now = now || (() => Date.now());
     // The host a saved chat says it was saved from (#598), display only.
     this.hostname = hostname || (() => os.hostname());
@@ -462,9 +465,16 @@ class FirstMateManager extends EventEmitter {
     return this.session.repo === undefined ? this.repoFn() || null : this.session.repo;
   }
 
+  // A new chat's repo: the switcher's, or in All repos the last one the user
+  // chose or sent a turn in (#100116), while `reposFn` still lists it as a
+  // target repo; a repo no longer listed is forgotten. The chip shows it
+  // tagged "last used" until the user picks one.
   _startChatRepo() {
     if (!this.repoFn) return;
-    this.session.repo = this.repoFn() || null;
+    const picked = this.repoFn() || null;
+    const sticky = picked ? null : stickyRepo(this.session, this.reposFn ? this.reposFn() : null);
+    this.session.repo = picked || sticky;
+    this.rt.repoSticky = Boolean(sticky);
     this.rt.repoChangedFrom = undefined;
   }
 
@@ -481,6 +491,8 @@ class FirstMateManager extends EventEmitter {
     if (next !== null && !REPO_RE.test(next)) return { ok: false, error: `not a repo: ${repo}` };
     const prev = this.chatRepo();
     this.session.repo = next;
+    this.rt.repoSticky = false;
+    if (next) this.session.last_repo = next;
     this._followChatRepo();
     if (prev !== next && this.session.history.length && this.rt.repoChangedFrom === undefined) this.rt.repoChangedFrom = prev;
     if (this.rt.repoChangedFrom === next) this.rt.repoChangedFrom = undefined;
@@ -496,6 +508,7 @@ class FirstMateManager extends EventEmitter {
       // false without a repo switcher (no chip).
       chat_repo: this.chatRepo(),
       chat_repo_on: Boolean(this.repoFn),
+      chat_repo_sticky: Boolean(this.rt.repoSticky && this.chatRepo()),
       version: 1,
       error: this.loadError || null,
       session_generation: this.session.session_generation,
@@ -1327,6 +1340,7 @@ class FirstMateManager extends EventEmitter {
       if (this.session.repo === undefined && !this.session.history.length) this._startChatRepo();
       const kicked = kickStarterRepo(text);
       if (kicked && !this.chatRepo()) this.session.repo = kicked;
+      if (this.chatRepo()) this.session.last_repo = this.chatRepo();
     }
     const body = withRepoLine(text.trim() ? text : "", this._turnRepoLine());
     rt.repoChangedFrom = undefined;

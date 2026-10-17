@@ -1094,7 +1094,9 @@ body.rowResizing iframe, body.rowResizing webview { pointer-events: none; }
 .fleet-root .pitchBox { height: 78vh; min-height: 280px; resize: vertical; overflow: hidden; border-radius: 6px;
                         border: 1px solid color-mix(in srgb, currentColor 18%, transparent); }
 .fleet-root .ticketPitchFrame { display: block; width: 100%; height: 100%; border: 0; border-radius: 0; background: var(--bg); color-scheme: dark; }
-.fleet-root .pitchOverlay { position: fixed; inset: 0; z-index: 40; display: flex; flex-direction: column; background: var(--bg); color: var(--text); }
+/* no-drag: the overlay covers the title bar's drag strip, and Electron's drag
+   regions ignore stacking, so without it Close ✕ is taken as a window drag. */
+.fleet-root .pitchOverlay { -webkit-app-region: no-drag; position: fixed; inset: 0; z-index: 40; display: flex; flex-direction: column; background: var(--bg); color: var(--text); }
 .fleet-root .pitchOverlayBar { display: flex; justify-content: space-between; align-items: center; padding: 6px 12px;
                                border-bottom: 1px solid rgba(255,255,255,0.12); }
 .fleet-root .ticketPitchFrame.full { flex: 1; height: auto; }
@@ -1483,6 +1485,7 @@ ul.ecProse { padding-left: 18px; }
 .fmChatRepo { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; padding: 1px 6px;
   border: 1px solid var(--border, #555); border-radius: 10px; margin: 2px 0; }
 .fmChatRepoNone { border-color: #d9a400; color: #d9a400; }
+.fmChatRepoSticky { margin-left: 6px; padding: 0 6px; border-radius: 8px; font-size: 11px; background: rgba(217, 164, 0, 0.18); color: #d9a400; }
 .fmChatRepoSelect { background: transparent; color: inherit; border: none; font: inherit; }
 
 /* The HITLP task view (hitlp-task.jsx): decision first, the story below. */

@@ -919,7 +919,10 @@ not do the work the ask describes.** Your whole product is one of:
   - **story points** (the ticket's `points`), one of 1, 2, 3, 5, 8, 13 (21, 34 or 55 for a feature only), judged
     by [`story-points.md`](story-points.md) — the one step where a ticket is
     pointed. A `Points: <n>` line from the user binds: file it as is and list
-    `points` in `userNamed`;
+    `points` in `userNamed`. In a target repo other than frakworks, point
+    by its calibration (`story-points.md`, "Calibration in target repos"):
+    its own closed tickets, else its seed file, else by shape after reading
+    the code the ask touches;
   - the **repo** the work belongs in: leave `repo` out when it is the intake's
     own repo (the engine rewrites the ask item in place). When the change
     is in another target repo's code (an ask filed in frakworks about

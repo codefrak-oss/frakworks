@@ -28,7 +28,7 @@ const { TurnLedger, userMessageUuids } = require("../pane-events");
 const { validateImages, buildContent } = require("../first-mate-images");
 const { normalizeFileLine } = require("../file-line");
 const {
-  FIRST_MATE_HISTORY_LIMIT, FILED_LIMIT, freshSession, archiveCurrentConversation, capTotal,
+  FIRST_MATE_HISTORY_LIMIT, FILED_LIMIT, freshSession, archiveCurrentConversation, capTotal, stickyRepo,
 } = require("../first-mate-store");
 const engineData = require("../engine-data");
 const engineTiers = require("../engine-tiers");
@@ -134,7 +134,19 @@ function createWebFirstMate({ store, storage, login, bearer, engineEvents, hosti
   };
   const remote = () => session.runtime === "kubernetes";
   const chatRepo = () => (session.repo === undefined ? repoFn() || null : session.repo);
-  const startChatRepo = () => { session.repo = repoFn() || null; rt.repoChangedFrom = undefined; };
+  // A new chat in All repos starts with the last-used repo while it is still
+  // a target repo (#100116; src/first-mate.js `_startChatRepo`).
+  let knownRepos = null;
+  const startChatRepo = () => {
+    const picked = repoFn() || null;
+    const sticky = picked ? null : stickyRepo(session, knownRepos);
+    session.repo = picked || sticky;
+    rt.repoSticky = Boolean(sticky);
+    rt.repoChangedFrom = undefined;
+  };
+  const refreshKnownRepos = async () => {
+    try { const r = await repoNamesFn(); if (r && Array.isArray(r.repos)) knownRepos = r.repos; } catch { /* keep the last list */ }
+  };
   const popTarget = () => session.conversations.find((c) => c.runtime === "kubernetes" && c.remote_session_id) || null;
 
   // ---- hosting -------------------------------------------------------------
@@ -165,6 +177,7 @@ function createWebFirstMate({ store, storage, login, bearer, engineEvents, hosti
     return {
       chat_repo: chatRepo(),
       chat_repo_on: true,
+      chat_repo_sticky: Boolean(rt.repoSticky && chatRepo()),
       version: 1,
       error: loadError || null,
       session_generation: session.session_generation,
@@ -402,7 +415,7 @@ function createWebFirstMate({ store, storage, login, bearer, engineEvents, hosti
         emitUpdate();
         return { ok: false, busy: true, refused: true, error: rt.notice };
       }
-      if (session.repo === undefined && !session.history.length) startChatRepo();
+      if (session.repo === undefined && !session.history.length) { await refreshKnownRepos(); startChatRepo(); }
       rt.notice = null;
       rt.fileCard = null;
       rt.fileError = null;
@@ -429,6 +442,7 @@ function createWebFirstMate({ store, storage, login, bearer, engineEvents, hosti
         emitUpdate();
         return { ok: false, refused: true, error: rt.notice };
       }
+      session.last_repo = chatRepo();
       // A relaunch that finds a pod session: the rows it wrote meanwhile come first.
       if (!rt.child && session.remote_session_id) {
         rt.busy = true;
@@ -471,6 +485,7 @@ function createWebFirstMate({ store, storage, login, bearer, engineEvents, hosti
         return { ok: false, refused: true, error: rt.notice };
       }
       endChild("starting a new conversation");
+      await refreshKnownRepos();
       archiveCurrentConversation(session);
       session.claude_session_id = null;
       session.saved_chat_id = null;
@@ -591,6 +606,8 @@ function createWebFirstMate({ store, storage, login, bearer, engineEvents, hosti
       const next = r == null || r === "" ? null : String(r);
       if (next !== null && !REPO_RE.test(next)) return { ok: false, error: `not a repo: ${r}` };
       session.repo = next;
+      rt.repoSticky = false;
+      if (next) session.last_repo = next;
       save();
       emitUpdate();
       return { ok: true, repo: next };

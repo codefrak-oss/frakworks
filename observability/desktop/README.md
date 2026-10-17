@@ -4091,8 +4091,17 @@ switcher. The pane makes the order plain (#2551):
   **No repo yet**. A pick there right after starting, before the first
   message, still moves the chat's cwd and MCP servers (#2363).
 
-- **A new chat** takes the switcher's repo, or none in All repos. With one
-  repo selected the chip shows it and the chat behaves as before.
+- **A new chat** takes the switcher's repo. In All repos it starts with
+  the **last used** repo (#100116): the one you last picked on the chip or
+  sent a message in, so working in one repo chat after chat needs no trip
+  to the picker. The chip shows it tagged **last used** before the first
+  message; pick another (or **No repo yet**) there and the tag goes. It is
+  kept per user with the session (`last_repo` in `first-mate.json`, or the
+  login's localStorage on the web page), written only by your own picks and
+  messages, never from config, and reused only while GET /repos still lists
+  it as a target repo: a removed repo is forgotten and the chat starts with
+  **No repo yet**, as it does before any chat had a repo. With one repo
+  selected in the switcher the chip shows that one, as before.
 - **A kick-starter** (Chat about this on a ticket, proposal or file) sets the
   chat's repo from the repo it names, while none is chosen; it never
   overrides a chosen one.

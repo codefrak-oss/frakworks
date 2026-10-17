@@ -82,3 +82,45 @@ test("switcher repo picked before Start new conversation -> the new chat's cwd a
   assert.equal(path.resolve(m.conversationCwd()), path.resolve(clone));
   assert.ok(cfg.mcpServers.ops);
 });
+
+// #100116: a new chat in All repos starts with the last-used repo.
+const stickyManager = (dir, over = {}) => new FirstMateManager({
+  dir, command: "true", cwd: dir, repoFn: () => null, reposFn: () => ["acme/widgets", "acme/other"], ...over,
+}).init();
+
+test("sticky: after a chat in o/n, a new chat in All repos starts in o/n, tagged last used (#100116)", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "fm100116-"));
+  const m = stickyManager(dir);
+  m.startNewConversation();
+  assert.equal(m.chatRepo(), null, "no last repo yet");
+  m.setChatRepo("acme/widgets");
+  assert.equal(m.snapshot().chat_repo_sticky, false);
+  m.session.history.push({ role: "user", text: "hi", at: 1 });
+  m.startNewConversation();
+  assert.equal(m.chatRepo(), "acme/widgets");
+  assert.equal(m.snapshot().chat_repo_sticky, true);
+  // kept across a restart
+  const b = stickyManager(dir);
+  b.startNewConversation();
+  assert.equal(b.chatRepo(), "acme/widgets");
+  // the picker still changes it, and the tag goes
+  b.setChatRepo("acme/other");
+  assert.equal(b.chatRepo(), "acme/other");
+  assert.equal(b.snapshot().chat_repo_sticky, false);
+});
+
+test("sticky: the switcher's selection wins; a removed repo is not reused (#100116)", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "fm100116-"));
+  let sel = "acme/other";
+  let repos = ["acme/widgets", "acme/other"];
+  const m = stickyManager(dir, { repoFn: () => sel, reposFn: () => repos });
+  m.session.last_repo = "acme/widgets";
+  m.startNewConversation();
+  assert.equal(m.chatRepo(), "acme/other");
+  assert.equal(m.snapshot().chat_repo_sticky, false);
+  sel = null;
+  repos = ["acme/other"];
+  m.startNewConversation();
+  assert.equal(m.chatRepo(), null, "never runs in a repo that is no longer a target");
+  assert.equal(m.session.last_repo, null);
+});

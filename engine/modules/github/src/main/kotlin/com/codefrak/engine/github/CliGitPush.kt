@@ -19,6 +19,8 @@ class CliGitPush(
     /** Who the engine's own commits on a repo are by: its token's account (engine/README.md, "Each repo's token"). */
     private val identity: TokenIdentity,
     @Value("\${engine.github.git-url:https://github.com}") private val gitUrl: String,
+    /** The sealed deployment patterns every push is checked against ([refuseDeploymentValues]). */
+    private val patterns: DeploymentPatternSource = DeploymentPatternSource.NONE,
 ) : GitPush {
     private val log = LoggerFactory.getLogger(CliGitPush::class.java)
 
@@ -27,6 +29,7 @@ class CliGitPush(
         val file = dir.resolve("commits.bundle").also { Files.write(it, bundle) }
         val source = verify(repo, clone, bundle, file, branch)
         refuseRewrite(clone, file, source, branch)
+        refuseDeploymentValues(clone, file, source, branch, default)
         git(clone, "fetch", "--quiet", file.toString(), "$source:refs/heads/$branch")
         val pushed = run(clone, emptyMap(), "push", "--quiet", "origin", "refs/heads/$branch:refs/heads/$branch")
         if (pushed.exit != 0) PushRejected.parse(pushed.err)?.let { throw it }
@@ -154,6 +157,26 @@ class CliGitPush(
         // A rejected result: the sandbox is gone, pushing the same bundle again can only fail the same way.
         error("${GitPush.REWRITES}$branch (the branch is at ${git(clone, "rev-parse", ref)}; the bundle's $source at " +
             "${git(clone, "rev-parse", scratch)} does not contain it; the Smith's bundle was not made on top of the branch)")
+    }
+
+    /**
+     * The gate for every Smith push, chunk or done (#100115): the lines the bundle's commits add since what is pushed
+     * (the branch, or `default` on a first push) are checked against the sealed deployment patterns, and a hit refuses
+     * the push naming file, line and commit only, never the pattern or the line. No pattern set: nothing is checked.
+     */
+    private fun refuseDeploymentValues(clone: Path, file: Path, source: String, branch: String, default: String) {
+        val rules = patterns.rules() ?: return
+        val scratch = "refs/bundle/scan"
+        git(clone, "fetch", "--quiet", file.toString(), "+$source:$scratch")
+        val ref = "refs/heads/$branch"
+        val base = if (run(clone, emptyMap(), "rev-parse", "--verify", "--quiet", ref).exit == 0) ref else "refs/heads/$default"
+        val log = git(clone, "log", "-p", "-U0", "--no-color", "--no-renames", "--no-ext-diff", "--format=${DeploymentValueScan.FORMAT}", "$base..$scratch")
+        val hits = DeploymentValueScan.scan(log, rules)
+        if (hits.isEmpty()) return
+        // A rejected result: the same bundle can only fail the same way.
+        error("${GitPush.UNAPPLIABLE}the bundle carries deployment values (a sealed deployment pattern matched) at " +
+            "${hits.take(20).joinToString(", ")}${if (hits.size > 20) " and ${hits.size - 20} more" else ""}; " +
+            "remove them from the commits (rewrite the unpushed ones) and bundle again")
     }
 
     /**

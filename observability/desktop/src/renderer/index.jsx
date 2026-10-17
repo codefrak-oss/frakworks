@@ -715,10 +715,6 @@ export const FirstMateStrip = ({ onOpenTicket, onOpenFile, selection, kickStarte
     setTierDraft(tier);
     await window.firstMate.file(tier, repo || null);
   }, []);
-  const onNewConversation = useCallback(() => {
-    onKickStarter(null);
-    return window.firstMate.startNew();
-  }, [onKickStarter]);
   const onSelectConversation = useCallback(async (id) => {
     const c = await window.firstMate.conversation(id);
     setResumeError(null);
@@ -730,6 +726,13 @@ export const FirstMateStrip = ({ onOpenTicket, onOpenFile, selection, kickStarte
     setViewingConversation(null);
     setResumeError(null);
   }, []);
+  // A new conversation leaves History too: a past transcript opened there
+  // would otherwise stay on screen over the new, empty one.
+  const onNewConversation = useCallback(() => {
+    onKickStarter(null);
+    onCloseHistory();
+    return window.firstMate.startNew();
+  }, [onKickStarter, onCloseHistory]);
   // Main archives the live conversation, makes this one live and sends a
   // firstMate:update, so closing History shows the resumed messages.
   const onResume = useCallback(async (id) => {

@@ -6,7 +6,7 @@
 // runs or reaches the network. The answer path stays the decision card's.
 
 import { useState, useEffect } from "react";
-import { TicketPitchView } from "./pitch.jsx";
+import { TicketPitchView, PitchOverlay, usePitchEscape, darkPitch } from "./pitch.jsx";
 
 export const DECK_HEADING = "Proposal";
 
@@ -29,19 +29,12 @@ const useDeck = (repo, number, fleet) => {
   return html;
 };
 
-const useEscape = (full, close) => useEffect(() => {
-  if (!full) return undefined;
-  const onKey = (e) => { if (e.key === "Escape") close(); };
-  window.addEventListener("keydown", onKey);
-  return () => window.removeEventListener("keydown", onKey);
-}, [full]);
-
 /** The ticket detail's Proposal section: the deck, foldable and full-window; nothing for a ticket with none. */
 export const DesignDeck = ({ repo, issue, fleet = typeof window !== "undefined" ? window.fleet : null }) => {
   const html = useDeck(repo, issue, fleet);
   const [full, setFull] = useState(false);
   const [open, setOpen] = useState(true);
-  useEscape(full, () => setFull(false));
+  usePitchEscape(full, () => setFull(false));
   return <TicketPitchView html={html} heading={DECK_HEADING} full={full} onOpen={() => setFull(true)}
                           onClose={() => setFull(false)} open={open} onFlip={() => setOpen((o) => !o)} />;
 };
@@ -50,12 +43,12 @@ export const DesignDeck = ({ repo, issue, fleet = typeof window !== "undefined" 
 export const DesignDeckLink = ({ repo, number, fleet = typeof window !== "undefined" ? window.fleet : null }) => {
   const html = useDeck(repo, number, fleet);
   const [full, setFull] = useState(false);
-  useEscape(full, () => setFull(false));
+  usePitchEscape(full, () => setFull(false));
   if (!html) return null;
   return (
     <div className="deckLink">
       <button type="button" className="pitchOpen" onClick={() => setFull(true)}>Open presentation ⤢</button>
-      {full && <TicketPitchView html={html} heading={DECK_HEADING} full open={false} onClose={() => setFull(false)} />}
+      {full && <PitchOverlay doc={darkPitch(html)} title={DECK_HEADING} onClose={() => setFull(false)} />}
     </div>
   );
 };
