@@ -42,6 +42,7 @@ import { CancelFlow } from "./cancel-flow.jsx";
 import { MainBuildStrip } from "./main-build.jsx";
 import { TicketWorkItem } from "./work-items.jsx";
 import { PitchView, TicketPitch, isProposal, isResearch } from "./pitch.jsx";
+import { DesignDeck } from "./design-deck.jsx";
 import { ProposalFacts, ProposalLink } from "./proposals.jsx";
 import { KIND_TITLES } from "./needs-you.jsx";
 import { FlowBody, DoctorSection, pendingNeed, needQuestion, pendingKind } from "./flow.jsx";
@@ -228,6 +229,7 @@ export const TicketDetailView = ({
         ? <PitchView repo={issue.repo} number={issue.number} title={issue.title} prUrl={f.prUrl} research={research}
                      decision={decision} taskId={taskId} onChatAbout={onChatAbout} />
         : <TicketPitch repo={historyRepo} issue={number} />}
+      {!pitch && <DesignDeck repo={historyRepo} issue={number} />}
 
       {doc && doc.issue_error && <div className="err">{doc.issue_error}</div>}
       {!doc && (error ? <div className="err">{String(error)}</div> : <div className="muted">asking the engine for the ticket…</div>)}

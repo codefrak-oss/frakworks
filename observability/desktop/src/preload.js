@@ -129,6 +129,7 @@ contextBridge.exposeInMainWorld("fleet", {
   ticketDetail: (owner, repoName, n) => ipcRenderer.invoke("engine:ticket", String(owner), String(repoName), Number(n)),
   // The issue detail's Pitch view (#563): GET /ticket/{owner}/{repo}/{n}/pitch,
   // { pitch: { kind, path, prUrl, content, options, awaitingChoice, awaitingDecision } } or { error }.
+  designDeck: (owner, repoName, n) => ipcRenderer.invoke("engine:design-deck", String(owner), String(repoName), Number(n)),
   ticketPitch: (owner, repoName, n) => ipcRenderer.invoke("engine:ticket-pitch", String(owner), String(repoName), Number(n)),
   // The explorer's Proposals branch (#660): GET /proposals for the selected
   // repo, { docs, failures } or { error, docs: [] }; and a doc's page with no

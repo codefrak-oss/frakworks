@@ -358,11 +358,15 @@ class PostFeatureQuestionDelegate(
             ?.let { liveParents?.of(repo, issue, it) }
         if (parent != null && parentQuestions != null) return parentQuestions.ask(id, repo, issue, mode, question, parent)
         val nth = questions.list(id).size + 1
+        // A confirm design's plan goes to the user: keep it for the design deck (docs/feature.md, "The design deck").
+        val deck = mode == "design" && DesignResult.parse(execution.output()).outcome != "ask"
+        if (deck) execution.setVariable(Vars.DESIGN_DECK, Variables.byteArrayValue(execution.output()))
         questions.ask(id, repo, issue, question)
         val filed = hitlp.ask(FlowWait(id, AskWaits.answerTask(execution), HitlpAsserted.Kind.QUESTION, repo, issue, question,
             AskWaits.askBlock(question), NeedKeys.askerIn(execution.variables), AskWaits.runId(execution, runs), nth = nth))
         execution.setVariable(Vars.HITLP_TASK_ID, filed.handle.taskId)
         tickets.commentOn(repo, issue, "The $mode Smith has a question ($nth) before it can go on:\n\n${question.trimEnd()}\n\n" +
+            (if (deck) "The plan is also a slide deck in the desktop: the ticket's Proposal tab, or Open presentation on the decision card.\n\n" else "") +
             "— engine ${execution.flow()} `$id`. ${IntakeQuestions.answerHint(filed.decisionUrl, filed.handle.taskId)}; " +
             "the next run works from the ticket plus every answer.")
     }
