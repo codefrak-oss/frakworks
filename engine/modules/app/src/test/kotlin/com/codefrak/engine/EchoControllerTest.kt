@@ -23,3 +23,5 @@ class EchoControllerTest(@Autowired val mvc: MockMvc) {
 }
 
 // build-time measurement 1
+
+// build-time measurement 2
