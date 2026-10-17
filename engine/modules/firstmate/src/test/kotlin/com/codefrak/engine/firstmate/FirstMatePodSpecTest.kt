@@ -52,7 +52,7 @@ class FirstMatePodSpecTest {
         assertEquals(listOf("fm-relay", "--"), mate.command.take(2))
         assertEquals(listOf("claude", "-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose",
             "--model", "claude-opus-5-5", "--effort", "high",
-            "--allowedTools", "mcp__frakworks__submit_ask,Read", "--disallowedTools", "Bash",
+            "--allowedTools", "mcp__frakworks__submit_ask,Read,mcp__checkout__checkout_repo", "--disallowedTools", "Bash",
             "--strict-mcp-config", "--mcp-config", "/etc/firstmate/mcp.json",
             "--append-system-prompt", "You are the first mate."), mate.command.drop(2))
         assertFalse(mate.stdin, "the engine never attaches")
