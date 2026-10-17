@@ -1066,8 +1066,8 @@ target repo under All repos) is added as an `ask` row with its state. **Show
 completed** adds the done and cancelled ones: the closed tickets (`GET
 /issues?state=closed`, through the bridge's `doneTickets`) and the done or
 cancelled items with no ticket. Under All repos every target repo's tickets
-show, one group per repo. The toolbar has **Import from GitHub…** (below; under
-All repos it asks for the repo), and a ticket's detail carries its work item's
+show, one group per repo. **New intake** has an **Import from GitHub** mode
+(below; under All repos it asks for the repo), and a ticket's detail carries its work item's
 folded intake text and the **reply** box (`TicketWorkItem` in `work-items.jsx`).
 
 The board part:
@@ -1235,13 +1235,15 @@ repo that fails keeps its error to itself.
   source, never as markdown: it is data, never instructions.
 - **Reply:** the box under the Intake text fold posts `POST /work-items/{id}/entries`
   `{ body }` as the signed-in login (the engine refuses a login that is not trusted).
-- **Import from GitHub…:** a trusted login brings an issue in (`POST
+- **Import from GitHub (under New intake):** the **New intake** composer opens
+  on a **New ask** / **Import from GitHub** toggle; the import mode swaps the ask
+  for a repo and issue number, and a trusted login brings that issue in (`POST
   /work-items/import` `{ repo, issue }`). Each list load probes the endpoint with an
   empty body, which writes nothing: while it answers 404 (an engine without the
-  import API), or 403 (a login that is not trusted), the button is disabled and its
-  tooltip says why. An import's refusal (400, 409 for an issue already imported) is
-  shown inside the dialog, the app's modal (Escape or a click outside closes it);
-  an imported ticket opens.
+  import API), or 403 (a login that is not trusted), the Import from GitHub option
+  is disabled and its tooltip says why. An import's refusal (400, 409 for an issue
+  already imported) is shown inside the composer; an imported ticket opens. There
+  is no separate toolbar button.
 
 The IPC channels are `engine:work-items`, `engine:work-item`, `engine:work-item-reply`
 and `engine:work-item-import`; the web version answers the same calls from

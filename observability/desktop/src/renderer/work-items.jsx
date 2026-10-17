@@ -5,14 +5,13 @@
 // All repos); with Show completed on, the closed tickets (GET
 // /issues?state=closed, through the bridge's doneTickets) and the done or
 // cancelled items with no ticket. Import from GitHub (POST /work-items/import)
-// sits on the pane's toolbar, disabled with a tooltip while that API answers
-// 404 or the login may not import; the folded intake text and the reply box
+// is a mode of the New intake composer (issues.jsx), disabled with a tooltip
+// while that API answers 404 or the login may not import; the folded intake text and the reply box
 // (POST /work-items/{id}/entries) are the ticket detail's (detail.jsx,
 // TicketWorkItem). Main shapes every item (src/work-items.js viewItem):
 // `badge`, `description*` and `conversation`.
 import { useCallback, useEffect, useState } from "react";
 import { Issues } from "./issues.jsx";
-import { ModalOverlay } from "./modal-overlay.jsx";
 
 const api = () => (typeof window !== "undefined" ? window.fleet : null);
 
@@ -35,11 +34,10 @@ export function Fenced({ source, text }) {
   );
 }
 
-/** The Import button: disabled, with the probe's reason as its tooltip, unless the engine can import. */
-export function ImportButton({ importable, onClick }) {
+/** The composer's Import from GitHub option: whether it can be picked, and the probe's reason as its tooltip when not. */
+export function importGate(importable) {
   const ok = !!(importable && importable.available);
-  const why = ok ? "Import a GitHub issue as a work item" : (importable && importable.reason) || "checking the import API…";
-  return <button type="button" className="newIntakeBtn wiImport" disabled={!ok} title={why} onClick={ok ? onClick : undefined}>Import from GitHub…</button>;
+  return { ok, why: ok ? "Import a GitHub issue as a work item" : (importable && importable.reason) || "checking the import API…" };
 }
 
 export function WorkItemDetail({ item, onReplied }) {
@@ -71,8 +69,8 @@ export function WorkItemDetail({ item, onReplied }) {
   );
 }
 
-/** `repo` is the switcher's repo; null (All repos) asks for one of `repos`. */
-export function ImportDialog({ repo, repos, onDone, onCancel }) {
+/** The New intake composer's import form. `repo` is the switcher's repo; null (All repos) asks for one of `repos`. */
+export function ImportForm({ repo, repos, onDone, onCancel }) {
   const [issue, setIssue] = useState("");
   const [picked, setPicked] = useState("");
   const [error, setError] = useState(null);
@@ -85,22 +83,20 @@ export function ImportDialog({ repo, repos, onDone, onCancel }) {
     else onDone && onDone(r.item);
   };
   return (
-    <ModalOverlay label="Import from GitHub" onEscape={onCancel} onBackdrop={onCancel} className="wiImportPanel">
-      <div className="wiImportForm">
-        {repo ? <div>Import an issue of <b>{repo}</b></div>
-          : <select className="acInput" value={picked} onChange={(e) => setPicked(e.target.value)}>
-            <option value="">pick a repo</option>
-            {(repos || []).map((r) => <option key={r} value={r}>{r}</option>)}
-          </select>}
-        <input className="acInput" type="number" min="1" aria-label="issue number" autoFocus value={issue}
-          onChange={(e) => setIssue(e.target.value)} placeholder="issue number" />
-        <div className="wiImportButtons">
-          <button type="button" className="acBtn primary" disabled={!(Number(issue) > 0) || !into} onClick={go}>Import</button>
-          <button type="button" className="acBtn" onClick={onCancel}>Cancel</button>
-        </div>
-        {error ? <div className="nmError">{error}</div> : null}
+    <div className="wiImportForm">
+      {repo ? <div>Import an issue of <b>{repo}</b></div>
+        : <select className="acInput" aria-label="repo" value={picked} onChange={(e) => setPicked(e.target.value)}>
+          <option value="">pick a repo</option>
+          {(repos || []).map((r) => <option key={r} value={r}>{r}</option>)}
+        </select>}
+      <input className="acInput" type="number" min="1" aria-label="issue number" autoFocus value={issue}
+        onChange={(e) => setIssue(e.target.value)} placeholder="issue number" />
+      <div className="askCompose">
+        <button type="button" className="askSend" disabled={!(Number(issue) > 0) || !into} onClick={go}>Import</button>
+        <button type="button" className="newIntakeCancel" onClick={onCancel}>Cancel</button>
       </div>
-    </ModalOverlay>
+      {error ? <div className="err">{error}</div> : null}
+    </div>
   );
 }
 
@@ -155,14 +151,13 @@ const COMPLETED_LIMIT = 200;
 
 /**
  * Tickets > Tickets: <Issues> with the rows above added, the Show completed
- * toggle (off by default) and Import from GitHub on its toolbar. `target` is the
+ * toggle (off by default) and the composer's Import from GitHub mode. `target` is the
  * switcher's repo, null for All repos (then `repos`); the rest is Issues' props.
  */
 export function Tickets({ result, target = null, repos, onOpenTicket, ...rest }) {
   const [completed, setCompleted] = useState(false);
   const [groups, setGroups] = useState(null);
   const [done, setDone] = useState(null);
-  const [importing, setImporting] = useState(false);
   const targets = target ? [target] : repos || [];
   const repoKey = targets.join(",");
   const load = useCallback(async () => {
@@ -179,15 +174,15 @@ export function Tickets({ result, target = null, repos, onOpenTicket, ...rest })
   const importable = (groups || []).map((g) => g.importable).find((x) => x && x.available) || (groups && groups[0] && groups[0].importable) || null;
   const extra = itemRows(groups, completed).concat(completed ? closedRows(done) : []);
   const onImported = (item) => {
-    setImporting(false); load();
+    load();
     if (item && item.ticket != null && onOpenTicket) onOpenTicket(item.ticket, item.repo);
   };
   return (
     <>
       <Issues {...rest} result={withExtra(result, extra)} onOpenTicket={onOpenTicket} target={target} repos={repos}
         showCompleted={completed} onShowCompleted={setCompleted}
-        toolbar={<ImportButton importable={importable} onClick={() => setImporting(true)} />} />
-      {importing ? <ImportDialog repo={target} repos={repos} onDone={onImported} onCancel={() => setImporting(false)} /> : null}
+        importGate={importGate(importable)}
+        importForm={(close) => <ImportForm repo={target} repos={repos} onDone={(item) => { close(); onImported(item); }} onCancel={close} />} />
       {done && done.error && completed ? <div className="nmWarn">{done.error}</div> : null}
     </>
   );

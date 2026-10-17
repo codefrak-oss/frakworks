@@ -708,16 +708,39 @@ export async function runIntake({ ask, repo, selected = null }, { submit, listen
  * in All repos (`target` null) a required repo <select> over `repos` (the
  * engine's GET /repos names), and Start intake stays disabled until one is
  * picked (`repo`).
+ *
+ * Import from GitHub (#100110): with `importForm` (work-items.jsx's
+ * ImportForm, `(close) => node`) the form opens on a New ask / Import from
+ * GitHub toggle (`mode`); `importGate` `{ ok, why }` disables the import
+ * option, its reason as the tooltip, unless the login may import.
  */
 export const NewIntakeForm = ({ open, ask, tier, tiers, busy, intakeId, issueUrl, error, onOpen, onClose, onAsk, onTier, onSubmit,
-                                target = null, repos = null, repo = null, onRepo }) => {
+                                target = null, repos = null, repo = null, onRepo,
+                                mode = "ask", onMode, importGate = null, importForm = null }) => {
   const repoName = useRepoName(repos);
   if (!open) return <button type="button" className="newIntakeBtn" onClick={onOpen}>New intake</button>;
+  const gate = importGate || { ok: false, why: "checking the import API…" };
+  const toggle = importForm && (
+    <span className="isFilter newIntakeMode" role="radiogroup" aria-label="New ask or Import from GitHub">
+      <label className={mode === "ask" ? "on" : undefined}>
+        <input type="radio" name="newIntakeMode" value="ask" checked={mode === "ask"} disabled={busy} onChange={() => onMode && onMode("ask")} />
+        New ask
+      </label>
+      <label className={mode === "import" ? "on" : undefined} title={gate.why}>
+        <input type="radio" name="newIntakeMode" value="import" checked={mode === "import"} disabled={busy || !gate.ok} onChange={() => onMode && onMode("import")} />
+        Import from GitHub
+      </label>
+    </span>
+  );
+  if (importForm && mode === "import" && gate.ok) {
+    return <div className="newIntakeForm">{toggle}{importForm(() => onClose && onClose())}</div>;
+  }
   const done = Boolean(issueUrl);
   const rows = Array.isArray(tiers) ? tiers : [];
   const tiersError = tiers && !Array.isArray(tiers) ? tiers.error || "no tier table" : null;
   return (
     <div className="newIntakeForm">
+      {toggle}
       {target
         ? <div className="newIntakeRepo">files in <b>{target}</b></div>
         : <select className="newIntakeRepoPick" aria-label="repo" required value={repo || ""}
@@ -749,7 +772,7 @@ export const NewIntakeForm = ({ open, ask, tier, tiers, busy, intakeId, issueUrl
   );
 };
 
-const EMPTY_INTAKE_FORM = { open: false, ask: "", tier: null, busy: false, intakeId: null, issueUrl: null, error: null, repo: null };
+const EMPTY_INTAKE_FORM = { open: false, mode: "ask", ask: "", tier: null, busy: false, intakeId: null, issueUrl: null, error: null, repo: null };
 
 /**
  * `result` is what src/engine-data.js fetchIssues returned: `{ issues,
@@ -767,10 +790,11 @@ const EMPTY_INTAKE_FORM = { open: false, ask: "", tier: null, busy: false, intak
  * repo's issues and the composer files there; null is All repos, where the
  * composer asks for one of `repos`. `restarting` (an engine update in flight,
  * #1053) draws a read error as the expected restart, muted, not as a failure.
+ * `importGate`/`importForm` add the composer's Import from GitHub mode (NewIntakeForm).
  */
 export const Issues = ({ result, onOpenTicket, now, onSubmitIntake, onIntakeEvents, onHoldRepo, tiers, needs,
                          target = null, repos: targetRepos = null, restarting = false, login = null, filter: filterProp,
-                         showCompleted = false, onShowCompleted = null, toolbar = null, view: viewProp }) => {
+                         showCompleted = false, onShowCompleted = null, toolbar = null, view: viewProp, importGate = null, importForm = null }) => {
   const [viewState, setViewState] = useState(readView);
   const view = viewProp || viewState;
   const setView = (v) => { setViewState(v); saveView(v); };
@@ -825,6 +849,8 @@ export const Issues = ({ result, onOpenTicket, now, onSubmitIntake, onIntakeEven
   );
   const form = intake.open && (
     <NewIntakeForm {...intake} tiers={tiers} target={target} repos={targetRepos}
+      importGate={importGate} importForm={importForm}
+      onMode={(mode) => setIntake((f) => ({ ...f, mode }))}
       onRepo={(repo) => setIntake((f) => ({ ...f, repo }))}
       onClose={() => setIntake(EMPTY_INTAKE_FORM)}
       onAsk={(ask) => setIntake((f) => ({ ...f, ask }))}
