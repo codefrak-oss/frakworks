@@ -380,3 +380,4 @@ Moved to [`docs/configuration.md`](docs/configuration.md).
 
 Moved to [`docs/run-it.md`](docs/run-it.md).
 <!-- test intake 2026-10-17T14:52Z: safe to delete -->
+
