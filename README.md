@@ -2,8 +2,8 @@
 
 An autonomous bot fleet that works tickets held by its engine. You file an ask; the
 engine refines it into a ticket, starts a sandboxed Claude Code agent ("a Smith") to
-do the work on a branch, checks the result (build, tests, an AI review), and opens a
-pull request for a human to merge.
+do the work on a branch, checks the result (build, tests, an AI review), and is
+capable of merging with no intervention if allowed.
 
 **Status:** a personal project, run daily against its own repo. Expect churn: APIs,
 config and docs change often, and nothing is versioned yet.
