@@ -112,17 +112,23 @@ class FirstMatePodSpecTest {
     }
 
     @Test
-    fun `the relay is told the session's repo to clone into the work folder, and the repo's git token comes from the Secret`() {
+    fun `an init container alone gets the repo's git token from the Secret and clones, and the main container never sees it`() {
         val mate = pod.spec.containers.single()
         assertEquals("acme/tickets", mate.env.single { it.name == "FM_REPO" }.value)
+        assertEquals(FIRST_MATE_CLONE, mate.env.single { it.name == "FM_CLONE" }.value)
         assertEquals(FIRST_MATE_CWD, mate.workingDir)
-        assertNull(mate.env.singleOrNull { it.name == "FM_GIT_TOKEN" }, "no token, no env")
-        val withToken = firstMatePod(name, session, "img", firstMateCommand(argv), name, null, 1, 1.0, gitToken = true).spec.containers.single()
+        assertNull(pod.spec.initContainers.single().env.singleOrNull { it.name == "FM_GIT_TOKEN" }, "no token, no env")
+        val spec = firstMatePod(name, session, "img", firstMateCommand(argv), name, null, 1, 1.0, gitToken = true).spec
+        assertNull(spec.containers.single().env.singleOrNull { it.name == "FM_GIT_TOKEN" }, "the main container never has the token")
+        assertTrue(spec.containers.single().volumeMounts.any { it.mountPath == FIRST_MATE_CLONE })
+        val withToken = spec.initContainers.single()
+        assertEquals(listOf("fm-relay", "--clone", FIRST_MATE_CLONE), withToken.command)
+        assertEquals("acme/tickets", withToken.env.single { it.name == "FM_REPO" }.value)
         val ref = withToken.env.single { it.name == "FM_GIT_TOKEN" }.valueFrom.secretKeyRef
         assertEquals(name to FIRST_MATE_GIT_TOKEN_KEY, ref.name to ref.key)
         val secret = firstMateSecret(name, session, FirstMateMcp(emptyMap(), emptyList()), null, null, "fw_pod", "github_pat_smith")
         assertEquals("github_pat_smith", secret.stringData[FIRST_MATE_GIT_TOKEN_KEY])
         assertNull(firstMateSecret(name, session, FirstMateMcp(emptyMap(), emptyList()), null, null, "fw_pod").stringData[FIRST_MATE_GIT_TOKEN_KEY])
-        assertFalse(withToken.toString().contains("github_pat_smith"), "the token is never in the pod's spec")
+        assertFalse(spec.toString().contains("github_pat_smith"), "the token is never in the pod's spec")
     }
 }

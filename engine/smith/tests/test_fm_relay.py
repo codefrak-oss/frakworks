@@ -297,10 +297,19 @@ class RelayTest(unittest.TestCase):
         git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "first")
         return "file://" + base
 
+    def clone(self, **extra):
+        """Runs the init container's `fm-relay --clone`; the clone folder the relay is then given as FM_CLONE."""
+        dest = os.path.join(self.tmp, "clone")
+        r = subprocess.run([sys.executable, "-I", RELAY_PY, "--clone", dest], env=dict(os.environ, **extra),
+                           stderr=subprocess.DEVNULL)
+        self.assertEqual(0, r.returncode)
+        return dest
+
     def test_a_new_session_clones_its_repo_into_the_work_folder_and_claude_never_sees_the_git_token(self):
         cwd = os.path.join(self.tmp, "work")
         os.makedirs(cwd)
-        self.relay(cwd=cwd, FM_REPO="owner/repo", FM_GIT_URL=self.origin(), FM_GIT_TOKEN="github_pat_secret")
+        src = self.clone(FM_REPO="owner/repo", FM_GIT_URL=self.origin(), FM_GIT_TOKEN="github_pat_secret")
+        self.relay(cwd=cwd, FM_REPO="owner/repo", FM_CLONE=src)
         self.engine.wait_for(lambda: len(self.engine.out) >= 1)
         init = json.loads(self.engine.out[1])
         self.assertIsNone(init["gitToken"])
@@ -315,7 +324,8 @@ class RelayTest(unittest.TestCase):
     def test_a_failed_clone_still_starts_claude_with_a_note_that_the_code_is_unavailable(self):
         cwd = os.path.join(self.tmp, "work")
         os.makedirs(cwd)
-        self.relay(cwd=cwd, FM_REPO="owner/missing", FM_GIT_URL="file://" + os.path.join(self.tmp, "nowhere"))
+        src = self.clone(FM_REPO="owner/missing", FM_GIT_URL="file://" + os.path.join(self.tmp, "nowhere"))
+        self.relay(cwd=cwd, FM_REPO="owner/missing", FM_CLONE=src)
         self.engine.wait_for(lambda: len(self.engine.out) >= 1)
         argv = json.loads(self.engine.out[1])["argv"]
         self.assertEqual("--append-system-prompt", argv[1])
@@ -334,14 +344,14 @@ class RelayTest(unittest.TestCase):
         self.engine.snapshot = {"claudeSessionId": "0b5e-77", "cwd": cwd, "deliveredSeq": 0,
                                 "sessionFile": base64.b64encode(b'{"type":"user"}\n').decode(),
                                 "workdirTar": base64.b64encode(buf.getvalue()).decode(), "size": 5, "dropped": False}
-        self.relay(resume=True, home=os.path.join(self.tmp, "home"), cwd=cwd, FM_REPO="owner/repo", FM_GIT_URL=self.origin())
+        src = self.clone(FM_REPO="owner/repo", FM_GIT_URL=self.origin())
+        self.relay(resume=True, home=os.path.join(self.tmp, "home"), cwd=cwd, FM_REPO="owner/repo", FM_CLONE=src)
         self.engine.wait_for(lambda: len(self.engine.out) >= 1)
         self.assertEqual(["-p", "--resume", "0b5e-77"], json.loads(self.engine.out[1])["argv"])
         with open(os.path.join(cwd, "notes.txt")) as f:
             self.assertEqual("kept\n", f.read())
         with open(os.path.join(cwd, "README.md")) as f:
             self.assertEqual("the code\n", f.read())
-        self.assertFalse(os.path.exists(os.path.join(cwd, ".fm-clone")))
 
 
 if __name__ == "__main__":
