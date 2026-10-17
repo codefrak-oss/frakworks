@@ -22,5 +22,5 @@ dependencies {
     // TicketFilerTest: EventRecorder.
     testImplementation(testFixtures(project(":engine-events")))
     // TicketRecorder.tickets(): a FakeTickets whose ends are recorded as the fake's closes.
-    testFixturesApi(testFixtures(project(":engine-github")))
+    testFixturesApi(testFixtures(project(":engine-github-api")))
 }

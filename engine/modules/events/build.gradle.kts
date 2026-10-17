@@ -9,7 +9,7 @@ plugins {
 }
 
 dependencies {
-    api(project(":engine-github"))
+    api(project(":engine-github-api"))
     // FlowEventsPlugin is a process engine plugin; the version is the app's (engine/build.gradle.kts).
     implementation("org.operaton.bpm.springboot:operaton-bpm-spring-boot-starter:2.1.5")
     // PostgresEventRelay LISTENs through the driver's PGConnection; the app ships the driver (runtimeOnly).

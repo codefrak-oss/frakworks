@@ -44,7 +44,7 @@ class RepoPermissionsTest {
         permissions[repo.fullName to "lundmatt1"] = "admin"
     }
     private var now = Instant.parse("2026-10-07T12:00:00Z")
-    private val permissions = RepoPermissions(details, TokenIdentity(details, own)).apply {
+    private val permissions = CachedRepoPermissions(details, GitHubTokenIdentity(details, own)).apply {
         clock = object : Clock() {
             override fun getZone() = ZoneOffset.UTC
             override fun withZone(zone: java.time.ZoneId?) = this

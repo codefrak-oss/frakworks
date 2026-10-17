@@ -13,7 +13,7 @@ class CliGitPushTest {
     private val remote = File(root, "acme/widgets.git")
     private val tokens = RepoTokens { "unused-by-file-remotes" }
     /** The token's account, as the fake's `GET /user` says: the engine's commits are by it. */
-    private val push = CliGitPush(tokens, TokenIdentity(FakeIssueDetails(), tokens), gitUrl = "file://${root.absolutePath}")
+    private val push = CliGitPush(tokens, GitHubTokenIdentity(FakeIssueDetails(), tokens), gitUrl = "file://${root.absolutePath}")
 
     private fun git(dir: File, vararg args: String): String {
         val p = ProcessBuilder(listOf("git", "-c", "user.name=t", "-c", "user.email=t@t", "-c", "init.defaultBranch=main") + args)
@@ -318,7 +318,7 @@ class CliGitPushTest {
         git(seed, "add", "."); git(seed, "commit", "--quiet", "-m", "seed")
         git(seed, "push", "--quiet", "file://${remote.absolutePath}", "HEAD:main")
         var rules: DeploymentRules? = DeploymentRules("# ours\nchang[e]d\n", "")
-        val gated = CliGitPush(tokens, TokenIdentity(FakeIssueDetails(), tokens), gitUrl = "file://${root.absolutePath}", patterns = { rules })
+        val gated = CliGitPush(tokens, GitHubTokenIdentity(FakeIssueDetails(), tokens), gitUrl = "file://${root.absolutePath}", patterns = { rules })
 
         val refused = assertThrows<IllegalStateException> { gated.push("acme/widgets", "smith/issue-5", smithRound("main", "conf/a.txt"), "main") }.message!!
         assertTrue(refused.startsWith(GitPush.UNAPPLIABLE) && "conf/a.txt:1 (commit " in refused, refused)

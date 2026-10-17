@@ -8,5 +8,5 @@ plugins {
 
 dependencies {
     api(project(":engine-accounts"))
-    api(project(":engine-github"))
+    api(project(":engine-github-api"))
 }

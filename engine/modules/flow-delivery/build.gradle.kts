@@ -13,5 +13,5 @@ dependencies {
     // testFiler and TicketRecorder (engine-smith's fixtures): the post-deployment check's bug filing test.
     testImplementation(testFixtures(project(":engine-smith")))
     // FakeTickets: the in-memory Tickets the delegates comment on and list (#100039).
-    testImplementation(testFixtures(project(":engine-github")))
+    testImplementation(testFixtures(project(":engine-github-api")))
 }

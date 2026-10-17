@@ -14,7 +14,7 @@ class EngineModulesTest {
     private val modules: Path = Path.of("").toAbsolutePath().resolve("modules")
 
     /** The library modules in layer order: each may use the ones before it. */
-    private val layers = listOf("common", "github", "events", "accounts", "jev", "smith", "incidents", "hitlp", "firstmate")
+    private val layers = listOf("common", "github-api", "github", "events", "accounts", "jev", "smith", "incidents", "hitlp", "firstmate")
     /** The flow modules: each may use every layer, never another flow. */
     private val flows = listOf("flow-delivery", "flow-doctor", "flow-feature", "flow-friction", "flow-intake", "flow-proposal")
     /** The upper layers in order, over every flow: each may use the flows, the layers and the ones before it, and the SDK. */
@@ -53,7 +53,7 @@ class EngineModulesTest {
         val allowed = mapOf(
             "smith" to setOf(":engine-jev"),
             "incidents" to setOf(":engine-smith"),
-            "hitlp" to setOf(":engine-smith", ":engine-github"),
+            "hitlp" to setOf(":engine-smith", ":engine-github-api"),
         )
         allowed.forEach { (name, ok) -> assertEquals(ok, projects(name), "modules/$name's project dependencies") }
     }
