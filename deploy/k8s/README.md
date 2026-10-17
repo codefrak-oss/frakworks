@@ -67,7 +67,7 @@ address, registry, storage class or certificate issuer. Those are an overlay's.
 - Pod Security `restricted`.
 - ServiceAccount `first-mate` with no token mounted and no binding: it cannot
   create Jobs or read a Smith's Secrets.
-- Role `frakworks-engine` (pods get/list/watch/create/delete, `pods/attach`,
+- Role `frakworks-engine` (pods get/list/watch/create/delete, `pods/exec`,
   `pods/log`; Secrets create/delete) and a RoleBinding to
   `frakworks:frakworks-engine`.
 - NetworkPolicy `firstmate-sandbox`: no ingress; egress to the cluster DNS,
