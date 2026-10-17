@@ -411,7 +411,7 @@ split by hand. Replaces the design intent of #152.
   replan's: `continue` keeps the drafts left, `revise` replaces them with
   `children`, `done` drops them; `drop` (with `continue`) drops the named
   drafts first. `EngineCalls.fileChildren` hands it to `ChildFiling`
-  (flow-feature, the `ChildFiler` contract in engine-smith), which checks it
+  (flow-feature, the `ChildFiler` contract in engine-smith-api), which checks it
   under `replanRules` against the split as it is (a refusal changes nothing),
   applies it (`SplitState.revised`, `done`, drops), records the children the
   engine's own close has closed (`reconcile`, the same pass `reconcile the
@@ -433,7 +433,7 @@ split by hand. Replaces the design intent of #152.
   if") goes through `post the smith's question` (`PostFeatureQuestionDelegate`,
   bound in every flow) to a HITLP request the user decides on the HITLP
   server (a question is no `/needs` row since #100013). Under a running live parent it goes to the parent first: the delegate asks
-  `LiveParents` (engine-smith) whether the child's ticket is an open child of
+  `LiveParents` (engine-smith-api) whether the child's ticket is an open child of
   a live split whose feature instance is at `call-parent` with a parent run
   under it (`childMode` `live`, `liveFallback` not set; the parent's number
   from the child's `Part N of M of #P` line). If so, `ParentQuestions.ask`

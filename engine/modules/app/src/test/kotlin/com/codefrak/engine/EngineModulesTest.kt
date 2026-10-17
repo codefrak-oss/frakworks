@@ -14,7 +14,7 @@ class EngineModulesTest {
     private val modules: Path = Path.of("").toAbsolutePath().resolve("modules")
 
     /** The library modules in layer order: each may use the ones before it. */
-    private val layers = listOf("common", "github-api", "github", "events", "accounts", "jev", "smith", "incidents", "hitlp", "firstmate")
+    private val layers = listOf("common", "github-api", "github", "events", "accounts", "jev", "smith-api", "smith", "incidents", "hitlp", "firstmate")
     /** The flow modules: each may use every layer, never another flow. */
     private val flows = listOf("flow-delivery", "flow-doctor", "flow-feature", "flow-friction", "flow-intake", "flow-proposal")
     /** The upper layers in order, over every flow: each may use the flows, the layers and the ones before it, and the SDK. */
@@ -49,11 +49,12 @@ class EngineModulesTest {
     }
 
     @Test
-    fun `engine-smith, engine-incidents and engine-hitlp depend only on the modules below them`() {
+    fun `engine-smith-api, engine-smith, engine-incidents and engine-hitlp depend only on the modules below them`() {
         val allowed = mapOf(
-            "smith" to setOf(":engine-jev"),
-            "incidents" to setOf(":engine-smith"),
-            "hitlp" to setOf(":engine-smith", ":engine-github-api"),
+            "smith-api" to setOf(":engine-jev"),
+            "smith" to setOf(":engine-smith-api"),
+            "incidents" to setOf(":engine-smith-api"),
+            "hitlp" to setOf(":engine-smith-api", ":engine-github-api"),
         )
         allowed.forEach { (name, ok) -> assertEquals(ok, projects(name), "modules/$name's project dependencies") }
     }
@@ -69,7 +70,7 @@ class EngineModulesTest {
 
     /**
      * Every `com.codefrak.*` import in a module resolves to a declaration in a module it may use: a layer in its
-     * own or a layer before it, and for a flow module the layers and itself. So `engine-smith` imports no flow
+     * own or a layer before it, and for a flow module the layers and itself. So `engine-smith-api` and `engine-smith` import no flow
      * module's code (a contract it holds in a flow's package, `intake.TicketFiler` say, is its own), no flow module
      * imports another's, no module below engine-plugins imports the SDK, and none imports a layer above its own.
      */
