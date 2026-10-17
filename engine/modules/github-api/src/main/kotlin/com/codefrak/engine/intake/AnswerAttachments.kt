@@ -1,12 +1,9 @@
 package com.codefrak.engine.intake
 
-import org.springframework.jdbc.core.simple.JdbcClient
-import org.springframework.stereotype.Repository
 import java.nio.ByteBuffer
 import java.nio.charset.CharacterCodingException
 import java.nio.charset.CodingErrorAction
 import java.time.OffsetDateTime
-import java.time.ZoneOffset
 
 /** One attachment's listing: its name, type and size in bytes. */
 data class AttachmentInfo(val name: String, val mime: String, val size: Int, val createdAt: OffsetDateTime, val createdBy: String)
@@ -15,13 +12,12 @@ data class AttachmentInfo(val name: String, val mime: String, val size: Int, val
 class AttachmentRefused(message: String, val tooLarge: Boolean = false, val badType: Boolean = false) : RuntimeException(message)
 
 /**
- * Answer attachments (engine/README.md, "Answer attachments"): files the user attaches to an answer, `engine.answer_attachment`,
- * keyed by the root flow that asked. The flow's Smith reads them through the frakworks MCP server; nothing here reaches GitHub.
+ * Answer attachments (engine/README.md, "Answer attachments"): files the user attaches to an answer, keyed by the root
+ * flow that asked. The flow's Smith reads them through the frakworks MCP server; nothing here reaches GitHub.
  * Text (UTF-8) and the images [IMAGE_TYPES] are taken; any other binary is refused, as is a file over [MAX_BYTES] or a flow
- * whose files would pass [MAX_FLOW_BYTES].
+ * whose files would pass [MAX_FLOW_BYTES]. The engine's is `StoredAnswerAttachments` (engine-github), `engine.answer_attachment`.
  */
-@Repository
-class AnswerAttachments(private val jdbc: JdbcClient) {
+interface AnswerAttachments {
     companion object {
         /** A file's name: letters, digits, `.`, `_`, `-` and spaces, not only dots. */
         val NAME = Regex("""^(?!\.+$)[A-Za-z0-9._ -]{1,100}$""")
@@ -56,26 +52,11 @@ class AnswerAttachments(private val jdbc: JdbcClient) {
         }
     }
 
-    fun list(flow: String): List<AttachmentInfo> =
-        jdbc.sql("SELECT name, mime, size, created_at, created_by FROM engine.answer_attachment WHERE flow = :f ORDER BY name")
-            .param("f", flow)
-            .query { rs, _ -> AttachmentInfo(rs.getString(1), rs.getString(2), rs.getInt(3), rs.getObject(4, OffsetDateTime::class.java), rs.getString(5)) }.list()
+    fun list(flow: String): List<AttachmentInfo>
 
     /** The file's type and bytes, or null when the flow has none by that name. */
-    fun read(flow: String, name: String): Pair<String, ByteArray>? =
-        jdbc.sql("SELECT mime, content FROM engine.answer_attachment WHERE flow = :f AND name = :n").param("f", flow).param("n", name)
-            .query { rs, _ -> rs.getString(1) to rs.getBytes(2) }.optional().orElse(null)
+    fun read(flow: String, name: String): Pair<String, ByteArray>?
 
     /** Checks and puts the file against [flow], replacing one by the same name; answers its stored listing. */
-    fun save(flow: String, name: String, mime: String?, bytes: ByteArray, by: String): AttachmentInfo {
-        val type = check(name, mime, bytes)
-        val others = list(flow).filter { it.name != name }.sumOf { it.size.toLong() }
-        if (others + bytes.size > MAX_FLOW_BYTES)
-            throw AttachmentRefused("the flow's attachments would be ${others + bytes.size} bytes: at most $MAX_FLOW_BYTES (5 MiB) per flow", tooLarge = true)
-        val now = OffsetDateTime.now(ZoneOffset.UTC)
-        jdbc.sql("DELETE FROM engine.answer_attachment WHERE flow = :f AND name = :n").param("f", flow).param("n", name).update()
-        jdbc.sql("INSERT INTO engine.answer_attachment (flow, name, mime, size, content, created_at, created_by) VALUES (:f, :n, :m, :s, :c, :t, :b)")
-            .param("f", flow).param("n", name).param("m", type).param("s", bytes.size).param("c", bytes).param("t", now).param("b", by).update()
-        return AttachmentInfo(name, type, bytes.size, now, by)
-    }
+    fun save(flow: String, name: String, mime: String?, bytes: ByteArray, by: String): AttachmentInfo
 }

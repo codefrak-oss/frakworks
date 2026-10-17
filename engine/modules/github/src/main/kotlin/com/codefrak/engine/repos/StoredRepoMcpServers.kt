@@ -4,102 +4,38 @@ import com.codefrak.engine.accounts.SecretsKey
 import com.codefrak.engine.badRequest
 import com.codefrak.engine.board.targetRepoOr404
 import com.codefrak.engine.refuseUnknownFields
+import com.codefrak.engine.repos.RepoMcpServers.Companion.AUDIENCE_400
+import com.codefrak.engine.repos.RepoMcpServers.Companion.KEY
+import com.codefrak.engine.repos.RepoMcpServers.Companion.MAX_VALUE
+import com.codefrak.engine.repos.RepoMcpServers.Companion.NAME
+import com.codefrak.engine.repos.RepoMcpServers.Companion.OPS_STDIO_400
+import com.codefrak.engine.repos.RepoMcpServers.Companion.RESERVED
+import com.codefrak.engine.repos.RepoMcpServers.Companion.ROLE_400
 import org.springframework.http.HttpStatus
 import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.stereotype.Repository
 import org.springframework.web.server.ResponseStatusException
 import tools.jackson.module.kotlin.jacksonObjectMapper
 import tools.jackson.module.kotlin.readValue
-import java.net.InetAddress
 import java.net.URI
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import java.util.Base64
 
-/** A server's kind: the `type` Claude Code's `--mcp-config` document takes. */
-enum class McpServerKind(val wire: String) {
-    HTTP("http"), SSE("sse"), STDIO("stdio");
-    companion object { fun of(s: String?) = entries.firstOrNull { it.wire == s } }
-}
-
 /**
- * Who gets a repo's MCP server (#2449): a First mate (the desktop's spawn and a first-mate pod), a Smith run of the repo,
- * or both. The same server is typically two rows, a laptop instance for the First mate and a cluster one for Smiths,
- * because the Mac cannot resolve cluster DNS and a Smith pod cannot reach the Mac's loopback.
- */
-enum class McpAudience(val wire: String) {
-    SMITH("smith"), FIRST_MATE("first-mate"), BOTH("both");
-    /** Whether a row of this audience is handed to [who]. */
-    fun serves(who: McpAudience) = this == BOTH || this == who
-    companion object {
-        fun of(s: String?) = entries.firstOrNull { it.wire == s }
-        val WIRES = entries.joinToString(", ") { it.wire }
-    }
-}
-
-/**
- * Whether [url]'s host is loopback (127.0.0.0/8, ::1), `localhost` or a `*.local` mDNS name; a malformed URL counts.
- * Neither a first-mate pod nor a Smith pod can reach one. A Kubernetes service name (`*.cluster.local`, the cluster
- * DNS zone) is not local: it is exactly what a Smith pod reaches a cluster instance by (#2449).
- */
-fun localMcpUrl(url: String?): Boolean {
-    val host = runCatching { URI(url!!.trim()).host }.getOrNull()?.lowercase()?.removePrefix("[")?.removeSuffix("]") ?: return true
-    if (host == "localhost" || host.endsWith(".localhost")) return true
-    if ((host == "local" || host.endsWith(".local")) && !host.endsWith(".cluster.local")) return true
-    if (host.contains(':')) return runCatching { InetAddress.getByName(host).isLoopbackAddress }.getOrDefault(true)
-    val octets = host.split('.')
-    return octets.size == 4 && octets.all { o -> o.toIntOrNull()?.let { it in 0..255 } == true } && octets[0] == "127"
-}
-
-/**
- * A server's role (#100008; engine/docs/feature.md, "The ops role"): `ops`, a server that conforms to the `ops/1`
- * contract (a tool `is_deployed(sha)` answering `{state: deployed|not_yet}`), which `DeployedChecks` asks whether a
- * commit is in production for the repo. A row without a role is a plain server.
- */
-enum class McpRole(val wire: String) {
-    OPS("ops");
-    companion object { fun of(s: String?) = entries.firstOrNull { it.wire == s } }
-}
-
-/** One server, its secrets opened: what the spawn's config and the engine's test need, never what a read answers. */
-data class McpServerConfig(val name: String, val kind: McpServerKind, val url: String?, val headers: Map<String, String>,
-                           val command: String?, val args: List<String>, val env: Map<String, String>,
-                           val audience: McpAudience = McpAudience.FIRST_MATE, val role: McpRole? = null) {
-    /** The server's entry in `--mcp-config`'s `mcpServers`. */
-    fun entry(): Map<String, Any?> = when (kind) {
-        McpServerKind.STDIO -> linkedMapOf("type" to "stdio", "command" to command, "args" to args, "env" to env)
-        else -> linkedMapOf("type" to kind.wire, "url" to url, "headers" to headers)
-    }
-}
-
-/**
- * A target repo's MCP servers (#1801, #2449; engine/README.md, "First mate's MCP servers", "A Smith's repo MCP servers"),
- * `engine.repo_mcp_server`: the servers added to a First mate's or a Smith run's `--mcp-config` for that repo, beside
- * the engine's three, each row saying which of the two gets it ([McpAudience]). A header or env
- * value marked secret is sealed with [SecretsKey], the repo, server and key as associated data, and a read answers only
- * `{secret: true, set, since}` for it; [config] opens them, for the desktop's spawn and the engine's test alone.
+ * [RepoMcpServers] in `engine.repo_mcp_server`: a header or env value marked secret is sealed with [SecretsKey], the
+ * repo, server and key as associated data.
  */
 @Repository
-class RepoMcpServers(private val jdbc: JdbcClient, private val secrets: SecretsKey, private val repos: TargetRepos) {
+class StoredRepoMcpServers(private val jdbc: JdbcClient, private val secrets: SecretsKey, private val repos: TargetRepos) : RepoMcpServers {
     companion object {
-        /** A server's name: it becomes `mcp__<name>__*` in First mate's allow list. */
-        val NAME = Regex("^[A-Za-z0-9_-]{1,64}$")
-        /** The engine's own servers, on every First mate and every Smith already. */
-        val RESERVED = setOf("frakworks", "frakworks-engine-diagnostics")
-        val KEY = Regex("^[A-Za-z0-9_.-]{1,100}$")
-        const val MAX_VALUE = 8000
         private val FIELDS = listOf("kind", "audience", "role", "url", "headers", "command", "args", "env")
-        const val AUDIENCE_400 = "audience is required: smith, first-mate or both (who gets the server)"
-        const val ROLE_400 = "role is ops or absent"
-        /** A stdio row cannot carry the ops role: the engine, not the user's machine, calls an ops server. */
-        const val OPS_STDIO_400 = "a stdio server cannot have role ops: it runs on the user's machine, and the engine calls an ops server itself; give it an http or sse url"
         private val JSON = jacksonObjectMapper()
     }
 
-    /** The repo's row name, or 404 for one that is not a target repo. */
-    fun repo(fullName: String): String = targetRepoOr404(repos, fullName).fullName
+    override fun repo(fullName: String): String = targetRepoOr404(repos, fullName).fullName
 
-    fun checkName(server: String): String {
+    override fun checkName(server: String): String {
         if (!NAME.matches(server)) throw badRequest("name is 1 to 64 letters, digits, '_' or '-'")
         if (server in RESERVED) throw badRequest("name $server is the engine's own server, on every First mate and Smith already")
         if (server == "config") throw badRequest("name config is taken: GET .../mcp-servers/config is the spawn's config")
@@ -131,23 +67,11 @@ class RepoMcpServers(private val jdbc: JdbcClient, private val secrets: SecretsK
         put("updatedAt", r.updatedAt); put("updatedBy", r.updatedBy)
     }
 
-    /** `GET`: the repo's servers, name order, no secret value among them. */
-    fun list(fullName: String): List<Map<String, Any?>> { val repo = repo(fullName); return rows(repo).map { view(repo, it) } }
+    override fun list(fullName: String): List<Map<String, Any?>> { val repo = repo(fullName); return rows(repo).map { view(repo, it) } }
 
-    /** One server's read view, or null. */
-    fun get(fullName: String, server: String): Map<String, Any?>? { val repo = repo(fullName); return rows(repo, server).firstOrNull()?.let { view(repo, it) } }
+    override fun get(fullName: String, server: String): Map<String, Any?>? { val repo = repo(fullName); return rows(repo, server).firstOrNull()?.let { view(repo, it) } }
 
-    /**
-     * `PUT`: adds the server or replaces it whole. `kind` and `audience` (`smith`, `first-mate` or `both`: who gets it)
-     * are required; `url` (and `headers`) for http and sse, `command` (and `args`, `env`) for stdio. A header or env value is a string (plain), `{"value": "...", "secret": true}` (sealed),
-     * or `{"secret": true}` alone, which keeps the value already sealed under that key. `role` is `ops` or absent
-     * ([McpRole]; 400 [ROLE_400] otherwise): an ops row is http or sse (400 [OPS_STDIO_400] for stdio) and the only
-     * one of the repo for its audience (400 naming the other). 400 names the field; 503 when a
-     * secret is to be sealed and `ENGINE_SECRETS_KEY` is unset. [check] sees a validated role row with its secrets
-     * opened before anything is written (a plain row is not checked), and refuses it by throwing (the ops conformance probe, `OpsContract`): nothing
-     * is stored when it does. Returns the read view and whether the server was new.
-     */
-    fun put(fullName: String, server: String, body: Any?, login: String?, check: (McpServerConfig) -> Unit = {}): Pair<Map<String, Any?>, Boolean> {
+    override fun put(fullName: String, server: String, body: Any?, login: String?, check: (McpServerConfig) -> Unit): Pair<Map<String, Any?>, Boolean> {
         val repo = repo(fullName)
         checkName(server)
         if (body !is Map<*, *>) throw badRequest("the body is an object with kind and its fields: url and headers, or command, args and env")
@@ -244,28 +168,18 @@ class RepoMcpServers(private val jdbc: JdbcClient, private val secrets: SecretsK
         return linkedMapOf("secret" to false, "value" to value)
     }
 
-    /** `DELETE`: false when the repo has no server by that name. */
-    fun delete(fullName: String, server: String): Boolean =
+    override fun delete(fullName: String, server: String): Boolean =
         jdbc.sql("DELETE FROM engine.repo_mcp_server WHERE repo = :r AND name = :n").param("r", repo(fullName)).param("n", server).update() == 1
 
-    /**
-     * The repo's servers with their secrets opened, every one or only those [audience] gets (its own and `both`): 503 when
-     * one is sealed and the key is unset. Never for a read.
-     */
-    fun config(fullName: String, server: String? = null, audience: McpAudience? = null): List<McpServerConfig> {
+    override fun config(fullName: String, server: String?, audience: McpAudience?): List<McpServerConfig> {
         val repo = repo(fullName)
         return rows(repo, server).filter { audience == null || it.audience.serves(audience) }.map { r ->
             McpServerConfig(r.name, r.kind, r.url, open(repo, r.name, "headers", r.headers), r.command, r.args, open(repo, r.name, "env", r.env), r.audience, r.role)
         }
     }
 
-    /** Whether the repo has an ops server (role `ops`), any audience, without opening its secrets. */
-    fun hasOpsServer(fullName: String): Boolean = rows(repo(fullName)).any { it.role == McpRole.OPS }
+    override fun hasOpsServer(fullName: String): Boolean = rows(repo(fullName)).any { it.role == McpRole.OPS }
 
-    /**
-     * The repo's ops server (role `ops`), secrets opened, for the engine to call: the row the engine can reach from the
-     * cluster first (`smith`, then `both`, then `first-mate`); null when the repo has none.
-     */
-    fun opsServer(fullName: String): McpServerConfig? = config(fullName).filter { it.role == McpRole.OPS }
+    override fun opsServer(fullName: String): McpServerConfig? = config(fullName).filter { it.role == McpRole.OPS }
         .minByOrNull { when (it.audience) { McpAudience.SMITH -> 0; McpAudience.BOTH -> 1; McpAudience.FIRST_MATE -> 2 } }
 }

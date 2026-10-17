@@ -4,16 +4,7 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
 import org.springframework.web.client.body
 
-/**
- * GitHub's compare of two commits (`GET /repos/{o}/{r}/compare/{base}...{head}`), for `DeployedChecks` (#100008):
- * whether a commit is an ancestor of the one running. Tests use a fake.
- */
-interface GitHubCompare {
-    /** GitHub's `status` for `base...head`: `identical`, `ahead` (head has base and more), `behind` or `diverged`. */
-    fun status(repo: String, base: String, head: String): String
-}
-
-/** The compare call with the repo's token ([RepoTokens]); the response is read for `status` alone. */
+/** The compare call ([GitHubCompare]) with the repo's token ([RepoTokens]); the response is read for `status` alone. */
 @Component
 class RestGitHubCompare(
     private val tokens: RepoTokens,

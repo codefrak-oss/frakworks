@@ -5,7 +5,7 @@ include(":sdk")
 project(":sdk").projectDir = file("../sdk")
 // The engine's modules (engine/modules, engine/README.md "Engine modules"), in layer order: libraries engine-app
 // depends on. The root project holds no code.
-for (module in listOf("common", "github", "events", "accounts", "jev", "smith", "incidents", "hitlp", "firstmate")) {
+for (module in listOf("common", "github-api", "github", "events", "accounts", "jev", "smith", "incidents", "hitlp", "firstmate")) {
     include(":engine-$module")
     project(":engine-$module").projectDir = file("modules/$module")
 }
