@@ -13,7 +13,7 @@ import com.codefrak.engine.repos.TargetRepos
 import com.codefrak.engine.runAllJobs
 import com.codefrak.engine.smith.Brief
 import com.codefrak.engine.smith.SmithCaller
-import com.codefrak.engine.smith.SmithExitNotifier
+import com.codefrak.engine.smith.SandboxExitNotifier
 import com.codefrak.engine.smith.SmithSpec
 import com.codefrak.engine.smith.ensureTestAccount
 import com.codefrak.engine.smith.dropTestAccount
@@ -51,7 +51,7 @@ class IncidentFixProcessTest {
     @Autowired lateinit var history: HistoryService
     @Autowired lateinit var management: ManagementService
     @Autowired lateinit var accounts: AiAccounts
-    @Autowired lateinit var exits: SmithExitNotifier
+    @Autowired lateinit var exits: SandboxExitNotifier
     @Autowired lateinit var github: TicketRecorder
     @Autowired lateinit var sandbox: ScriptedSandbox
     @Autowired lateinit var fixes: IncidentFixController

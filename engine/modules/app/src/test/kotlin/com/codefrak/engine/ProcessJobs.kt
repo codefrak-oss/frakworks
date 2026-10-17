@@ -1,10 +1,10 @@
 package com.codefrak.engine
 
-import com.codefrak.engine.smith.SmithExitNotifier
+import com.codefrak.engine.smith.SandboxExitNotifier
 import org.operaton.bpm.engine.ManagementService
 
 /** Drains every due job, round by round, until none are left or `rounds` is exhausted. */
-fun ManagementService.runAllJobs(exits: SmithExitNotifier, rounds: Int = 100, messages: Boolean = false) {
+fun ManagementService.runAllJobs(exits: SandboxExitNotifier, rounds: Int = 100, messages: Boolean = false) {
     repeat(rounds) {
         // Exited sandboxes reach their waiting runs through the backstop scan: no event stream in tests.
         exits.scanExits()

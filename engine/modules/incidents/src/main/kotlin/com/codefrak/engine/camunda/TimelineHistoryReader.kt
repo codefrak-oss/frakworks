@@ -4,7 +4,7 @@ import com.codefrak.engine.accounts.ClaudeUsage
 import com.codefrak.engine.accounts.ClaudeUsageLedger
 import com.codefrak.engine.at
 import com.codefrak.engine.engineJson
-import com.codefrak.engine.smith.ReadResultDelegate
+import com.codefrak.engine.smith.RESULT_REJECTED
 import com.codefrak.engine.smith.ReviewResult
 import com.codefrak.engine.smith.SmithRunStat
 import com.codefrak.engine.smith.SmithRunStats
@@ -92,8 +92,8 @@ class TimelineHistoryReader(
         val output = if (collected) v[Vars.OUTPUT] as? ByteArray else null
         val resultJson = output?.let { runCatching { engineJson.readTree(it) }.getOrNull() }
         val result = if (collected) v[Vars.RESULT] as? String else null
-        val rejected = last && wrapper?.endTime != null && wrapperVars["outcome"] == ReadResultDelegate.REJECTED
-        val outcome = if (rejected) ReadResultDelegate.REJECTED else resultJson?.get("outcome")?.takeIf { it.isString }?.asString() ?: result
+        val rejected = last && wrapper?.endTime != null && wrapperVars["outcome"] == RESULT_REJECTED
+        val outcome = if (rejected) RESULT_REJECTED else resultJson?.get("outcome")?.takeIf { it.isString }?.asString() ?: result
         val readDone = wrapper != null && acts[wrapper.id].orEmpty().any { it.activityId == READ_RESULT && it.endTime != null }
         val reviewNo = if (mode in TicketTimelineController.REVIEW_MODES && last && readDone) (wrapperVars["reviews"] as? Number)?.toInt() else null
         val ended = if (collected) done.getValue(COLLECT).endTime?.at() else null

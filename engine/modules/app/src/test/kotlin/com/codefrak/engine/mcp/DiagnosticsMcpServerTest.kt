@@ -14,7 +14,7 @@ import com.codefrak.engine.repos.Access
 import com.codefrak.engine.repos.TargetRepos
 import com.codefrak.engine.runAllJobs
 import com.codefrak.engine.smith.SmithCaller
-import com.codefrak.engine.smith.SmithExitNotifier
+import com.codefrak.engine.smith.SandboxExitNotifier
 import com.codefrak.engine.smith.ensureTestAccount
 import com.codefrak.engine.smith.dropTestAccount
 import com.codefrak.engine.settings.PublicUrl
@@ -55,7 +55,7 @@ class DiagnosticsMcpServerTest {
     @Autowired lateinit var runtime: RuntimeService
     @Autowired lateinit var management: ManagementService
     @Autowired lateinit var repository: org.operaton.bpm.engine.RepositoryService
-    @Autowired lateinit var exits: SmithExitNotifier
+    @Autowired lateinit var exits: SandboxExitNotifier
     @Autowired lateinit var accounts: AiAccounts
     @Autowired lateinit var repos: TargetRepos
     @Autowired lateinit var access: Access

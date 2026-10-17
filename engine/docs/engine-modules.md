@@ -9,8 +9,8 @@ code, only what the modules share (the plugin versions, the toolchain, the Sprin
 `com.codefrak.engine.*` packages its code had, so a package can span modules, and component scanning from
 `EngineApplication`, bean names and BPMN delegate expressions are unchanged.
 
-**The layer rule.** The modules form layers, lowest first: `common`, `github-api`, `github`, `events`, `accounts`, `jev`, `smith`,
-`incidents`, `hitlp`, `firstmate` (layers 0-2 below), the flow modules (one layer), `plugins`, `api`, `app`. A module uses its own classes
+**The layer rule.** The modules form layers, lowest first: `common`, `github-api`, `github`, `events`, `accounts`, `jev`, `smith-api`,
+`smith`, `incidents`, `hitlp`, `firstmate` (layers 0-2 below), the flow modules (one layer), `plugins`, `api`, `app`. A module uses its own classes
 and those of lower layers only, never an upper layer's, and a flow module never uses another flow module's: what two
 flows share is a contract in a lower layer. Gradle holds it (each build file names only lower modules), and two tests
 in `engine-app` check it: `EngineModulesTest` resolves every import of each module against what the modules it may
@@ -19,7 +19,7 @@ from, with fixture classes it places by hand to show the rule fails for a lower 
 a flow that uses another.
 
 **Where tests live.** Each module tests itself: a test that needs only one module and the modules below it is in that
-module's `src/test` (`modules/smith/src/test`, `modules/flow-doctor/src/test`, ...), so a change in one flow module
+module's `src/test` (`modules/smith-api/src/test`, `modules/flow-doctor/src/test`, ...), so a change in one flow module
 recompiles and re-runs that flow's tests and the app's, and every other module's test task is up to date or from the
 build cache. `modules/app/src/test` keeps the tests that need the whole application: the `@SpringBootTest` classes
 (the full context, the BPMN deployed from the app's resources), the process tests that drive a flow's BPMN end to
@@ -27,7 +27,7 @@ end, `EngineModulesTest`, `ConfigConsistencyTest` and `LayerRuleTest` (they read
 Smith's result against `smith/schemas` (packed into the app's resources as `result-schemas/`: `ResultContractTest`,
 `WorkResultTest`, `FixResultTest`, `DoctorResultTest`), `RefactorPromptTest` (it reads `bots/refactor-values.md`, which only the app packs), and the tests whose constants app tests use (`PushRejectedTest`,
 `PitchRulesTest`, with `ResearchResultTest`). A helper tests in several modules share is a test fixture of the lowest module it needs
-(`modules/events/src/testFixtures`: `EventRecorder`; `modules/smith/src/testFixtures`: `FakeSandbox`), used as
+(`modules/events/src/testFixtures`: `EventRecorder`; `modules/smith-api/src/testFixtures`: `FakeSandbox`, `TicketRecorder`, `eventually`), used as
 `testImplementation(testFixtures(project(...)))`, never copied. The root build (`engine/build.gradle.kts`) gives every module the same test libraries and test JVM settings;
 every test runs from `engine/`.
 
@@ -39,9 +39,10 @@ every test runs from `engine/`.
 | `engine-events` | `EngineEvent`, `EngineEvents`, `FlowEvents`, `FlowEventsPlugin`, `GET /events`, and the payload types their frames carry (`BoardIssue` and what it holds, `BoardRows`); `FlowIssues` and `IssueBoard` are `engine-api`'s, behind `FlowIssueLookup` and `BoardRows` | github-api |
 | `engine-accounts` | `accounts/**` and `tier/**`; `GET /accounts`'s live runs come from `RunningModels` (`SmithTelemetry`) | events |
 | `engine-jev` | `jev/**` and `summarize/**`; the live runs a summary reads come from `LiveRunSessions` (`SmithLiveRunSessions`) | accounts, github-api |
-| `engine-smith` | `smith/**` (the sandboxes, the Smith delegates, `read result`), `webhook/**`, and the flow-tracking half of `repos/**` (`RunningFlows`, `RootProcessInstance`, `HandledIssues`, `DeferredIssues`, `Access`); `TargetRepoController` and `RepoSetup*` are `engine-api`'s | jev |
-| `engine-incidents` | `camunda/**` (incidents, their fixes, flows and timelines) `doctor.DoctorVars`, and the intake links `IntakeRefs` and `IntakeTickets` | smith |
-| `engine-hitlp` | `hitlp/**` ("The HITLP requester"): the engine as a HITLP requester (`HitlpServerSettings`, `HitlpRequester`, `HitlpFiling`, `HitlpTaskStream`, `HitlpPoller`, `HitlpRequests`), the vendored spec/schemas (`resources/hitlp/**`), and the judge's escalation, teach and SSH-verdict readers; it serves no HITLP (#2484) | smith |
+| `engine-smith-api` | The Smith contract, and nothing that runs a sandbox or touches the database: the interfaces (`SmithSandbox`, `ResultHandler` with `WorkResultListener`, `SmithRunStats`, `SmithSessions`, `SmithHosting`, `SmithExitNotifier`, `RunTokens`, `repos.EngineTokens`, `IntakeLookup` with `RetroNotes`, `webhook.FlowWakes`, `PluginMetrics`), the run's value types (`SmithSpec`, `SmithCaller`, `SandboxExit`, `Brief`, `Ticket`, `Finding`, `Answer`, `Vars`, `WorkResult` and the other result types, `SmithRunStat`, `RunLabels`, `LiveFigures`, `Lineage`, `IntakeRef`, `SmithHostingSettings`, `EngineToken`, `RunTokenClaims`), the pure helpers (`DelegateVariables`, `AllowedScope`, `ResultSchemas` with `PassAlong`, `SmithRefusal` with `SandboxCallers`, `RunSandboxStopper`, `InCluster`, `kubernetesConfig`, `refreshable`, the result modes and variables in `ResultModes.kt`, the pod constants `SMITH_UID` and `SMITH_PRIORITY_CLASS`), the flow-shared layer in the flows' own packages (`intake`, `feature`, `proposal`, `research`, `doctor`, `friction`, `chore`, `trigger`, `board`, `jobs`: "What two flows share", below) and the flow-tracking half of `repos/**` (`RunningFlows`, `RootProcessInstance`, `HandledIssues`, `DeferredIssues`, `Access`); `FakeSandbox`, `TicketRecorder` and `eventually` (`src/testFixtures`). Every module above programs against this module alone | jev |
+| `engine-smith` | The implementations of `engine-smith-api`: the sandboxes (`DockerSandbox`, `KubernetesSandbox`, `SmithSandboxes`), the smith-run delegates (`StartSmithDelegate`, `CollectSmithDelegate`, `ReadResultDelegate` with `WorkResultReader`, `RemoveSmithDelegate`, `NoteSmithRerunDelegate`), the telemetry and live sessions (`SmithTelemetry`, `SmithTelemetryResume`, `LiveTally`, `SessionDigest`, `SmithLiveRunSessions`), the stores `StoredSmithRunStats`, `StoredSmithSessions`, `StoredSmithHosting`, `StoredRunTokens` and `repos.StoredEngineTokens`, `SandboxExitNotifier`, the engine's own controllers (`SmithHostingController`, `SmithMetricsController`, `EngineUpdateController`, `EngineRestartController`) and `webhook/**` (`GitHubWebhookController`, `WebhookWake`, `WakeLeader`). Only `engine-app` depends on it (the beans reach the context by component scanning, the packages being the same; `smith-run.bpmn`'s delegate expressions resolve by bean name), so a change here rebuilds and retests this module and the app, no module in between | smith-api |
+| `engine-incidents` | `camunda/**` (incidents, their fixes, flows and timelines) `doctor.DoctorVars`, and the intake links `IntakeRefs` and `IntakeTickets` | smith-api |
+| `engine-hitlp` | `hitlp/**` ("The HITLP requester"): the engine as a HITLP requester (`HitlpServerSettings`, `HitlpRequester`, `HitlpFiling`, `HitlpTaskStream`, `HitlpPoller`, `HitlpRequests`), the vendored spec/schemas (`resources/hitlp/**`), and the judge's escalation, teach and SSH-verdict readers; it serves no HITLP (#2484) | smith-api |
 | `engine-firstmate` | `firstmate/**` ("First-mate sessions"): the phone's first-mate session store and transcript, `/first-mate/sessions`, the session pod's MCP config (`FirstMateMcpConfig`), the session pods running `fm-relay` (`FirstMatePodSpec`, `KubernetesFirstMateSessionPods`) and the relay's endpoints (`FirstMatePodController`), and their freeze and resume (`FirstMateFreezer`, `FirstMateSnapshots`), and the APNs pushes (`firstmate.push`: "Push notifications") | hitlp |
 | `engine-flow-intake` | `intake/**`: the intake flow, `FlowCanceller`, `TicketAmender` (`IntakeController` is `engine-api`'s) | layers 0-2 |
 | `engine-flow-feature` | `feature/**` and `bug/**` | layers 0-2 |
@@ -51,7 +52,7 @@ every test runs from `engine/`.
 | `engine-flow-proposal` | `proposal/**` and `research/**` | layers 0-2 |
 | `engine-plugins` | `jobs/**` (custom jobs, plugin jars and flows, the job controller), `sdk/**` (the engine's side of the SDK), `refactor.RefactorConfigs` and its controller, and `bpmn.FlowRules` (the diagram checks, for the engine's flows and a plugin's) | every flow module, `:sdk` |
 | `engine-api` | `board/**` (the Issues board, needs, pitches), `mcp/**` (the engine-served MCP servers), `firstmate/**`, `frakpanel/**`, `TargetRepoController`, `EngineAccessController` and `RepoSetup*` in `repos`, `intake.IntakeController`, `events.FlowIssues`, and the root controllers (`HealthController`, `VersionController`, `EchoController`, `ProcessTestController`) | plugins |
-| `engine-app` | `EngineApplication`, `ProcessMigrator`, `UnknownEngineProperties`, the root delegates (`HelloDelegate`, `NoopDelegate`, `NotBuiltListener`), the Kotlin Flyway migrations (`db.migration`), and every resource: `src/main/resources` (`bpmn/`, `db/migration`, `frakpanel/`, `application.properties`, `META-INF`), the Modeler drafts in `engine/bpmn` (a resource directory of the module, deployed as they are), `smith/schemas` and `bots/refactor-values.md`. Its tests are the ones that need the whole application ("Where tests live", below) | api, github |
+| `engine-app` | `EngineApplication`, `ProcessMigrator`, `UnknownEngineProperties`, the root delegates (`HelloDelegate`, `NoopDelegate`, `NotBuiltListener`), the Kotlin Flyway migrations (`db.migration`), and every resource: `src/main/resources` (`bpmn/`, `db/migration`, `frakpanel/`, `application.properties`, `META-INF`), the Modeler drafts in `engine/bpmn` (a resource directory of the module, deployed as they are), `smith/schemas` and `bots/refactor-values.md`. Its tests are the ones that need the whole application ("Where tests live", below) | api, github, smith |
 
 Every package, by the modules that hold it (a package in several modules is split by class, as the table above says):
 
@@ -59,34 +60,34 @@ Every package, by the modules that hold it (a package in several modules is spli
 |---|---|
 | (root) | common, api, app |
 | `accounts` | common (`SecretsKey`), accounts |
-| `board` | github-api, events, smith, api |
+| `board` | github-api, events, smith-api, api |
 | `bpmn` | plugins |
 | `bug` | flow-feature |
 | `camunda` | events, incidents |
-| `chore` | smith, flow-delivery |
+| `chore` | smith-api, flow-delivery |
 | `ci` | github-api, flow-delivery |
-| `doctor` | smith, incidents, flow-doctor |
+| `doctor` | smith-api, incidents, flow-doctor |
 | `events` | events, api (`FlowIssues`) |
-| `feature` | smith, flow-feature |
+| `feature` | smith-api, flow-feature |
 | `firstmate` | api |
 | `frakpanel` | api |
-| `friction` | smith, flow-friction |
+| `friction` | smith-api, flow-friction |
 | `github` | github-api (the contract), github (the clients) |
 | `hitlp` | hitlp |
-| `intake` | github-api (`AnswerAttachments`), github (`StoredAnswerAttachments`), events, smith, incidents, flow-intake, api (`IntakeController`) |
+| `intake` | github-api (`AnswerAttachments`), github (`StoredAnswerAttachments`), events, smith-api, incidents, flow-intake, api (`IntakeController`) |
 | `jev` | jev |
-| `jobs` | smith (`JOB_OUTCOME`, `JobCreators`), plugins |
+| `jobs` | smith-api (`JOB_OUTCOME`, `JobCreators`, `JobRuns`), plugins |
 | `mcp` | api |
-| `proposal` | smith, flow-proposal |
+| `proposal` | smith-api, flow-proposal |
 | `refactor` | flow-delivery, plugins (`RefactorConfigs`) |
-| `repos` | github-api, github (the stores), smith, api |
-| `research` | smith, flow-proposal |
+| `repos` | github-api, github (the stores), smith-api (the flow-tracking half, `EngineTokens`), smith (`StoredEngineTokens`), api |
+| `research` | smith-api, flow-proposal |
 | `sdk` | plugins |
-| `smith` | accounts, smith |
+| `smith` | accounts, smith-api (the contract), smith (the sandboxes, delegates, telemetry and stores) |
 | `summarize` | jev |
 | `tier` | accounts |
-| `trigger` | smith, flow-delivery |
-| `webhook` | github-api, smith |
+| `trigger` | smith-api, flow-delivery |
+| `webhook` | github-api, smith-api (`FlowWakes`), smith |
 | `workitems` | github-api (`Tickets`, `WorkItem`, `TicketReads`; `FakeTickets` in its test fixtures), api (`WorkItemStore`, `WorkItemTickets`, `GitHubWorkItemSource`) |
 | `db.migration` (not under `com.codefrak.engine`) | app |
 
@@ -101,14 +102,23 @@ classpath. A consumer that needs a new operation adds it to the interface in `en
 layers, `engine-github-api` just below `engine-github`). `FakeTickets` is `engine-github-api`'s test fixture
 (`testImplementation(testFixtures(project(":engine-github-api")))`).
 
+`engine-smith-api` and `engine-smith` are cut the same way: the contract (the interfaces, the run's value types, the
+pure helpers, the flow-shared layer) in `engine-smith-api`, the sandboxes, delegates, telemetry and stores in
+`engine-smith`, which only `engine-app` depends on. A consumer that needs a store or a bean of the smith layer takes it
+through its interface (`SmithSessions`, not `StoredSmithSessions`; `SmithExitNotifier`, not `SandboxExitNotifier`); a
+test that needs both an implementation and an upper module (`GitHubWebhookTest`, `EngineMetricsTest`,
+`FirstMatePodSpecTest`, `PreviousBundleCarryTest`) is an app test. `FakeSandbox` and `TicketRecorder` are
+`engine-smith-api`'s test fixtures. What the split buys: a change inside `engine-smith` (a sandbox, a delegate, the
+telemetry) runs that module's compile and tests and the app's tests, and every other module's tasks come from the cache.
+
 `JevAgreement` (`GET /jev/summary`'s `judged` and `agreed`, "Jev decisions") is a bean over every
 `JevAgreementRule` bean: each use case's package registers the rule that reads its outcomes (`CiTriageAgreement`,
 `IncidentTriageAgreement`, `DuplicateAgreement`, `RefinePickAgreement`, `SightingAgreement`,
 `FrictionGroupAgreement`, `ProposalDecisionAgreement`; `acceptance`, which no flow asks any more, is
 `engine-jev`'s own), so `engine-jev` imports none of them. Its tests are in `modules/jev/src/test`; the agreements' tests are with their modules.
 
-`engine-smith` imports no flow module's code (`EngineModulesTest`); what it needs of one is an interface the flow
-module implements:
+`engine-smith-api` and `engine-smith` import no flow module's code (`EngineModulesTest`); what the smith layer needs of
+one is an interface in `engine-smith-api` the flow module implements:
 
 - `ResultHandler`: `read result` (`ReadResultDelegate`) reads the smith-owned modes itself (work, reproduce, verify,
   review, security, job) and hands every other mode's result, checked against its schema, to the one handler bean
@@ -116,7 +126,7 @@ module implements:
   `ProposeResultHandler` (propose), `ResearchResultHandler` (research), `DoctorResultHandler` (doctor) and
   `engine-incidents`' `IncidentResultHandler` (fix, diagnose). Two handlers claiming one mode, or a smith-owned one,
   fail the startup. `WorkResultListener` beans hear of every accepted work result (`CiTriageListener`).
-- `IntakeLookup` (`IntakeLookups`): the earlier intakes a brief names (`IntakeRef`, now in `smith`) and the refiner's
+- `IntakeLookup` (`IntakeLookups`): the earlier intakes a brief names (`IntakeRef`, now in `smith-api`) and the refiner's
   tier; `RetroNotes` (`FrictionRetroNotes`): a run's retro notes as friction notes.
 - `FlowWakes` (`IssueScanWakes`): what a webhook wake starts and wakes, the issue scan and the engine-check poll.
 - `PluginMetrics` (`EngineMetrics`): the plugins' series `GET /metrics` appends.
@@ -126,7 +136,7 @@ its filed ticket in is `Vars.FILED_TICKET`.
 
 A flow module depends on layers 0-2 (common through incidents) alone, never on another flow module or an upper layer
 (`EngineModulesTest` resolves every import of each module against what the modules it may use declare). What two
-flows share is a contract in `engine-smith`, in the package it had, with the implementation in its flow:
+flows share is a contract in `engine-smith-api`, in the package it had, with the implementation in its flow:
 
 - Types, constants and pure helpers, moved as they were: `feature.FeatureMode`/`AcceptResult`/`PlanQuestion`
   (`FeatureResults`), `SplitState` and `mergedText`, `intake.RefineResult`, `proposal.ProposeResult`, `PitchRules`,

@@ -16,6 +16,10 @@ dependencies {
     // contract alone, and the one application puts the implementations on the classpath (component scanning finds
     // them, their packages being the same). Its tests construct a few of them (StoredRepoMcpServers, GitHubTokenIdentity).
     implementation(project(":engine-github"))
+    // The Smith sandboxes, delegates, telemetry and stores behind engine-smith-api's contract, the same way: every other
+    // module programs against the contract, and the app puts the implementations on the classpath (smith-run.bpmn's
+    // delegate expressions resolve by bean name). Its tests drive them (SandboxExitNotifier, StoredSmithSessions).
+    implementation(project(":engine-smith"))
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
     implementation("tools.jackson.module:jackson-module-kotlin")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
@@ -31,7 +35,7 @@ dependencies {
     runtimeOnly("com.h2database:h2")
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
     testImplementation(testFixtures(project(":engine-events")))
-    testImplementation(testFixtures(project(":engine-smith")))
+    testImplementation(testFixtures(project(":engine-smith-api")))
     // LayerRuleTest: the modules' layer rule over the compiled classes.
     testImplementation("com.tngtech.archunit:archunit-junit5:1.4.1")
 }

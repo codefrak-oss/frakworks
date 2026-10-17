@@ -4,7 +4,7 @@ import com.codefrak.engine.github.GitPush
 import com.codefrak.engine.smith.Brief
 import com.codefrak.engine.smith.Finding
 import com.codefrak.engine.smith.Vars
-import com.codefrak.engine.smith.WorkResultReader
+import com.codefrak.engine.smith.CI_NOT_MINE_CAP
 import com.codefrak.engine.workitems.Tickets
 import com.codefrak.engine.workitems.WorkItemRefused
 import org.operaton.bpm.engine.HistoryService
@@ -85,7 +85,7 @@ class IncidentRetrier(
             activityId in CONFLICT_ACTIVITIES && message != null && message.startsWith("merge conflict with") && "conflict rounds" in message
 
         /** Whether the incident is the work result refused past [Vars.CI_NOT_MINE_MAX] rounds declining the same check's failure. */
-        fun ciNotMineCap(message: String?): Boolean = message?.contains(WorkResultReader.CI_NOT_MINE_CAP) == true
+        fun ciNotMineCap(message: String?): Boolean = message?.contains(CI_NOT_MINE_CAP) == true
 
         fun unappliable(message: String?): Boolean =
             message?.startsWith("${GitPush.UNAPPLIABLE}the bundle cannot be applied") == true

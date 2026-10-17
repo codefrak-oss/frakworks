@@ -1,6 +1,7 @@
 package com.codefrak.engine.smith
 
 import com.codefrak.engine.lease.LeaseLost
+import com.codefrak.engine.smith.SmithExitNotifier.Delivery
 import com.codefrak.engine.lease.LeaseAcquired
 import com.codefrak.engine.lease.EngineLease
 import org.operaton.bpm.engine.MismatchingMessageCorrelationException
@@ -12,14 +13,11 @@ import org.springframework.context.event.EventListener
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 
-/** The message `smith-run` waits at after starting its sandbox (bpmn/smith-run.bpmn, `event-smith-exited`). */
-const val SMITH_EXITED_MESSAGE = "message-smith-exited"
-
 /** One backstop scan's outcome: how many waiting runs it looked at, how many it found exited and collected. */
 data class ExitScanReport(val checked: Int, val collected: Int)
 
 /**
- * How `smith-run` learns its sandbox exited (engine/README.md, "Smith runs").
+ * [SmithExitNotifier] over the sandbox provider: how `smith-run` learns its sandbox exited (engine/README.md, "Smith runs").
  * The process waits at a message catch event; this delivers the message,
  * with the exit code, two ways:
  *
@@ -44,13 +42,13 @@ data class ExitScanReport(val checked: Int, val collected: Int)
  * about a minute, and otherwise left to the backstop.
  */
 @Component
-class SmithExitNotifier(
+class SandboxExitNotifier(
     private val runtime: RuntimeService,
     private val sandbox: SmithSandbox,
     @Value("\${engine.smith.exit-scan.enabled:true}") private val scanEnabled: Boolean,
     private val lease: EngineLease,
-) {
-    private val log = LoggerFactory.getLogger(SmithExitNotifier::class.java)
+) : SmithExitNotifier {
+    private val log = LoggerFactory.getLogger(SandboxExitNotifier::class.java)
     private var subscription: AutoCloseable? = null
 
     /** How often a `die` that found no waiting run is retried, and how long between tries. */
@@ -101,14 +99,12 @@ class SmithExitNotifier(
         return earlyRetries + 1
     }
 
-    enum class Delivery { COLLECTED, ALREADY, NOT_WAITING }
-
     /**
      * Correlate the message to the run's process instance: by run id when the
      * exit carries one, else by the `sandboxHandle` variable. Exactly one of
      * event and backstop gets [Delivery.COLLECTED]; the other is a no-op.
      */
-    fun deliver(exit: SandboxExit): Delivery {
+    override fun deliver(exit: SandboxExit): Delivery {
         val instanceId = exit.runId ?: runtime.createProcessInstanceQuery()
             .variableValueEquals(Vars.HANDLE, exit.handle).list().singleOrNull()?.id
             ?: return Delivery.NOT_WAITING.also { log.debug("exit of {}: no run has that handle", exit.handle.take(12)) }
