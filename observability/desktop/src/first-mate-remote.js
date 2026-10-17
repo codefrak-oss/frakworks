@@ -52,6 +52,11 @@ function splitContent(content) {
 }
 
 /** The pod's line as First mate reads it: no turn attribution the desktop could not match. */
+function isToolResult(line) {
+  const c = line.message && line.message.content;
+  return Array.isArray(c) && c.some((b) => b && b.type === "tool_result");
+}
+
 function localLine(line) {
   if (!line || typeof line !== "object") return line;
   const out = { ...line };
@@ -121,6 +126,10 @@ class RemoteSession extends EventEmitter {
     const line = d.line;
     if (!line || typeof line !== "object") return;
     if (line.type === "user") {
+      // A tool_result line claude writes after a tool call is not an echo:
+      // taken as one, it queued a stray turn on the ledger and the next
+      // turn's result was then refused, leaving the pane busy.
+      if (isToolResult(line)) return;
       // The engine's echo of a message posted here: the turn's own uuid.
       const uuid = this.echoes.shift();
       this.draining = false;
