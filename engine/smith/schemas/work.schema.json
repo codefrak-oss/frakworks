@@ -1,0 +1,155 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/codefrak-oss/frakworks/engine/smith/schemas/work.schema.json",
+  "title": "WorkResult",
+  "description": "What a work Smith writes to /work/out/result.json. The engine checks it (ReadResultDelegate) before its own rules; the Smith checks it with check-result work. Strict types where the engine branches, any non-empty JSON where it only passes content on.",
+  "type": "object",
+  "required": [
+    "outcome"
+  ],
+  "properties": {
+    "outcome": {
+      "enum": [
+        "done",
+        "nothing-to-do",
+        "ask",
+        "split"
+      ],
+      "description": "Branched on by the engine and the BPMN."
+    },
+    "title": {
+      "type": "string",
+      "description": "The PR title, used as is."
+    },
+    "summary": {
+      "$ref": "#/$defs/content"
+    },
+    "reason": {
+      "$ref": "#/$defs/content"
+    },
+    "question": {
+      "$ref": "#/$defs/content"
+    },
+    "children": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/child"
+      },
+      "description": "For outcome split, on a child of a split feature only: the drafts, in order, that replace this ticket in the parent's plan; the design run's child shape."
+    },
+    "addressed": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "finding"
+        ],
+        "properties": {
+          "finding": {
+            "type": "string"
+          },
+          "how": {
+            "$ref": "#/$defs/content"
+          }
+        }
+      }
+    },
+    "declined": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "finding"
+        ],
+        "properties": {
+          "finding": {
+            "type": "string"
+          },
+          "why": {
+            "$ref": "#/$defs/content"
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "content": {
+      "description": "Passed on to a brief or a GitHub comment, never branched on: any non-empty JSON. A string is shown as itself; an object or array as a fenced JSON block.",
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        {
+          "type": "object",
+          "minProperties": 1
+        },
+        {
+          "type": "array",
+          "minItems": 1
+        },
+        {
+          "type": [
+            "number",
+            "boolean"
+          ]
+        }
+      ]
+    },
+    "child": {
+      "type": "object",
+      "required": [
+        "title",
+        "body",
+        "kind",
+        "dependsOn",
+        "points"
+      ],
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "The child issue's title, filed as is."
+        },
+        "body": {
+          "type": "string",
+          "description": "The child issue's markdown body; the engine reads its sections."
+        },
+        "kind": {
+          "enum": [
+            "chore",
+            "bug",
+            "feature"
+          ],
+          "description": "Branched on: which flow the child is filed for."
+        },
+        "featureMode": {
+          "enum": [
+            "auto",
+            "confirm",
+            null
+          ],
+          "description": "Ignored: a feature child takes its parent's mode. Omit it."
+        },
+        "dependsOn": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "description": "Indexes of earlier children."
+        },
+        "points": {
+          "enum": [
+            1,
+            2,
+            3,
+            5,
+            8,
+            13
+          ],
+          "description": "The child's story points (bots/story-points.md), at most 13: recorded on the filed child."
+        }
+      }
+    }
+  }
+}

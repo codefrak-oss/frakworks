@@ -1,0 +1,63 @@
+{
+  "idempotencyKey": "deploy-4821-prod",
+  "deadline": "2026-10-15T12:00:00Z",
+  "defaultOnTimeout": "reject",
+  "priority": "high",
+  "requires": {
+    "roles": [
+      "approver.production-deploy"
+    ]
+  },
+  "context": {
+    "summary": "Release 4.21 passed staging checks."
+  },
+  "action": "Deploy release 4.21 to production",
+  "payload": {
+    "service": "billing",
+    "version": "4.21.0"
+  },
+  "payloadDigest": "sha256:9f2c1e0a",
+  "scope": {
+    "maxUses": 1,
+    "notAfter": "2026-10-16T00:00:00Z"
+  },
+  "requiresHuman": false,
+  "asserted": {
+    "why": "release 4.21 passed staging checks and the change window is open",
+    "recommendation": {
+      "verdict": "allow",
+      "confidence": 0.9,
+      "by": {
+        "requester": "release-orchestrator",
+        "judge": "release checks",
+        "model": "none",
+        "rubric": "release-policy@v12"
+      },
+      "reasons": [
+        "staging checks green",
+        "change window open"
+      ]
+    },
+    "lineage": [
+      {
+        "kind": "command",
+        "claim": "deploy release 4.21 to production",
+        "source": {
+          "run": "rel-4821"
+        },
+        "by": "release-orchestrator"
+      },
+      {
+        "kind": "ticket",
+        "claim": "ship billing 4.21 this week",
+        "source": {
+          "repo": "acme/billing",
+          "number": 4821,
+          "bodyRev": "a1b2"
+        },
+        "by": "release-orchestrator"
+      }
+    ],
+    "asOf": "2026-10-14T09:00:00Z"
+  }
+}

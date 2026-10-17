@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/codefrak-oss/hitlp/spec/schemas/approve.response.schema.json",
+  "title": "HITLP human.approve result (decision record)",
+  "allOf": [{ "$ref": "decision-record.schema.json" }],
+  "properties": {
+    "primitive": { "const": "approve" },
+    "outcome": { "enum": ["approved", "rejected", "timed_out", "cancelled"] }
+  },
+  "not": { "required": ["answer"] }
+}

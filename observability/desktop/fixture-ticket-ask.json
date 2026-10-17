@@ -1,0 +1,37 @@
+{
+  "_comment": "One ticket detail document whose thread ends in a Smith question carrying the fenced `ask` block of the desktop app design's §\"Actions and write access\" — the fixture the stage-3 ticket pins (#1337) are tested against. Hand-built: no Smith is known to emit an `ask` block yet, that adoption being stage 3b and its own ticket, so this is what one would look like and not a capture. A pin reads the issue, never the Timeline widget's engine history.",
+  "ticket": 1287,
+  "repo": "codefrak-oss/frakworks",
+  "now": 1789910000,
+  "issue_error": null,
+  "issue": {
+    "node_id": "I_kwDORmY50M6fixture1287",
+    "number": 1287,
+    "title": "Proxied Claude Code panes in Agent Army",
+    "state": "OPEN",
+    "url": "https://github.com/codefrak-oss/frakworks/issues/1287",
+    "labels": ["bot-task", "needs-review", "p2"],
+    "createdAt": "2026-09-21T00:00:00Z",
+    "closedAt": null,
+    "comments": [
+      {
+        "id": "IC_fixture1287_1",
+        "revision": "2026-09-21T00:10:00Z:aaaaaaaaaaaa",
+        "author": "example-smith",
+        "createdAt": "2026-09-21T00:10:00Z",
+        "updatedAt": "2026-09-21T00:10:00Z",
+        "body": "🤖 Claimed by Smith `smith-runner-1287-1789959477` on smith-runner.\n- Started: `2026-09-21T00:10:00Z`",
+        "url": "https://github.com/codefrak-oss/frakworks/issues/1287#issuecomment-1"
+      },
+      {
+        "id": "IC_fixture1287_2",
+        "revision": "2026-09-21T01:00:00Z:bbbbbbbbbbbb",
+        "author": "example-smith",
+        "createdAt": "2026-09-21T01:00:00Z",
+        "updatedAt": "2026-09-21T01:00:00Z",
+        "body": "Blocked: the pane needs a decision before it can read anything.\n\n```ask\nkind: choice            # yes-no | choice | text | confirm\nquestion: Should the desktop app authenticate to VictoriaMetrics, or stay tailnet-only?\noptions:\n  - id: tailnet\n    label: Stay tailnet-only\n  - id: auth\n    label: Put VM behind auth\nreply: comment           # comment | label:<name> | close\n```\n\n— 🤖 Agent Smith `smith-runner-1287-1789959477` · issue #1287",
+        "url": "https://github.com/codefrak-oss/frakworks/issues/1287#issuecomment-2"
+      }
+    ]
+  }
+}

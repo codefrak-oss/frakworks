@@ -1,0 +1,209 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/codefrak-oss/hitlp/spec/schemas/envelope.schema.json",
+  "title": "HITLP request envelope",
+  "type": "object",
+  "required": [
+    "idempotencyKey",
+    "deadline",
+    "defaultOnTimeout"
+  ],
+  "properties": {
+    "idempotencyKey": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "deadline": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "defaultOnTimeout": {
+      "enum": [
+        "reject",
+        "escalate",
+        "cancel",
+        "fail"
+      ]
+    },
+    "priority": {
+      "enum": [
+        "low",
+        "normal",
+        "high",
+        "urgent"
+      ],
+      "default": "normal"
+    },
+    "requires": {
+      "type": "object",
+      "properties": {
+        "capabilities": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "roles": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "context": {
+      "type": "object",
+      "properties": {
+        "summary": {
+          "type": "string"
+        },
+        "links": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uri"
+          }
+        },
+        "data": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    "requiresHuman": {
+      "type": "boolean",
+      "default": false,
+      "description": "True skips the proxy's rule and model layers (spec 5.4)."
+    },
+    "asserted": {
+      "type": "object",
+      "description": "What the requester says about the request: evidence, never authority (spec 5.1).",
+      "properties": {
+        "why": {
+          "type": "string"
+        },
+        "onBehalfOf": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string"
+            },
+            "id": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": true
+        },
+        "recommendation": {
+          "type": "object",
+          "required": [
+            "verdict"
+          ],
+          "properties": {
+            "verdict": {
+              "enum": [
+                "allow",
+                "deny",
+                "escalate",
+                "none"
+              ]
+            },
+            "confidence": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "by": {
+              "type": "object",
+              "properties": {
+                "requester": {
+                  "type": "string"
+                },
+                "judge": {
+                  "type": "string"
+                },
+                "model": {
+                  "type": "string"
+                },
+                "rubric": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            },
+            "reasons": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        "lineage": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "kind",
+              "claim"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string"
+              },
+              "claim": {
+                "type": "string"
+              },
+              "source": {
+                "type": "object"
+              },
+              "by": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "asOf": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "additionalProperties": false
+    },
+    "attested": {
+      "type": "object",
+      "description": "Filled by the server from the credentials it authenticated; one sent by a requester is dropped (spec 5.1, R8).",
+      "required": [
+        "requester",
+        "by"
+      ],
+      "properties": {
+        "requester": {
+          "type": "string"
+        },
+        "onBehalfOf": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string"
+            },
+            "id": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": true
+        },
+        "by": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    }
+  }
+}

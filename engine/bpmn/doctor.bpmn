@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:camunda="http://camunda.org/schema/1.0/bpmn" xmlns:modeler="http://camunda.org/schema/modeler/1.0" id="Definitions_doctor" targetNamespace="http://bpmn.io/schema/bpmn" exporter="Camunda Modeler" exporterVersion="5.51.1" modeler:executionPlatform="Camunda Platform" modeler:executionPlatformVersion="7.24.0">
+  <bpmn:process id="doctor" name="doctor" isExecutable="true" camunda:historyTimeToLive="30">
+    <bpmn:documentation>The doctor (engine/README.md, "Doctor"): one Smith run on a stuck ticket, started by the doctor's tick (Doctor). The ticket's repo and issue ride as doctorRepo and doctorIssue, so this instance is not taken for the ticket's own flow; doctorRoot is its root flow, doctorPosition the position it is stuck at.</bpmn:documentation>
+    <bpmn:startEvent id="start-doctor">
+      <bpmn:outgoing>flow-start-doctor</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:callActivity id="call-health-check" name="health check" calledElement="reusable-smith-run" camunda:asyncBefore="true">
+      <bpmn:documentation>reusable-smith-run in mode doctor, with the stuck ticket in the brief; ReadResultDelegate records a failed run as outcome failed, not as an incident</bpmn:documentation>
+      <bpmn:extensionElements>
+        <camunda:in source="doctorRepo" target="repo" />
+        <camunda:in source="doctorIssue" target="issue" />
+        <camunda:in sourceExpression="${'doctor'}" target="mode" />
+        <camunda:in source="model" target="model" />
+        <camunda:in source="effort" target="effort" />
+        <camunda:in source="tier" target="tier" />
+        <camunda:in source="stuck" target="stuck" />
+        <camunda:in source="approvedTicket" target="approvedTicket" />
+        <camunda:in source="dryRun" target="dryRun" />
+        <camunda:in source="fakeOutcome" target="fakeOutcome" />
+        <camunda:out source="outcome" target="outcome" />
+        <camunda:out source="result" target="result" />
+        <camunda:out source="output" target="output" />
+        <camunda:out source="fixError" target="fixError" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>flow-start-doctor</bpmn:incoming>
+      <bpmn:outgoing>flow-to-remedy</bpmn:outgoing>
+    </bpmn:callActivity>
+    <bpmn:serviceTask id="task-apply-remedy" name="apply the remedy" camunda:delegateExpression="${applyDoctorRemedy}">
+      <bpmn:documentation>ApplyDoctorRemedyDelegate: the Smith's remedy (retry, collect-exit, run-job) while its target is still part of the ticket's position, and the engine.doctor_run row's outcome</bpmn:documentation>
+      <bpmn:incoming>flow-to-remedy</bpmn:incoming>
+      <bpmn:outgoing>flow-to-end</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="end-doctor">
+      <bpmn:incoming>flow-to-end</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="flow-start-doctor" sourceRef="start-doctor" targetRef="call-health-check" />
+    <bpmn:sequenceFlow id="flow-to-remedy" sourceRef="call-health-check" targetRef="task-apply-remedy" />
+    <bpmn:sequenceFlow id="flow-to-end" sourceRef="task-apply-remedy" targetRef="end-doctor" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_doctor">
+    <bpmndi:BPMNPlane id="BPMNPlane_doctor" bpmnElement="doctor">
+      <bpmndi:BPMNShape id="start-doctor-di" bpmnElement="start-doctor">
+        <dc:Bounds x="152" y="102" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="call-health-check-di" bpmnElement="call-health-check">
+        <dc:Bounds x="250" y="80" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-apply-remedy-di" bpmnElement="task-apply-remedy">
+        <dc:Bounds x="410" y="80" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="end-doctor-di" bpmnElement="end-doctor">
+        <dc:Bounds x="572" y="102" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="flow-start-doctor-di" bpmnElement="flow-start-doctor">
+        <di:waypoint x="188" y="120" />
+        <di:waypoint x="250" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-to-remedy-di" bpmnElement="flow-to-remedy">
+        <di:waypoint x="350" y="120" />
+        <di:waypoint x="410" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-to-end-di" bpmnElement="flow-to-end">
+        <di:waypoint x="510" y="120" />
+        <di:waypoint x="572" y="120" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

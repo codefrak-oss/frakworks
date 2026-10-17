@@ -1,0 +1,242 @@
+{
+ "since": "2026-09-20T12:00Z",
+ "until": "2026-09-27T12:00Z",
+ "totals": {
+  "calls": 19,
+  "noAnswer": 2,
+  "medianLatencyMs": 840,
+  "withOutcome": 10,
+  "judged": 9,
+  "agreed": 7,
+  "agreement": 0.7777777777777778
+ },
+ "useCases": [
+  {
+   "useCase": "acceptance",
+   "calls": 3,
+   "noAnswer": 0,
+   "medianLatencyMs": 700,
+   "picks": {
+    "accepted": {
+     "yes": 2,
+     "no": 1
+    }
+   },
+   "confidence": [
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    1
+   ],
+   "floor": 0.85,
+   "actions": {
+    "accepted": 2,
+    "left for review": 1
+   },
+   "withOutcome": 3,
+   "judged": 3,
+   "agreed": 3,
+   "agreement": 1.0,
+   "runsSaved": null,
+   "perDay": {
+    "2026-09-24": 1,
+    "2026-09-26": 2
+   }
+  },
+  {
+   "useCase": "proposal-decision",
+   "calls": 0,
+   "noAnswer": 0,
+   "medianLatencyMs": null,
+   "picks": {},
+   "confidence": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "floor": null,
+   "actions": {},
+   "withOutcome": 0,
+   "judged": 0,
+   "agreed": 0,
+   "agreement": null,
+   "runsSaved": null,
+   "perDay": {}
+  },
+  {
+   "useCase": "ci-triage",
+   "calls": 3,
+   "noAnswer": 1,
+   "medianLatencyMs": 910,
+   "picks": {
+    "cause": {
+     "infrastructure": 1,
+     "code": 1
+    }
+   },
+   "confidence": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+    1,
+    0
+   ],
+   "floor": 0.7,
+   "actions": {
+    "re-ran the job": 1,
+    "handed to the Smith": 1,
+    "no answer": 1
+   },
+   "withOutcome": 2,
+   "judged": 2,
+   "agreed": 1,
+   "agreement": 0.5,
+   "runsSaved": 1,
+   "perDay": {
+    "2026-09-25": 2,
+    "2026-09-27": 1
+   }
+  },
+  {
+   "useCase": "refine-pick",
+   "calls": 3,
+   "noAnswer": 1,
+   "medianLatencyMs": 1200,
+   "picks": {
+    "kind": {
+     "feature": 1,
+     "chore": 1
+    },
+    "featureMode": {
+     "direct": 2
+    },
+    "tier": {
+     "tier 7": 1,
+     "tier 5": 1
+    }
+   },
+   "confidence": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ],
+   "floor": 0.6,
+   "actions": {
+    "filed at jev's pick": 1,
+    "filed, a field below the floor": 1,
+    "no answer: the refiner's": 1
+   },
+   "withOutcome": 2,
+   "judged": 2,
+   "agreed": 1,
+   "agreement": 0.5,
+   "runsSaved": null,
+   "perDay": {
+    "2026-09-26": 3
+   }
+  },
+  {
+   "useCase": "incident-triage",
+   "calls": 1,
+   "noAnswer": 0,
+   "medianLatencyMs": 650,
+   "picks": {
+    "remedy": {
+     "retry": 1
+    }
+   },
+   "confidence": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1
+   ],
+   "floor": 0.8,
+   "actions": {
+    "retried without a Smith": 1
+   },
+   "withOutcome": 1,
+   "judged": 1,
+   "agreed": 1,
+   "agreement": 1.0,
+   "runsSaved": 1,
+   "perDay": {
+    "2026-09-27": 1
+   }
+  },
+  {
+   "useCase": "intake-duplicate",
+   "calls": 9,
+   "noAnswer": 0,
+   "medianLatencyMs": 780,
+   "picks": {
+    "duplicate": {
+     "none": 3,
+     "#12": 1,
+     "#40": 1,
+     "#41": 1,
+     "#77": 1,
+     "#80": 1,
+     "#81": 1
+    }
+   },
+   "confidence": [
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    1,
+    2,
+    2,
+    3
+   ],
+   "floor": 0.9,
+   "actions": {
+    "not a duplicate": 3,
+    "asked the user": 6
+   },
+   "withOutcome": 2,
+   "judged": 1,
+   "agreed": 1,
+   "agreement": 1.0,
+   "runsSaved": null,
+   "perDay": {
+    "2026-09-21": 1,
+    "2026-09-26": 8
+   }
+  }
+ ]
+}

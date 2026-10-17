@@ -1,0 +1,210 @@
+[
+  {
+    "id": "task-ask-1",
+    "primitive": "ask",
+    "status": "input_required",
+    "requiresHuman": false,
+    "createdAt": "2026-09-24T23:30:00Z",
+    "deadline": "2026-09-25T02:14:00Z",
+    "priority": "urgent",
+    "question": "Which store should the cache use?\n\nPostgres is already in the stack; Redis would be new.",
+    "responseSchema": {
+      "type": "string",
+      "enum": [
+        "pg",
+        "redis"
+      ]
+    },
+    "options": [
+      {
+        "value": "pg",
+        "label": "Postgres"
+      },
+      {
+        "value": "redis",
+        "label": "Redis"
+      }
+    ],
+    "context": {
+      "summary": "The cache layer lands this week and needs a backing store."
+    },
+    "asserted": {
+      "why": "The cache layer of codefrak-oss/frakworks#2201 needs a store before it merges.",
+      "onBehalfOf": {
+        "kind": "person",
+        "id": "lundmatt1"
+      },
+      "lineage": [
+        {
+          "kind": "ticket",
+          "claim": "Add a cache layer",
+          "source": {
+            "repo": "codefrak-oss/frakworks",
+            "number": 2201
+          },
+          "by": "lundmatt1",
+          "at": "2026-09-20T10:00:00Z"
+        },
+        {
+          "kind": "run",
+          "claim": "Smith run 7 works the ticket",
+          "source": "smith-run-7",
+          "at": "2026-09-24T23:00:00Z"
+        }
+      ],
+      "asOf": "2026-09-24T23:30:00Z"
+    },
+    "attested": {
+      "source": "server",
+      "requester": "smith-run-7",
+      "onBehalfOf": {
+        "kind": "person",
+        "id": "lundmatt1"
+      },
+      "by": "hitlp-server"
+    }
+  },
+  {
+    "id": "task-ask-2",
+    "primitive": "ask",
+    "status": "input_required",
+    "requiresHuman": false,
+    "createdAt": "2026-09-24T23:00:00Z",
+    "deadline": "2026-09-25T01:00:00Z",
+    "question": "Name the release",
+    "responseSchema": {
+      "type": "string"
+    },
+    "context": {
+      "summary": "Name the release"
+    },
+    "asserted": {
+      "why": "The release needs a name."
+    },
+    "attested": {
+      "source": "server",
+      "requester": "release-bot",
+      "onBehalfOf": {
+        "kind": "person",
+        "id": "someone-else"
+      },
+      "by": "hitlp-server"
+    }
+  },
+  {
+    "id": "task-approve-1",
+    "primitive": "approve",
+    "status": "input_required",
+    "requiresHuman": false,
+    "createdAt": "2026-09-24T22:30:00Z",
+    "deadline": "2026-09-24T23:45:00Z",
+    "priority": "high",
+    "action": "Deploy engine 1.42 to the cluster",
+    "payload": {
+      "image": "engine:1.42",
+      "namespace": "frakworks"
+    },
+    "payloadDigest": "sha256:9f3c0d1e",
+    "scope": {
+      "uses": 1
+    },
+    "context": {
+      "summary": "Deploy engine 1.42 to the cluster"
+    },
+    "asserted": {
+      "why": "Engine 1.42 fixes the lease handover.",
+      "onBehalfOf": {
+        "kind": "team",
+        "id": "fleet"
+      },
+      "recommendation": {
+        "verdict": "approve",
+        "confidence": 0.82,
+        "by": {
+          "type": "model",
+          "model": "jev"
+        },
+        "reasons": [
+          "the image is signed",
+          "one use only"
+        ]
+      }
+    },
+    "attested": {
+      "source": "server",
+      "requester": "deploy-bot",
+      "by": "hitlp-server"
+    }
+  },
+  {
+    "id": "task-ask-closed",
+    "primitive": "ask",
+    "status": "completed",
+    "requiresHuman": true,
+    "createdAt": "2026-09-24T20:00:00Z",
+    "deadline": "2026-09-25T20:00:00Z",
+    "priority": "high",
+    "question": "Ship the cache behind a flag?",
+    "responseSchema": {
+      "type": "boolean"
+    },
+    "context": {
+      "summary": "Flag or no flag for the cache rollout.",
+      "data": {
+        "repo": "codefrak-oss/frakworks",
+        "ticket": 2201
+      }
+    },
+    "attested": {
+      "source": "server",
+      "requester": "smith-run-7",
+      "by": "hitlp.example"
+    },
+    "result": {
+      "requestId": "task-ask-closed",
+      "idempotencyKey": "k-ask-closed",
+      "primitive": "ask",
+      "outcome": "answered",
+      "answer": true,
+      "decidedBy": {
+        "type": "human",
+        "id": "lundmatt1"
+      },
+      "decidedAt": "2026-09-24T21:15:00Z",
+      "channel": "desktop"
+    }
+  },
+  {
+    "id": "task-approve-closed",
+    "primitive": "approve",
+    "status": "completed",
+    "requiresHuman": true,
+    "createdAt": "2026-09-24T18:00:00Z",
+    "deadline": "2026-09-25T18:00:00Z",
+    "priority": "normal",
+    "action": "Restart the engine pod",
+    "payload": {
+      "pod": "engine-0"
+    },
+    "payloadDigest": "sha256:cafe",
+    "attested": {
+      "source": "server",
+      "requester": "first-mate",
+      "by": "hitlp.example"
+    },
+    "result": {
+      "requestId": "task-approve-closed",
+      "idempotencyKey": "k-approve-closed",
+      "primitive": "approve",
+      "outcome": "rejected",
+      "reason": "not during the deploy",
+      "decidedBy": {
+        "type": "human",
+        "id": "lundmatt1"
+      },
+      "decidedAt": "2026-09-24T19:30:00Z",
+      "channel": "slack",
+      "payloadDigest": "sha256:cafe"
+    }
+  }
+]

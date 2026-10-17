@@ -1,0 +1,57 @@
+# frakworks-firstmate: the iPhone first mate's pods
+# (ios/README.md). The engine starts and attaches to
+# them; the pods themselves hold no Kubernetes grant at all.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: frakworks-firstmate
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest
+---
+# A first mate pod's identity. No RoleBinding or ClusterRoleBinding names it,
+# and it mounts no token: it cannot create Jobs or read a Smith's Secrets.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: first-mate
+  namespace: frakworks-firstmate
+automountServiceAccountToken: false
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: frakworks-engine
+  namespace: frakworks-firstmate
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+  - apiGroups: [""]
+    resources: ["pods/attach"]
+    verbs: ["get", "create"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["create", "delete"]
+  # A session pod's own egress policy to its repo's LAN MCP servers
+  # (FirstMateEgress): one address and port per server, that pod only.
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["networkpolicies"]
+    verbs: ["create", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: frakworks-engine
+  namespace: frakworks-firstmate
+subjects:
+  - kind: ServiceAccount
+    name: frakworks-engine
+    namespace: frakworks
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: frakworks-engine

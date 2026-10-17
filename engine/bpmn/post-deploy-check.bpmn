@@ -1,0 +1,490 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:camunda="http://camunda.org/schema/1.0/bpmn" xmlns:operaton="http://operaton.org/schema/1.0/bpmn" xmlns:modeler="http://camunda.org/schema/modeler/1.0" id="Definitions_post_deploy_check" targetNamespace="http://codefrak.com/agent-army/bpmn" exporter="Camunda Modeler" exporterVersion="5.51.1" modeler:executionPlatform="Camunda Platform" modeler:executionPlatformVersion="7.23.0">
+  <bpmn:message id="message-deploy-reached" name="deploy reached production" />
+  <bpmn:message id="message-check-event" name="check event" />
+  <bpmn:process id="post-deploy-check" name="post deploy check" isExecutable="true" camunda:historyTimeToLive="30">
+    <bpmn:documentation>The post-deployment check of a merged ticket whose PR has a POST-DEPLOYMENT-CHECK section (#100007; called with every variable in: repo, issue, pr, prUrl, mergeSha, postDeployCheck). Waits, with no Smith running, until the merge is in production: a deploy's wake (DeployReachedWaits, from DeployEvents.post) or the 12 h safety poll. Then a check Smith runs until it answers passed (the ticket closes naming the check) or failed (a bug is filed and the ticket closes naming it); not_yet waits for the Smith's time or bus frame, else nextCheck's ladder, and checks again. At checkDeadlineAt (the section's deadline, else the start plus 7 days) the user decides on HITLP: wait (check again, with a new deadline), drop (close) or bug (file one, close).</bpmn:documentation>
+    <bpmn:startEvent id="start-post-deploy-check" name="merged">
+      <bpmn:outgoing>flow-start-init</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:serviceTask id="task-init-check" name="set the deadline&#10;(engine)" camunda:delegateExpression="${initCheck}">
+      <bpmn:documentation>InitCheckDelegate: checkDeadlineAt from the section&#39;s Deadline:, else the start (the merge) plus 7 days</bpmn:documentation>
+      <bpmn:incoming>flow-start-init</bpmn:incoming>
+      <bpmn:outgoing>flow-init-poll</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="task-poll-deployed" name="in production?&#10;(ops)" camunda:asyncBefore="true" camunda:delegateExpression="${pollDeployed}">
+      <bpmn:documentation>PollDeployedDelegate: asks DeployedChecks (the engine&#39;s build for its own repo, the repo&#39;s ops server for any other) whether mergeSha is deployed; sets deployed, and deployEvent when it is. No ops server is the incident</bpmn:documentation>
+      <bpmn:extensionElements>
+        <operaton:failedJobRetryTimeCycle>R5/PT1M</operaton:failedJobRetryTimeCycle>
+      </bpmn:extensionElements>
+      <bpmn:incoming>flow-init-poll</bpmn:incoming>
+      <bpmn:incoming>flow-safety-poll</bpmn:incoming>
+      <bpmn:outgoing>flow-poll-gateway</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="gateway-deployed" name="deployed?" default="flow-not-deployed">
+      <bpmn:incoming>flow-poll-gateway</bpmn:incoming>
+      <bpmn:outgoing>flow-deployed</bpmn:outgoing>
+      <bpmn:outgoing>flow-not-deployed</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:receiveTask id="receive-deploy-reached" name="wait for the deploy" messageRef="message-deploy-reached">
+      <bpmn:documentation>No Smith runs: DeployReachedWaits correlates deploy reached production, with deployEvent, when a deploy of the repo is mergeSha or DeployedChecks says mergeSha went out with it</bpmn:documentation>
+      <bpmn:incoming>flow-not-deployed</bpmn:incoming>
+      <bpmn:outgoing>flow-deploy-reached</bpmn:outgoing>
+    </bpmn:receiveTask>
+    <bpmn:boundaryEvent id="event-safety-poll" name="every 12 h" attachedToRef="receive-deploy-reached">
+      <bpmn:documentation>A lost deploy wake: polls again every 12 hours</bpmn:documentation>
+      <bpmn:outgoing>flow-safety-poll</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="timer-safety-poll">
+        <bpmn:timeDuration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="bpmn:tFormalExpression">PT12H</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:boundaryEvent>
+    <bpmn:subProcess id="subprocess-wait-and-check" name="check until it passes">
+      <bpmn:documentation>The check loop, bounded by event-deadline; a wait answer at the deadline enters it again, from a fresh check</bpmn:documentation>
+      <bpmn:incoming>flow-deployed</bpmn:incoming>
+      <bpmn:incoming>flow-deploy-reached</bpmn:incoming>
+      <bpmn:incoming>flow-deadline-wait</bpmn:incoming>
+      <bpmn:outgoing>flow-checked-close</bpmn:outgoing>
+      <bpmn:startEvent id="start-check" name="deployed">
+        <bpmn:outgoing>flow-start-check</bpmn:outgoing>
+      </bpmn:startEvent>
+      <bpmn:callActivity id="call-check" name="check it&#10;(smith run)" camunda:asyncBefore="true" calledElement="reusable-smith-run">
+        <bpmn:documentation>A check Smith (mode check, the map&#39;s check tier) on the deployed change, with the section, the PR, mergeSha, deployEvent and every earlier run in its brief; CheckResultHandler sets checkOutcome passed, failed or not_yet, checkSummary and the wake hint</bpmn:documentation>
+        <bpmn:extensionElements>
+          <camunda:in variables="all" />
+          <camunda:in sourceExpression="${&#39;check&#39;}" target="mode" />
+          <camunda:out variables="all" />
+        </bpmn:extensionElements>
+        <bpmn:incoming>flow-start-check</bpmn:incoming>
+        <bpmn:incoming>flow-event-came</bpmn:incoming>
+        <bpmn:incoming>flow-fallback-reached</bpmn:incoming>
+        <bpmn:incoming>flow-time-reached</bpmn:incoming>
+        <bpmn:outgoing>flow-check-outcome</bpmn:outgoing>
+      </bpmn:callActivity>
+      <bpmn:exclusiveGateway id="gateway-check-outcome" name="outcome?" default="flow-check-not-yet">
+        <bpmn:incoming>flow-check-outcome</bpmn:incoming>
+        <bpmn:outgoing>flow-check-passed</bpmn:outgoing>
+        <bpmn:outgoing>flow-check-failed</bpmn:outgoing>
+        <bpmn:outgoing>flow-check-not-yet</bpmn:outgoing>
+      </bpmn:exclusiveGateway>
+      <bpmn:endEvent id="end-check-passed" name="passed">
+        <bpmn:incoming>flow-check-passed</bpmn:incoming>
+      </bpmn:endEvent>
+      <bpmn:serviceTask id="task-file-check-bug" name="file the bug&#10;(github)" camunda:asyncBefore="true" camunda:delegateExpression="${fileCheckBug}">
+        <bpmn:documentation>FileCheckBugDelegate: files the result&#39;s bug in the repo, naming this ticket, its PR and mergeSha; sets checkBugTicket</bpmn:documentation>
+        <bpmn:extensionElements>
+          <operaton:failedJobRetryTimeCycle>R5/PT1M</operaton:failedJobRetryTimeCycle>
+        </bpmn:extensionElements>
+        <bpmn:incoming>flow-check-failed</bpmn:incoming>
+        <bpmn:outgoing>flow-bug-filed</bpmn:outgoing>
+      </bpmn:serviceTask>
+      <bpmn:endEvent id="end-check-failed" name="bug filed">
+        <bpmn:incoming>flow-bug-filed</bpmn:incoming>
+      </bpmn:endEvent>
+      <bpmn:serviceTask id="task-next-check" name="when next?&#10;(engine)" camunda:delegateExpression="${nextCheck}">
+        <bpmn:documentation>NextCheckDelegate: checkWakeAt is the Smith&#39;s at, else the section&#39;s Re-check: after the first run, else the ladder (1 h, 4 h, 1 d, then daily); with an event hint it is the fallback</bpmn:documentation>
+        <bpmn:incoming>flow-check-not-yet</bpmn:incoming>
+        <bpmn:outgoing>flow-next-wait</bpmn:outgoing>
+      </bpmn:serviceTask>
+      <bpmn:exclusiveGateway id="gateway-wake-on" name="how to wait?" default="flow-wait-time">
+        <bpmn:incoming>flow-next-wait</bpmn:incoming>
+        <bpmn:outgoing>flow-wait-event</bpmn:outgoing>
+        <bpmn:outgoing>flow-wait-time</bpmn:outgoing>
+      </bpmn:exclusiveGateway>
+      <bpmn:receiveTask id="receive-check-event" name="wait for the event" messageRef="message-check-event">
+        <bpmn:documentation>CheckEventWaits correlates check event when a bus frame of the repo matches checkWakeEvent (type, or type:field=value)</bpmn:documentation>
+        <bpmn:incoming>flow-wait-event</bpmn:incoming>
+        <bpmn:outgoing>flow-event-came</bpmn:outgoing>
+      </bpmn:receiveTask>
+      <bpmn:boundaryEvent id="event-check-fallback" name="fallback" attachedToRef="receive-check-event">
+        <bpmn:documentation>The event never came: checks again at checkWakeAt, the ladder&#39;s time</bpmn:documentation>
+        <bpmn:outgoing>flow-fallback-reached</bpmn:outgoing>
+        <bpmn:timerEventDefinition id="timer-check-fallback">
+          <bpmn:timeDate xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="bpmn:tFormalExpression">${checkWakeAt}</bpmn:timeDate>
+        </bpmn:timerEventDefinition>
+      </bpmn:boundaryEvent>
+      <bpmn:intermediateCatchEvent id="event-check-at" name="wake at">
+        <bpmn:documentation>Fires at checkWakeAt (a date: the Smith&#39;s at, the section&#39;s Re-check: or the ladder)</bpmn:documentation>
+        <bpmn:incoming>flow-wait-time</bpmn:incoming>
+        <bpmn:outgoing>flow-time-reached</bpmn:outgoing>
+        <bpmn:timerEventDefinition id="timer-check-at">
+          <bpmn:timeDate xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="bpmn:tFormalExpression">${checkWakeAt}</bpmn:timeDate>
+        </bpmn:timerEventDefinition>
+      </bpmn:intermediateCatchEvent>
+      <bpmn:sequenceFlow id="flow-start-check" sourceRef="start-check" targetRef="call-check" />
+      <bpmn:sequenceFlow id="flow-check-outcome" sourceRef="call-check" targetRef="gateway-check-outcome" />
+      <bpmn:sequenceFlow id="flow-check-passed" name="passed" sourceRef="gateway-check-outcome" targetRef="end-check-passed">
+          <bpmn:conditionExpression xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="bpmn:tFormalExpression">${checkOutcome == 'passed'}</bpmn:conditionExpression>
+      </bpmn:sequenceFlow>
+      <bpmn:sequenceFlow id="flow-check-failed" name="failed" sourceRef="gateway-check-outcome" targetRef="task-file-check-bug">
+          <bpmn:conditionExpression xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="bpmn:tFormalExpression">${checkOutcome == 'failed'}</bpmn:conditionExpression>
+      </bpmn:sequenceFlow>
+      <bpmn:sequenceFlow id="flow-bug-filed" sourceRef="task-file-check-bug" targetRef="end-check-failed" />
+      <bpmn:sequenceFlow id="flow-check-not-yet" name="not yet" sourceRef="gateway-check-outcome" targetRef="task-next-check" />
+      <bpmn:sequenceFlow id="flow-next-wait" sourceRef="task-next-check" targetRef="gateway-wake-on" />
+      <bpmn:sequenceFlow id="flow-wait-event" name="on an event" sourceRef="gateway-wake-on" targetRef="receive-check-event">
+          <bpmn:conditionExpression xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="bpmn:tFormalExpression">${execution.getVariable('checkWakeEvent') != null}</bpmn:conditionExpression>
+      </bpmn:sequenceFlow>
+      <bpmn:sequenceFlow id="flow-wait-time" name="at a time" sourceRef="gateway-wake-on" targetRef="event-check-at" />
+      <bpmn:sequenceFlow id="flow-event-came" sourceRef="receive-check-event" targetRef="call-check" />
+      <bpmn:sequenceFlow id="flow-fallback-reached" sourceRef="event-check-fallback" targetRef="call-check" />
+      <bpmn:sequenceFlow id="flow-time-reached" sourceRef="event-check-at" targetRef="call-check" />
+    </bpmn:subProcess>
+    <bpmn:boundaryEvent id="event-deadline" name="deadline" attachedToRef="subprocess-wait-and-check">
+      <bpmn:documentation>At checkDeadlineAt the check stops and the user decides</bpmn:documentation>
+      <bpmn:outgoing>flow-deadline-question</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="timer-deadline">
+        <bpmn:timeDate xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="bpmn:tFormalExpression">${checkDeadlineAt}</bpmn:timeDate>
+      </bpmn:timerEventDefinition>
+    </bpmn:boundaryEvent>
+    <bpmn:serviceTask id="task-post-deadline-question" name="ask the user&#10;(hitlp)" camunda:asyncBefore="true" camunda:delegateExpression="${postCheckDeadline}">
+      <bpmn:documentation>PostCheckDeadlineDelegate: files a HITLP human.ask of kind DECISION with options wait, drop and bug, records it in engine.intake_question and comments it on the ticket</bpmn:documentation>
+      <bpmn:extensionElements>
+        <operaton:failedJobRetryTimeCycle>R5/PT1M</operaton:failedJobRetryTimeCycle>
+      </bpmn:extensionElements>
+      <bpmn:incoming>flow-deadline-question</bpmn:incoming>
+      <bpmn:outgoing>flow-question-answer</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:userTask id="user-task-answer-deadline" name="decide at the deadline">
+      <bpmn:documentation>HitlpAnswers completes it from the decision record</bpmn:documentation>
+      <bpmn:incoming>flow-question-answer</bpmn:incoming>
+      <bpmn:outgoing>flow-answer-read</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:serviceTask id="task-read-deadline-answer" name="read the answer&#10;(engine)" camunda:delegateExpression="${readCheckDeadline}">
+      <bpmn:documentation>ReadCheckDeadlineDelegate: checkDeadlineAnswer wait, drop or bug; wait moves checkDeadlineAt on</bpmn:documentation>
+      <bpmn:incoming>flow-answer-read</bpmn:incoming>
+      <bpmn:outgoing>flow-read-gateway</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="gateway-deadline-answer" name="answer?" default="flow-deadline-wait">
+      <bpmn:incoming>flow-read-gateway</bpmn:incoming>
+      <bpmn:outgoing>flow-deadline-wait</bpmn:outgoing>
+      <bpmn:outgoing>flow-deadline-drop</bpmn:outgoing>
+      <bpmn:outgoing>flow-deadline-bug</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="task-file-deadline-bug" name="file the bug&#10;(github)" camunda:asyncBefore="true" camunda:delegateExpression="${fileDeadlineBug}">
+      <bpmn:documentation>FileDeadlineBugDelegate: files a bug that the check never passed, with the section and the last run; sets checkBugTicket</bpmn:documentation>
+      <bpmn:extensionElements>
+        <operaton:failedJobRetryTimeCycle>R5/PT1M</operaton:failedJobRetryTimeCycle>
+      </bpmn:extensionElements>
+      <bpmn:incoming>flow-deadline-bug</bpmn:incoming>
+      <bpmn:outgoing>flow-deadline-bug-close</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="task-close-ticket" name="close the ticket&#10;(github)" camunda:asyncBefore="true" camunda:delegateExpression="${closeTicket}">
+      <bpmn:documentation>CloseTicketDelegate: says which PR merged and how the check ended (passed, failed with its bug, dropped or a bug at the deadline), then closes the ticket</bpmn:documentation>
+      <bpmn:extensionElements>
+        <operaton:failedJobRetryTimeCycle>R5/PT1M</operaton:failedJobRetryTimeCycle>
+      </bpmn:extensionElements>
+      <bpmn:incoming>flow-checked-close</bpmn:incoming>
+      <bpmn:incoming>flow-deadline-drop</bpmn:incoming>
+      <bpmn:incoming>flow-deadline-bug-close</bpmn:incoming>
+      <bpmn:outgoing>flow-close-end</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="end-post-deploy-check" name="closed">
+      <bpmn:incoming>flow-close-end</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="flow-start-init" sourceRef="start-post-deploy-check" targetRef="task-init-check" />
+    <bpmn:sequenceFlow id="flow-init-poll" sourceRef="task-init-check" targetRef="task-poll-deployed" />
+    <bpmn:sequenceFlow id="flow-poll-gateway" sourceRef="task-poll-deployed" targetRef="gateway-deployed" />
+    <bpmn:sequenceFlow id="flow-deployed" name="yes" sourceRef="gateway-deployed" targetRef="subprocess-wait-and-check">
+      <bpmn:conditionExpression xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="bpmn:tFormalExpression">${deployed}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow-not-deployed" name="no" sourceRef="gateway-deployed" targetRef="receive-deploy-reached" />
+    <bpmn:sequenceFlow id="flow-deploy-reached" sourceRef="receive-deploy-reached" targetRef="subprocess-wait-and-check" />
+    <bpmn:sequenceFlow id="flow-safety-poll" sourceRef="event-safety-poll" targetRef="task-poll-deployed" />
+    <bpmn:sequenceFlow id="flow-checked-close" sourceRef="subprocess-wait-and-check" targetRef="task-close-ticket" />
+    <bpmn:sequenceFlow id="flow-close-end" sourceRef="task-close-ticket" targetRef="end-post-deploy-check" />
+    <bpmn:sequenceFlow id="flow-deadline-question" sourceRef="event-deadline" targetRef="task-post-deadline-question" />
+    <bpmn:sequenceFlow id="flow-question-answer" sourceRef="task-post-deadline-question" targetRef="user-task-answer-deadline" />
+    <bpmn:sequenceFlow id="flow-answer-read" sourceRef="user-task-answer-deadline" targetRef="task-read-deadline-answer" />
+    <bpmn:sequenceFlow id="flow-read-gateway" sourceRef="task-read-deadline-answer" targetRef="gateway-deadline-answer" />
+    <bpmn:sequenceFlow id="flow-deadline-wait" name="wait" sourceRef="gateway-deadline-answer" targetRef="subprocess-wait-and-check" />
+    <bpmn:sequenceFlow id="flow-deadline-drop" name="drop" sourceRef="gateway-deadline-answer" targetRef="task-close-ticket">
+      <bpmn:conditionExpression xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="bpmn:tFormalExpression">${checkDeadlineAnswer == 'drop'}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow-deadline-bug" name="bug" sourceRef="gateway-deadline-answer" targetRef="task-file-deadline-bug">
+      <bpmn:conditionExpression xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="bpmn:tFormalExpression">${checkDeadlineAnswer == 'bug'}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow-deadline-bug-close" sourceRef="task-file-deadline-bug" targetRef="task-close-ticket" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="post-deploy-check">
+      <bpmndi:BPMNShape id="start-post-deploy-check-di" bpmnElement="start-post-deploy-check">
+        <dc:Bounds x="152" y="182" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="148" y="225" width="44" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-init-check-di" bpmnElement="task-init-check">
+        <dc:Bounds x="240" y="160" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-poll-deployed-di" bpmnElement="task-poll-deployed">
+        <dc:Bounds x="400" y="160" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="gateway-deployed-di" bpmnElement="gateway-deployed">
+        <dc:Bounds x="555" y="175" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="555" y="150" width="50" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="receive-deploy-reached-di" bpmnElement="receive-deploy-reached">
+        <dc:Bounds x="530" y="300" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="event-safety-poll-di" bpmnElement="event-safety-poll">
+        <dc:Bounds x="542" y="362" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="575" y="400" width="50" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="subprocess-wait-and-check-di" bpmnElement="subprocess-wait-and-check" isExpanded="true">
+        <dc:Bounds x="720" y="80" width="760" height="500" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="start-check-di" bpmnElement="start-check">
+        <dc:Bounds x="750" y="182" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="746" y="225" width="44" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="call-check-di" bpmnElement="call-check">
+        <dc:Bounds x="830" y="160" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="gateway-check-outcome-di" bpmnElement="gateway-check-outcome">
+        <dc:Bounds x="985" y="175" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1040" y="160" width="45" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="end-check-passed-di" bpmnElement="end-check-passed">
+        <dc:Bounds x="1102" y="182" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1100" y="225" width="40" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-file-check-bug-di" bpmnElement="task-file-check-bug">
+        <dc:Bounds x="1180" y="90" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="end-check-failed-di" bpmnElement="end-check-failed">
+        <dc:Bounds x="1322" y="112" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1315" y="155" width="50" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-next-check-di" bpmnElement="task-next-check">
+        <dc:Bounds x="960" y="290" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="gateway-wake-on-di" bpmnElement="gateway-wake-on">
+        <dc:Bounds x="985" y="405" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1040" y="445" width="60" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="receive-check-event-di" bpmnElement="receive-check-event">
+        <dc:Bounds x="830" y="390" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="event-check-fallback-di" bpmnElement="event-check-fallback">
+        <dc:Bounds x="897" y="372" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="925" y="330" width="45" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="event-check-at-di" bpmnElement="event-check-at">
+        <dc:Bounds x="1102" y="412" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1135" y="455" width="40" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="event-deadline-di" bpmnElement="event-deadline">
+        <dc:Bounds x="1282" y="562" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1310" y="600" width="45" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-post-deadline-question-di" bpmnElement="task-post-deadline-question">
+        <dc:Bounds x="1250" y="640" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="user-task-answer-deadline-di" bpmnElement="user-task-answer-deadline">
+        <dc:Bounds x="1400" y="640" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-read-deadline-answer-di" bpmnElement="task-read-deadline-answer">
+        <dc:Bounds x="1550" y="640" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="gateway-deadline-answer-di" bpmnElement="gateway-deadline-answer">
+        <dc:Bounds x="1705" y="655" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1760" y="640" width="40" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-file-deadline-bug-di" bpmnElement="task-file-deadline-bug">
+        <dc:Bounds x="1800" y="640" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-close-ticket-di" bpmnElement="task-close-ticket">
+        <dc:Bounds x="1540" y="230" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="end-post-deploy-check-di" bpmnElement="end-post-deploy-check">
+        <dc:Bounds x="1692" y="252" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1690" y="295" width="40" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="flow-start-init-di" bpmnElement="flow-start-init">
+        <di:waypoint x="188" y="200" />
+        <di:waypoint x="240" y="200" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-init-poll-di" bpmnElement="flow-init-poll">
+        <di:waypoint x="340" y="200" />
+        <di:waypoint x="400" y="200" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-poll-gateway-di" bpmnElement="flow-poll-gateway">
+        <di:waypoint x="500" y="200" />
+        <di:waypoint x="555" y="200" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-deployed-di" bpmnElement="flow-deployed">
+        <di:waypoint x="605" y="200" />
+        <di:waypoint x="720" y="200" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="630" y="180" width="20" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-not-deployed-di" bpmnElement="flow-not-deployed">
+        <di:waypoint x="580" y="225" />
+        <di:waypoint x="580" y="300" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="588" y="255" width="15" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-deploy-reached-di" bpmnElement="flow-deploy-reached">
+        <di:waypoint x="630" y="340" />
+        <di:waypoint x="680" y="340" />
+        <di:waypoint x="680" y="220" />
+        <di:waypoint x="720" y="220" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-safety-poll-di" bpmnElement="flow-safety-poll">
+        <di:waypoint x="560" y="398" />
+        <di:waypoint x="560" y="420" />
+        <di:waypoint x="450" y="420" />
+        <di:waypoint x="450" y="240" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-start-check-di" bpmnElement="flow-start-check">
+        <di:waypoint x="786" y="200" />
+        <di:waypoint x="830" y="200" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-check-outcome-di" bpmnElement="flow-check-outcome">
+        <di:waypoint x="930" y="200" />
+        <di:waypoint x="985" y="200" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-check-passed-di" bpmnElement="flow-check-passed">
+        <di:waypoint x="1035" y="200" />
+        <di:waypoint x="1102" y="200" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1045" y="205" width="35" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-check-failed-di" bpmnElement="flow-check-failed">
+        <di:waypoint x="1010" y="175" />
+        <di:waypoint x="1010" y="130" />
+        <di:waypoint x="1180" y="130" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1020" y="110" width="30" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-bug-filed-di" bpmnElement="flow-bug-filed">
+        <di:waypoint x="1280" y="130" />
+        <di:waypoint x="1322" y="130" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-check-not-yet-di" bpmnElement="flow-check-not-yet">
+        <di:waypoint x="1010" y="225" />
+        <di:waypoint x="1010" y="290" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1020" y="255" width="40" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-next-wait-di" bpmnElement="flow-next-wait">
+        <di:waypoint x="1010" y="370" />
+        <di:waypoint x="1010" y="405" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-wait-event-di" bpmnElement="flow-wait-event">
+        <di:waypoint x="985" y="430" />
+        <di:waypoint x="930" y="430" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="935" y="405" width="45" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-wait-time-di" bpmnElement="flow-wait-time">
+        <di:waypoint x="1035" y="430" />
+        <di:waypoint x="1102" y="430" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1045" y="410" width="45" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-event-came-di" bpmnElement="flow-event-came">
+        <di:waypoint x="880" y="390" />
+        <di:waypoint x="880" y="240" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-fallback-reached-di" bpmnElement="flow-fallback-reached">
+        <di:waypoint x="915" y="372" />
+        <di:waypoint x="915" y="240" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-time-reached-di" bpmnElement="flow-time-reached">
+        <di:waypoint x="1120" y="448" />
+        <di:waypoint x="1120" y="540" />
+        <di:waypoint x="790" y="540" />
+        <di:waypoint x="790" y="220" />
+        <di:waypoint x="830" y="220" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-checked-close-di" bpmnElement="flow-checked-close">
+        <di:waypoint x="1480" y="270" />
+        <di:waypoint x="1540" y="270" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-close-end-di" bpmnElement="flow-close-end">
+        <di:waypoint x="1640" y="270" />
+        <di:waypoint x="1692" y="270" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-deadline-question-di" bpmnElement="flow-deadline-question">
+        <di:waypoint x="1300" y="598" />
+        <di:waypoint x="1300" y="640" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-question-answer-di" bpmnElement="flow-question-answer">
+        <di:waypoint x="1350" y="680" />
+        <di:waypoint x="1400" y="680" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-answer-read-di" bpmnElement="flow-answer-read">
+        <di:waypoint x="1500" y="680" />
+        <di:waypoint x="1550" y="680" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-read-gateway-di" bpmnElement="flow-read-gateway">
+        <di:waypoint x="1650" y="680" />
+        <di:waypoint x="1705" y="680" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-deadline-wait-di" bpmnElement="flow-deadline-wait">
+        <di:waypoint x="1730" y="705" />
+        <di:waypoint x="1730" y="760" />
+        <di:waypoint x="700" y="760" />
+        <di:waypoint x="700" y="500" />
+        <di:waypoint x="720" y="500" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1740" y="720" width="25" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-deadline-drop-di" bpmnElement="flow-deadline-drop">
+        <di:waypoint x="1730" y="655" />
+        <di:waypoint x="1730" y="400" />
+        <di:waypoint x="1620" y="400" />
+        <di:waypoint x="1620" y="310" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1740" y="600" width="25" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-deadline-bug-di" bpmnElement="flow-deadline-bug">
+        <di:waypoint x="1755" y="680" />
+        <di:waypoint x="1800" y="680" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1765" y="660" width="25" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-deadline-bug-close-di" bpmnElement="flow-deadline-bug-close">
+        <di:waypoint x="1850" y="640" />
+        <di:waypoint x="1850" y="200" />
+        <di:waypoint x="1600" y="200" />
+        <di:waypoint x="1600" y="230" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

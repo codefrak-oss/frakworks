@@ -1,0 +1,26 @@
+{
+  "board": [
+    { "repo": "o/r", "number": 21, "title": "Where do drafts live?", "url": "https://github.com/o/r/issues/21", "kind": "research",
+      "flow": { "flow": "research", "stage": "user-task-answer-decision", "ended": false } },
+    { "repo": "o/r", "number": 22, "title": "How does the doctor tick?", "url": "https://github.com/o/r/issues/22", "kind": "research",
+      "flow": { "flow": "research", "stage": "user-task-answer-decision", "ended": false } }
+  ],
+  "needs": [
+    { "repo": "o/r", "ticket": 21, "kind": "decision", "actionId": "r-21", "ask": "Answer ready (round 1): In Vars.PROPOSAL.",
+      "wanted": "answer ready: accept, save, drop, or ask a follow-up" },
+    { "repo": "o/r", "ticket": 22, "kind": "decision", "actionId": "r-22", "ask": "Answer ready (round 3): Every tick, two positions.",
+      "wanted": "answer ready: accept, save, drop, or ask a follow-up" }
+  ],
+  "thread": {
+    "22": [
+      { "round": 1, "summary": "Every tick.", "md": "# How does the doctor tick?\n\nEvery tick." },
+      { "round": 2, "summary": "Every tick, comparing positions.", "md": "# How does the doctor tick?\n\nEvery tick, comparing positions." },
+      { "round": 3, "summary": "Every tick, two positions.", "md": "# How does the doctor tick?\n\nEvery tick, two positions in a row." }
+    ]
+  },
+  "pages": {
+    "o/r:21": { "pitch": { "kind": "html", "path": null, "prUrl": "", "content": "<h1>Where do drafts live?</h1><svg viewBox=\"0 0 1 1\"></svg>", "round": 1 } },
+    "o/r:22": { "pitch": { "kind": "html", "path": null, "prUrl": "", "content": "<h1>How does the doctor tick?</h1><svg viewBox=\"0 0 1 1\"></svg>", "round": 3 } },
+    "o/r:23": { "pitch": { "kind": "html", "path": null, "prUrl": "", "content": "<h1>Closed and accepted</h1><svg viewBox=\"0 0 1 1\"></svg>", "round": 2 } }
+  }
+}

@@ -1,0 +1,55 @@
+# The engine's database: a plain StatefulSet (no operator yet), its volume
+# from the cluster's default storage class unless the overlay names one.
+apiVersion: v1
+kind: Service
+metadata:
+  name: engine-db
+  namespace: frakworks
+spec:
+  clusterIP: None
+  selector: {app.kubernetes.io/name: engine-db}
+  ports:
+    - {name: postgres, port: 5432}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: engine-db
+  namespace: frakworks
+spec:
+  serviceName: engine-db
+  replicas: 1
+  selector:
+    matchLabels: {app.kubernetes.io/name: engine-db}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: engine-db}
+    spec:
+      # Above every Smith (smith.yaml): evicted last, memory requested at its limit.
+      priorityClassName: frakworks-core
+      containers:
+        - name: postgres
+          image: postgres:16
+          ports:
+            - {name: postgres, containerPort: 5432}
+          env:
+            - {name: POSTGRES_DB, value: engine}
+            - {name: POSTGRES_USER, value: engine}
+            - name: POSTGRES_PASSWORD
+              valueFrom: {secretKeyRef: {name: engine, key: db-password}}
+            - {name: PGDATA, value: /var/lib/postgresql/data/pgdata}
+          resources:
+            requests: {memory: 1Gi}
+            limits: {memory: 1Gi}
+          readinessProbe:
+            exec: {command: ["pg_isready", "-U", "engine", "-d", "engine"]}
+            periodSeconds: 5
+          volumeMounts:
+            - {name: data, mountPath: /var/lib/postgresql/data}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests: {storage: 10Gi}

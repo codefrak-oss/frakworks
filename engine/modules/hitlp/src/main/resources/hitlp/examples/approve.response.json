@@ -1,0 +1,43 @@
+{
+  "requestId": "task-7f3a",
+  "idempotencyKey": "deploy-4821-prod",
+  "primitive": "approve",
+  "outcome": "approved",
+  "decidedBy": {
+    "type": "human",
+    "id": "h-102",
+    "roles": [
+      "approver.production-deploy"
+    ]
+  },
+  "decidedAt": "2026-10-08T18:04:11Z",
+  "channel": "url",
+  "payloadDigest": "sha256:9f2c1e0a",
+  "signature": {
+    "alg": "ES256",
+    "keyId": "hitlp-2026",
+    "value": "MEUCIQ..."
+  },
+  "attested": {
+    "requester": "release-orchestrator",
+    "onBehalfOf": {
+      "kind": "run",
+      "id": "rel-4821"
+    },
+    "by": "hitlp-server"
+  },
+  "recommendation": {
+    "verdict": "allow",
+    "confidence": 0.9,
+    "by": {
+      "requester": "release-orchestrator",
+      "judge": "release checks",
+      "model": "none",
+      "rubric": "release-policy@v12"
+    },
+    "reasons": [
+      "staging checks green",
+      "change window open"
+    ]
+  }
+}

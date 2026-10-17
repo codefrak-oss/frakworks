@@ -1,0 +1,3 @@
+# The startup check (engine/README.md, "Configuration"): an engine.* property that is not
+# a key of application.properties stops the engine before any bean is made.
+org.springframework.boot.EnvironmentPostProcessor=com.codefrak.engine.UnknownEngineProperties

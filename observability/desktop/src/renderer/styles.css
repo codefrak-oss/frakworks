@@ -1,0 +1,1692 @@
+/* styles.css — the views' styles, scoped to .fleet-root (a view's root element). */
+/* The palette's roles (#2213): today's scheme ("Current" in palettes.jsx);
+   Config > Palettes overrides them on <html> with the chosen scheme. */
+:root {
+  --bg: #14161b; --surface: #1b1e24; --border: #25272c;
+  --text: #e6e8eb; --muted: #9aa0a8; --accent: #4c86e0;
+  --ok: #4c86e0; --warn: #8fb8f2; --err: #e3eefb; --info: #4c86e0;
+}
+html, body { margin: 0; background: var(--bg); }
+body { padding: 0; }
+.fleet-root {
+  width: 552px;
+  font-family: -apple-system, "SF Pro Text", Helvetica, sans-serif;
+  font-size: 12px; color: var(--text);
+  /* No backdrop-filter: the window is opaque behind a view, so a blur had
+     nothing to soften, and the compositor re-blurred it every frame the
+     running card animated (#1110). */
+  background: color-mix(in srgb, var(--bg) 72%, transparent);
+  border: 1px solid rgba(255,255,255,0.08); border-radius: 12px;
+  padding: 14px 16px 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.35);
+  -webkit-font-smoothing: antialiased;
+  /* The palette: the severity ramp (good / warning / critical) and the two
+     phase colours the charts use. */
+  --sev-good: var(--ok);
+  --sev-warn: var(--warn);
+  --sev-crit: var(--err);
+  --p-impl: var(--accent);
+  --p-review: color-mix(in srgb, var(--accent) 45%, var(--bg));
+  /* Timeline card colours (src/renderer/timeline.jsx, #101); --tl-ci (a `ci`
+     wait and the split bar's CI segment) is its own. */
+  --tl-coding: var(--info);
+  --tl-security: var(--ok);
+  --tl-correctness: var(--warn);
+  --tl-ci: var(--accent);
+}
+.fleet-root h1 { font-size: 14px; font-weight: 600; margin: 0; letter-spacing: .2px; }
+.fleet-root h2 { font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .6px;
+       color: var(--muted); margin: 12px 0 5px; }
+.fleet-root .head { display: flex; justify-content: space-between; align-items: baseline; }
+/* The Issues board's all / asked by me radios beside the heading (#1289). */
+.fleet-root .isHeading { display: inline-flex; align-items: baseline; gap: 12px; }
+.fleet-root .isFilter { display: inline-flex; gap: 2px; font-size: 11px; }
+.fleet-root .isFilter label { display: inline-flex; align-items: center; gap: 4px; padding: 1px 8px;
+                border-radius: 10px; color: var(--muted); cursor: pointer; border: 1px solid transparent; }
+.fleet-root .isFilter label:hover { color: #d8dde3; }
+.fleet-root .isFilter label.on { color: #e6e9ee; border-color: var(--sev-good);
+                background: color-mix(in srgb, var(--sev-good) 22%, transparent); }
+.fleet-root .isFilter input { accent-color: var(--sev-good); margin: 0; width: 10px; height: 10px; }
+.fleet-root .meta { color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.fleet-root .err  { margin-top: 8px; padding: 6px 8px; border-radius: 6px;
+          background: color-mix(in srgb, var(--sev-crit) 18%, transparent);
+          border: 1px solid var(--sev-crit); color: var(--sev-crit); }
+.fleet-root .refreshBtn { background: transparent; border: none; color: var(--ok); cursor: pointer;
+                font-size: 22px; line-height: 1; padding: 2px 6px; border-radius: 6px;
+                margin-left: 8px; font-weight: 700; }
+.fleet-root .refreshBtn:hover { color: var(--ok); background: rgba(255,255,255,0.1); }
+.fleet-root .refreshBtn:disabled { opacity: .4; cursor: default; }
+.fleet-root .refreshBtn.spinning { animation: refreshSpin .8s linear infinite; }
+@keyframes refreshSpin { to { transform: rotate(360deg); } }
+.fleet-root table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.fleet-root th { text-align: left; font-weight: 500; color: var(--muted); font-size: 10.5px; padding: 0 0 3px; }
+.fleet-root td { padding: 3px 0; border-top: 1px solid rgba(255,255,255,0.06); vertical-align: middle; }
+.fleet-root td.num, th.num { text-align: right; }
+.fleet-root .muted { color: var(--muted); }
+.fleet-root .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
+.fleet-root .chip { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 999px;
+          background: rgba(255,255,255,0.06); font-size: 11px; }
+.fleet-root .chip i { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+.fleet-root .chip b { font-weight: 600; }
+.fleet-root .foot { display: flex; justify-content: space-between; margin-top: 10px; padding-top: 8px;
+          border-top: 1px solid rgba(255,255,255,0.08); font-size: 11px; color: #b8bcc4; }
+.fleet-root .foot b { color: var(--text); font-weight: 600; }
+.fleet-root svg text { font-size: 9.5px; fill: var(--muted); }
+.fleet-root a { color: inherit; text-decoration: none; }
+
+
+/* --- view tabs + the "needs you" list (stage 3a, issue #1282) ----------- */
+.app { width: 552px; }
+.tabs { display: flex; gap: 6px; margin-bottom: 8px;
+        font-family: -apple-system, "SF Pro Text", Helvetica, sans-serif; }
+.tabs .tab { display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 11px;
+       color: #b8bcc4; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+       border-radius: 999px; padding: 3px 12px; cursor: pointer; }
+.tabs .tab:hover { color: var(--text); background: rgba(255,255,255,0.12); }
+.tabs .tab.on { color: var(--text); background: rgba(255,255,255,0.16); border-color: rgba(255,255,255,0.28); }
+.tabs .tabBadge { font-size: 10px; font-weight: 700; line-height: 1; padding: 2px 6px; border-radius: 999px;
+            background: var(--sev-crit, #d03b3b); color: #fff; }
+.fleet-root .nmView h2 { display: flex; align-items: center; gap: 6px; }
+.fleet-root .nmRank { display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px;
+           border-radius: 3px; background: rgba(255,255,255,0.12); color: var(--text); font-size: 9.5px; }
+.fleet-root .nmRow { display: flex; align-items: flex-start; gap: 8px; padding: 5px 0;
+          border-top: 1px solid rgba(255,255,255,0.06); }
+.fleet-root .nmRow.muted { opacity: .55; }
+.fleet-root .nmTicket { min-width: 46px; max-width: 200px; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--muted); font-variant-numeric: tabular-nums; }
+.fleet-root .nmTicket:hover { color: var(--text); text-decoration: underline; }
+.fleet-root .nmBody { flex: 1; min-width: 0; }
+.fleet-root .nmTitle { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fleet-root .nmAsk { color: #b8bcc4; font-size: 11px; margin-top: 2px; }
+.fleet-root .nmSide { flex-shrink: 0; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+.fleet-root .nmDeps { display: block; font-size: 10px; color: var(--muted); }
+/* A HITLP task's row (#2173): the question in full, the buttons, the countdown. */
+.fleet-root .nmQuestion { color: #d0d4da; font-size: 12px; margin-top: 2px; white-space: pre-wrap; }
+.fleet-root .nmButtons { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; }
+.fleet-root .nmButtons .acInput { min-width: 220px; }
+.fleet-root .nmPayload { margin-top: 4px; font-size: 11px; color: var(--muted); }
+.fleet-root .nmPayload summary { cursor: pointer; }
+.fleet-root .nmSide .nmDeadline { display: block; }
+.fleet-root .nmSide .nmDeadline.overdue { color: #ff8a8a; }
+.fleet-root .nmSide .nmWait { display: block; font-size: 11px; }
+.fleet-root .nmOpenable { cursor: pointer; border-radius: 4px; }
+.fleet-root .nmVerified { color: #7fd4a8; font-size: 11px; }
+.fleet-root .nmTrust { color: var(--muted); font-size: 11px; }
+.fleet-root .nmLineage ol { margin: 2px 0 0; padding-left: 20px; }
+.fleet-root .nmLineage code { overflow-wrap: anywhere; }
+.fleet-root .nmOpenable:hover, .fleet-root .nmOpenable:focus-visible { background: var(--hover, rgba(127,127,127,.12)); outline: none; }
+.fleet-root .nmOneLine { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fleet-root .nmPriority { display: inline-block; margin-right: 6px; padding: 0 5px; border-radius: 3px; font-size: 11px;
+  border: 1px solid var(--muted); color: var(--muted); }
+.fleet-root .nmPriority-urgent { border-color: #ff8a8a; color: #ff8a8a; }
+.fleet-root .nmPriority-high { border-color: #f0b35a; color: #f0b35a; }
+.fleet-root .nmBack { background: none; border: none; color: var(--muted); cursor: pointer; padding: 0; font: inherit; }
+.fleet-root .nmBack:hover { color: var(--text); }
+.fleet-root .nmTaskView .nmContext { margin: 6px 0 10px; color: var(--muted); }
+.fleet-root .nmTaskView .nmScope { overflow-wrap: anywhere; }
+.fleet-root .nmEmpty { margin-top: 10px; color: var(--muted); }
+/* The Issues view (issues.jsx): the engine's board as a table. */
+.fleet-root .isView table { margin-top: 8px; table-layout: fixed; }
+.fleet-root .isView col.isNumCol { width: 80px; }
+/* The state column (and its progress bar) gives up width before the title does. */
+.fleet-root .isView col.isStateCol { width: clamp(120px, 28%, 260px); }
+.fleet-root .isView td { vertical-align: top; padding: 5px 8px 5px 0; }
+.fleet-root .isTitle { overflow-wrap: anywhere; }
+.fleet-root .isNum a { color: var(--muted); font-variant-numeric: tabular-nums; }
+.fleet-root .isNum a:hover { color: var(--text); text-decoration: underline; }
+.fleet-root .isLabels { margin-top: 2px; display: flex; flex-wrap: wrap; gap: 4px; }
+.fleet-root .isLabel { font-size: 10px; padding: 0 5px; border-radius: 999px; color: #b8bcc4;
+  background: rgba(255,255,255,0.08); }
+.fleet-root .isLabel.isPoints { color: #d6c27a; }
+.fleet-root .isLabel.isPitch { color: #0e1624; background: var(--info); font-weight: 600; }
+.fleet-root .isState { color: var(--muted); min-width: 0; overflow-wrap: anywhere; }
+.fleet-root .isState a { color: var(--ok); }
+.fleet-root .is-question .isState { color: var(--warn); font-weight: 600; }
+.fleet-root .is-need .isState { color: var(--warn); font-weight: 600; }
+.fleet-root .is-running .isState { color: var(--ok); }
+.fleet-root .is-refused .isState { color: var(--err); }
+/* The live progress bar under a running issue's state (issues.jsx, ProgressBar). */
+.fleet-root .isProgress { margin-top: 4px; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.08); overflow: hidden; }
+.fleet-root .isProgressFill { height: 100%; background: var(--ok); transition: width 0.9s linear; }
+.fleet-root .isProgress.hold .isProgressFill { background: var(--warn); }
+/* A split parent's bar with a part weighed by its siblings' mean points (issues.jsx, partsProgress). */
+.fleet-root .isProgress.estimated .isProgressFill { background-image: repeating-linear-gradient(135deg, rgba(0,0,0,0.25) 0 4px, transparent 4px 8px); }
+/* the issue detail view's bigger copy of the same bar */
+.fleet-root .isProgress.isProgressLg { margin: 10px 0 4px; height: 12px; border-radius: 6px; }
+.fleet-root .isAge { color: var(--muted); white-space: nowrap; }
+/* The live age under a ticket's number: smaller and fainter than the number. */
+.fleet-root .isNum .isAge { font-size: 11px; opacity: 0.75; font-variant-numeric: tabular-nums; margin-top: 1px; }
+/* Config > AI Accounts (accounts.jsx). */
+/* The refiner-tier setting above the tiles: one engine setting, not an account. */
+.fleet-root .acSetting { margin-top: 8px; padding: 8px 10px; border-radius: 6px;
+  background: rgba(255,255,255,0.02); border: 1px dashed rgba(255,255,255,0.14); }
+.fleet-root .acSettingHead { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; }
+.fleet-root .acSetting .acForm { margin: 6px 0 0; }
+/* Config > frakworks > Sign in to the engine (#2206): one row, the field or the login, and its button. */
+.fleet-root .acSetting .signInRow { display: flex; align-items: center; gap: 8px; margin: 6px 0 0; }
+.fleet-root .acSetting .signInToken { min-width: 320px; }
+.fleet-root .acSetting .signInWho { color: #c9ccd1; }
+.fleet-root .acSetting .signInWho b { color: #e6e6e6; font-weight: 600; }
+/* Config > frakworks > Tiers (tiers.jsx): one line per tier, its number then the model and effort selects. */
+.fleet-root .acSetting .tierRow { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+.fleet-root .acSetting .tierRow .tierN { min-width: 64px; color: #c9ccd1; }
+.fleet-root .acSettingNow { font-size: 12px; }
+.fleet-root .acGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; margin-top: 8px; }
+@media (max-width: 640px) { .fleet-root .acGrid { grid-template-columns: 1fr; } }
+.fleet-root .tier-accounts-tile { margin: 8px 0; padding: 10px 12px; border-radius: 0; border: 1px dashed rgba(120,170,255,0.45);
+  border-left: 3px solid rgba(120,170,255,0.8); background: rgba(120,170,255,0.06); }
+.fleet-root .tier-accounts-tile .taHead { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.fleet-root .tier-accounts-tile h2 { margin: 0; font-size: 13px; font-weight: 600; color: #9fc0ff; text-transform: uppercase; letter-spacing: 0.04em; }
+.fleet-root .tier-accounts-tile h2.taFold { padding: 4px 6px; margin: -4px -6px; }
+.fleet-root .tier-accounts-tile .taTable { border-collapse: collapse; margin-top: 6px; font-size: 12px; }
+.fleet-root .tier-accounts-tile .taTable th, .fleet-root .tier-accounts-tile .taTable td { padding: 2px 12px 2px 0; text-align: left; }
+.fleet-root .tier-accounts-tile .taTable th { color: var(--muted); font-weight: 500; }
+.fleet-root .tier-accounts-tile .taNone { color: #e0a060; }
+.fleet-root .acTile { display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: 6px;
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); }
+.fleet-root .acTileHead { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.fleet-root .acProvider { color: var(--muted); font-size: 11px; }
+.fleet-root .acTileHead .acPill { margin-left: auto; }
+.fleet-root .acToggle { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; color: var(--muted); cursor: pointer; }
+.fleet-root .acPill { font-size: 10px; text-transform: uppercase; letter-spacing: .4px; padding: 1px 6px; border-radius: 8px;
+  background: rgba(255,255,255,0.08); color: var(--muted); }
+.fleet-root .acPill.allowed { color: #0c1a0e; background: var(--ok); }
+.fleet-root .acPill.warning { color: #1a1400; background: var(--warn); }
+.fleet-root .acPill.rejected { color: #fff; background: var(--err); }
+/* Config > Repos: a setup check under way, neither good nor bad; beside the report a row already has. */
+.fleet-root .acPill.neutral { color: #c9ced6; background: rgba(255,255,255,0.12); }
+.fleet-root .acTileBody { display: flex; flex-direction: column; gap: 4px; }
+.fleet-root .acWindow { display: flex; align-items: center; gap: 8px; }
+.fleet-root .acWinLabel { width: 2ch; color: var(--muted); }
+.fleet-root .acWinLabelWide { width: auto; min-width: 2ch; white-space: nowrap; }
+.fleet-root .acCountdown { margin-left: auto; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.fleet-root .acFable.warn { color: var(--err); font-weight: 600; }
+.fleet-root .acTileFoot { margin-top: auto; padding-top: 6px; border-top: 1px solid rgba(255,255,255,0.08);
+  font-size: 11px; color: var(--muted); display: flex; flex-direction: column; gap: 6px; }
+.fleet-root .acFacts { display: flex; flex-wrap: wrap; gap: 10px; }
+.fleet-root .acName { font-weight: 600; }
+.fleet-root .acEmail { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fleet-root .acNote { flex-basis: 100%; font-size: 11px; color: var(--muted); }
+.fleet-root .acDim, .fleet-root .acAge { color: var(--muted); white-space: nowrap; }
+.fleet-root .acState { color: var(--muted); }
+.fleet-root .acRunning { font-size: 11px; color: var(--ok); border: 1px solid #2f5f45; border-radius: 9px; padding: 0 7px; white-space: nowrap; }
+.fleet-root .acRunningLabel { color: #4f8f6c; }
+.fleet-root .ac-ready .acState { color: var(--ok); }
+.fleet-root .ac-stored .acState { color: var(--muted); }
+.fleet-root .ac-rejected .acState, .fleet-root .ac-nocred .acState { color: var(--warn); font-weight: 600; }
+.fleet-root .ac-off { opacity: 0.55; }
+.fleet-root .acMeter { font-variant-numeric: tabular-nums; display: inline-flex; align-items: center; gap: 6px; }
+.fleet-root .acBar { display: inline-block; width: 56px; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.08); overflow: hidden; }
+.fleet-root .acFill { display: block; height: 100%; border-radius: 3px; }
+.fleet-root .acFill.ok { background: var(--ok); }
+.fleet-root .acFill.warm { background: var(--warn); }
+.fleet-root .acFill.hot { background: var(--err); }
+.fleet-root .acPct { min-width: 3ch; text-align: right; }
+.fleet-root .acActions { display: flex; flex-wrap: wrap; gap: 4px; }
+.fleet-root .acBtn { font: inherit; font-size: 11px; color: #d0d4da; background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.14); border-radius: 4px; padding: 2px 8px; margin-left: 4px; cursor: pointer; }
+.fleet-root .acBtn:hover:not(:disabled) { background: rgba(255,255,255,0.12); }
+.fleet-root .acBtn:disabled { opacity: 0.45; cursor: default; }
+.fleet-root .acBtn.primary { color: #0c1a0e; background: var(--ok); border-color: var(--ok); font-weight: 600; }
+.fleet-root .acBtn.danger { color: #ff8a8a; border-color: rgba(255,107,107,0.45); }
+.fleet-root .acForm { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 8px 0; }
+.fleet-root .acProblem { flex-basis: 100%; font-size: 12px; color: var(--sev-crit, #d03b3b); }
+.fleet-root .acInput { font: inherit; font-size: 12px; color: var(--text); background: rgba(0,0,0,0.3);
+  border: 1px solid rgba(255,255,255,0.18); border-radius: 4px; padding: 3px 6px; }
+.fleet-root .acToken { flex: 1; min-width: 260px; }
+.fleet-root .acConfirm { color: var(--warn); }
+.fleet-root .acNotice { margin-top: 6px; font-size: 11px; color: var(--ok); }
+/* Config > frakworks > .env (env-lines.jsx, #912): the unused and missing keys
+   inside an acSetting. Dark first; .fleet-root stays dark under the light
+   scheme, and the list's tint is currentColor-relative, so it holds in both. */
+.fleet-root .envGroup { margin-top: 6px; }
+.fleet-root .envCount { font-weight: 600; }
+.fleet-root .envFile { color: var(--muted); font-size: 11px; overflow-wrap: anywhere; margin-top: 2px; }
+.fleet-root .envKeys { list-style: none; margin: 4px 0; padding: 4px 8px; border-radius: 4px;
+  background: color-mix(in srgb, currentColor 6%, transparent);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11.5px; line-height: 1.5; }
+.fleet-root .envGroup .acActions .acBtn { margin-left: 0; }
+.fleet-root .envNote { margin: 6px 0 0; color: var(--warn); font-size: 11px; }
+/* Config > Repos (repos.jsx): tiles as the accounts', plus the setup checklist and the grants. */
+.fleet-root .rpChecklist, .fleet-root .rpGrants { list-style: none; margin: 4px 0; padding: 0; display: flex; flex-direction: column; gap: 3px; font-size: 11.5px; }
+.fleet-root .rpItem.ok .rpMark { color: var(--ok); }
+.fleet-root .rpItem.bad { color: var(--warn); }
+.fleet-root .rpItem.bad .rpMark { color: var(--err); font-weight: 600; }
+.fleet-root .rpItem.unknown { color: var(--muted); }
+/* The webhook row's warning, and the scan interval modal (#958): amber and red read on the dark tiles. */
+.fleet-root .acWarn { color: var(--warn); font-weight: 600; }
+.fleet-root .acModal { position: fixed; inset: 0; z-index: 30; display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.55); }
+.fleet-root .acModalBox { width: min(560px, 92vw); max-height: 90vh; overflow-y: auto; padding: 14px 16px; font-size: 12px;
+  color: var(--text); background: var(--surface); border: 1px solid rgba(255,255,255,0.18); border-radius: 8px; box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
+.fleet-root .acModalBox h2 { margin: 0 0 8px; font-size: 14px; }
+.fleet-root .acModalBox .acDim { white-space: normal; }
+.fleet-root .acMinutes { width: 7ch; }
+.fleet-root .acFormula { margin: 8px 0; padding: 6px 8px; border-radius: 4px; background: rgba(0,0,0,0.3);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11.5px; line-height: 1.6; }
+.fleet-root .acBand.ok { color: var(--ok); }
+.fleet-root .acBand.warn { color: var(--warn); font-weight: 600; }
+.fleet-root .acBand.danger { color: #ff8a8a; font-weight: 600; }
+.fleet-root .rpFlow { display: inline-block; min-width: 8ch; color: var(--muted); }
+.fleet-root .nmWarn { margin-top: 6px; font-size: 10.5px; color: var(--muted); }
+/* ---- ticket detail view (stage 2, #1281) -------------------------------- */
+.fleet-root .backBtn { background: transparent; border: none; color: #b8bcc4; cursor: pointer;
+            font-size: 20px; line-height: 1; padding: 0 6px 0 0; font-weight: 700; }
+.fleet-root .backBtn:hover { color: var(--text); }
+.fleet-root .ghLink { color: var(--muted); text-decoration: none; font-size: 11px; font-weight: 400;
+            margin-left: 6px; }
+.fleet-root .ghLink:hover { color: var(--text); text-decoration: underline; }
+/* open/closed reads as a state. */
+.fleet-root .chip.tdState { font-weight: 600; text-transform: uppercase; font-size: 9.5px;
+                 letter-spacing: .4px; }
+.fleet-root .chip.tdState.open { color: var(--sev-good);
+                 background: color-mix(in srgb, var(--sev-good) 22%, transparent); }
+.fleet-root .chip.tdState.closed { color: #b47ce0;
+                 background: color-mix(in srgb, #b47ce0 22%, transparent); }
+/* Head row + title stay at the top of .work's scroll area (#342); top: -12px
+   cancels .work's padding so nothing peeks above it. Opaque: body's colour. */
+.fleet-root .tdPinned { position: sticky; top: -12px; z-index: 5; background: var(--bg);
+                        margin: -12px -12px 0; padding: 12px 12px 0; }
+.fleet-root .tdTitle { margin: 6px 0 8px; font-size: 12.5px; line-height: 1.35; color: var(--text); }
+.fleet-root .tdIntake { margin: -4px 0 8px; font-size: 11px; color: var(--muted); }
+.fleet-root .tdIntake a { color: inherit; }
+/* tdBarFoot is shared with the live transcript pane's byline (TranscriptPane,
+   ticket.jsx) — kept even though the stage bar that first used it is gone. */
+.fleet-root .tdBarFoot { display: flex; justify-content: space-between; margin-top: 3px;
+               font-size: 11px; color: #b8bcc4; font-variant-numeric: tabular-nums; }
+.fleet-root .tdBarFoot small { font-size: 9.5px; color: var(--muted); }
+
+/* The "can't do with current permissions" banner (BlockedBanner, timeline.jsx, #443): above the rest of the
+   ticket detail when the engine's timeline carries `ticket.blocked`. */
+.fleet-root .tdBlocked { margin: 8px 0; padding: 8px 10px; border-radius: 5px;
+              border: 1px solid color-mix(in srgb, var(--sev-crit) 55%, transparent);
+              background: color-mix(in srgb, var(--sev-crit) 10%, transparent); }
+.fleet-root .tdBlockedHead { margin: 0 0 3px; font-size: 13px; color: var(--sev-crit); }
+.fleet-root .tdBlockedSummary { font-size: 12px; }
+.fleet-root .tdBlockedReason { margin-top: 5px; font-size: 11px; color: #b8bcc4; }
+.fleet-root .tdBlockedReason summary { cursor: pointer; color: var(--muted); }
+.fleet-root .tdBlockedReasonText { margin-top: 3px; white-space: pre-wrap; }
+.fleet-root .wiIntakeFold summary { font-size: 10.5px; font-weight: 600; text-transform: uppercase;
+       letter-spacing: .6px; color: var(--muted); margin: 12px 0 5px; cursor: pointer; }
+
+/* ---- Timeline (src/renderer/timeline.jsx, #101) --------------------------- */
+.fleet-root .tlHeader { margin: 4px 0 8px; }
+.fleet-root .tlHeaderTop { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.fleet-root .tlTotals { display: flex; gap: 14px; margin-top: 4px; font-size: 11px;
+              color: #b8bcc4; font-variant-numeric: tabular-nums; }
+.fleet-root .tlTotals b { color: var(--text); }
+/* The one length-encoded element in the widget: elapsed split into
+   working/waiting-person/stuck/ci/engine, by flex-basis on each segment's ms. */
+.fleet-root .tlSplitBar { height: 8px; border-radius: 3px; overflow: hidden; display: flex;
+                margin-top: 5px; background: rgba(255,255,255,0.06); }
+.fleet-root .tlSplitBar > div { height: 100%; }
+.fleet-root .tlSplitBar .tl-working { background: var(--sev-good); }
+.fleet-root .tlSplitBar .tl-waiting-person { background: var(--warn); }
+.fleet-root .tlSplitBar .tl-stuck { background: var(--sev-crit); }
+.fleet-root .tlSplitBar .tl-ci { background: var(--tl-ci); }
+.fleet-root .tlSplitBar .tl-engine { background: #6f757e; }
+.fleet-root .tlTrack { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+/* Every card is the same size regardless of durationMs — only tlSplitBar above
+   encodes a value by length. */
+.fleet-root .tlCard { position: relative; padding: 6px 8px; border-radius: 5px;
+            border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04);
+            display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; font-size: 11px; }
+.fleet-root .tlCard.coding { border-left: 3px solid var(--tl-coding); }
+.fleet-root .tlCard.security { border-left: 3px solid var(--tl-security); }
+.fleet-root .tlCard.correctness { border-left: 3px solid var(--tl-correctness); }
+.fleet-root .tlCard.running { border-style: dashed; }
+.fleet-root .tlPulse { position: absolute; top: 6px; right: 8px; width: 7px; height: 7px;
+            border-radius: 50%; background: var(--sev-good); animation: tlPulse 1.4s ease-in-out infinite; }
+@keyframes tlPulse { 0%, 100% { opacity: .35; } 50% { opacity: 1; } }
+/* The running card in action: a bright stripe travels down just inside its
+   3px accent border (overflow: hidden clips at the border's inner edge), and a faint highlight sweeps across the card, both on a loop.
+   Every keyframe here moves `transform` or `opacity` only, so the compositor
+   animates the card with no paint per frame (#1110): the sweep is a band 40%
+   of the card wide, slid across it, not a moving background. */
+.fleet-root .tlCard.tlActive { overflow: hidden; --tl-accent: var(--sev-good); }
+.fleet-root .tlCard.coding.tlActive { --tl-accent: var(--tl-coding); }
+.fleet-root .tlCard.security.tlActive { --tl-accent: var(--tl-security); }
+.fleet-root .tlCard.correctness.tlActive { --tl-accent: var(--tl-correctness); }
+.fleet-root .tlCard.tlActive::before { content: ""; position: absolute; left: 0; top: 0; width: 3px; height: 40%;
+            background: linear-gradient(to bottom, transparent, #fff, transparent);
+            animation: tlStripe 1.6s linear infinite; }
+.fleet-root .tlSweep { position: absolute; top: 0; bottom: 0; left: 0; width: 40%; pointer-events: none;
+            background: linear-gradient(100deg, transparent 0%,
+              color-mix(in srgb, var(--tl-accent) 22%, transparent) 50%, transparent 100%);
+            animation: tlSweep 2.4s ease-in-out infinite; }
+@keyframes tlStripe { from { transform: translateY(-100%); } to { transform: translateY(250%); } }
+/* The same path as the old moving background (a 40%-wide image at -40% → 140%): its left edge
+   from -24% to 84% of the card, i.e. -60% → 210% of the band's own width. */
+@keyframes tlSweep { from { transform: translateX(-60%); } to { transform: translateX(210%); } }
+/* No motion: the running card keeps a solid, brighter accent instead. */
+@media (prefers-reduced-motion: reduce) {
+  .fleet-root .tlCard.tlActive::before, .fleet-root .tlSweep { animation: none; display: none; }
+  .fleet-root .tlPulse { animation: none; opacity: 1; }
+  .fleet-root .tlCard.tlActive { border-style: solid; border-left-width: 5px;
+            background: color-mix(in srgb, var(--tl-accent) 12%, transparent); }
+}
+/* The running coding card's transcript controls, and the pane under it (#867). */
+.fleet-root .tlCardCtl { grid-column: 1 / -1; display: flex; gap: 6px; margin-top: 4px; position: relative; }
+.fleet-root .tlCtl { background: transparent; border: 1px solid #2c313b; border-radius: 5px;
+           color: #c8ccd2; font: inherit; font-size: 10.5px; padding: 1px 8px; cursor: pointer; }
+.fleet-root .tlCtl:hover { background: rgba(255,255,255,0.08); }
+.fleet-root .tlCtl:disabled { opacity: .5; cursor: default; }
+.fleet-root .tlTranscript { margin: -2px 0 2px 18px; padding-left: 8px; border-left: 3px solid var(--tl-coding); }
+.fleet-root .tlRework { grid-column: 1 / -1; font-size: 9.5px; text-transform: uppercase;
+              letter-spacing: .4px; color: var(--warn); }
+.fleet-root .tlCatchUp { color: var(--muted); }
+.fleet-root .tlCardRole { font-weight: 600; text-transform: capitalize; }
+.fleet-root .tlCardModel, .fleet-root .tlCardAccount, .fleet-root .tlCardOutcome { grid-column: 1 / -1; color: var(--muted); }
+/* The review card's prediction bar (#1746): -100 deny … 0 … +100 approve. */
+.fleet-root .tlPredict { grid-column: 1 / -1; display: flex; align-items: center; gap: 6px; margin-top: 3px; }
+.fleet-root .tlPredictTrack { position: relative; flex: 1; height: 6px; border-radius: 3px; background: #2c313b; overflow: hidden; }
+.fleet-root .tlPredictZero { position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: #6b7280; }
+.fleet-root .tlPredictFill { position: absolute; top: 0; bottom: 0; }
+.fleet-root .tlPredict.approve .tlPredictFill { background: #4caf7d; }
+.fleet-root .tlPredict.deny .tlPredictFill { background: #e06c75; }
+.fleet-root .tlPredictLabel { font-size: 10.5px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.fleet-root .tlCardTokens { grid-column: 1 / -1; color: var(--muted); font-variant-numeric: tabular-nums; }
+.fleet-root .tlCardDur, .fleet-root .tlCardCost, .fleet-root .tlCardTurns { text-align: right;
+              font-variant-numeric: tabular-nums; color: #b8bcc4; }
+/* One fixed-size dotted line per wait, coloured and labelled by cause; a click
+   toggles its minor detail (WaitLine/WaitMinor). */
+.fleet-root .tlWait { padding: 4px 8px; border-radius: 4px; cursor: pointer;
+            border: 1px dashed rgba(255,255,255,0.18); font-size: 10.5px; }
+.fleet-root .tlWait.amber { color: var(--warn); border-color: rgba(255,209,102,0.45); }
+.fleet-root .tlWait.red { color: var(--sev-crit); border-color: color-mix(in srgb, var(--sev-crit) 55%, transparent); }
+.fleet-root .tlWait.grey { color: var(--muted); }
+.fleet-root .tlWait.ci { color: var(--tl-ci); border-color: color-mix(in srgb, var(--tl-ci) 50%, transparent); }
+/* A CI check still running (#1678): a pulsing dot and a breathing border. */
+.fleet-root .tlWait.ci.running { animation: tlWaitRun 1.6s ease-in-out infinite; }
+.fleet-root .tlWaitDot { display: inline-block; width: 6px; height: 6px; margin-right: 6px; border-radius: 50%;
+            vertical-align: middle; background: var(--tl-ci); animation: tlPulse 1.4s ease-in-out infinite; }
+@keyframes tlWaitRun { 0%, 100% { border-color: color-mix(in srgb, var(--tl-ci) 35%, transparent); }
+            50% { border-color: var(--tl-ci); } }
+@media (prefers-reduced-motion: reduce) {
+  .fleet-root .tlWait.ci.running, .fleet-root .tlWaitDot { animation: none; opacity: 1; }
+}
+.fleet-root .tlWait.expanded { background: rgba(255,255,255,0.05); }
+.fleet-root .tlMinor { margin-top: 4px; padding-top: 4px; border-top: 1px solid rgba(255,255,255,0.08);
+            color: #b8bcc4; font-size: 10.5px; }
+.fleet-root .tlMinorStep { padding: 1px 0; }
+
+.fleet-root .tdDesc { white-space: pre-wrap; word-break: break-word; font-size: 11.5px; line-height: 1.45;
+  margin: 2px 0 0; padding: 6px 8px; border-radius: 4px; background: rgba(127,127,127,.08); }
+.fleet-root .tdDescMode { display: flex; justify-content: flex-end; gap: 4px; font-size: 10px;
+  margin: -4px 0 2px; opacity: .55; }
+.fleet-root .tdDescMode:hover { opacity: .9; }
+.fleet-root .tdDescMode button { background: none; border: none; padding: 0; cursor: pointer;
+  color: inherit; font-size: inherit; }
+.fleet-root .tdDescMode button.on { font-weight: 600; text-decoration: underline; cursor: default; }
+.fleet-root .tdDesc.md { white-space: normal; max-width: 72ch;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11.5px; line-height: 1.6; }
+.fleet-root .tdDesc.md.clipped { max-height: 19.2em; overflow: hidden;
+  -webkit-mask-image: linear-gradient(to bottom, #000 80%, transparent); }
+.fleet-root .tdDesc.md > :first-child { margin-top: 0; }
+.fleet-root .tdDesc.md > :last-child { margin-bottom: 0; }
+.fleet-root .tdDesc.md h1, .fleet-root .tdDesc.md h2, .fleet-root .tdDesc.md h3 {
+  font-weight: 700; margin: 1.2em 0 .4em; text-transform: none; letter-spacing: 0; }
+.fleet-root .tdDesc.md h1 { font-size: 13px; }
+.fleet-root .tdDesc.md h2 { font-size: 12px; }
+.fleet-root .tdDesc.md h3 { font-size: 11.5px; }
+.fleet-root .tdDesc.md p, .fleet-root .tdDesc.md ul, .fleet-root .tdDesc.md ol,
+.fleet-root .tdDesc.md blockquote, .fleet-root .tdDesc.md pre, .fleet-root .tdDesc.md table { margin: 0 0 .9em; }
+.fleet-root .tdDesc.md li { margin: .25em 0; }
+.fleet-root .tdDesc.md ul, .fleet-root .tdDesc.md ol { padding-left: 18px; }
+.fleet-root .tdDesc.md li.task-list-item { list-style: none; margin-left: -16px; }
+.fleet-root .tdDesc.md code { font-family: inherit; font-size: inherit; padding: 0 4px; border-radius: 4px;
+  background: rgba(127,127,127,.18); }
+.fleet-root .tdDesc.md pre { padding: 8px 10px; border-radius: 6px; background: rgba(127,127,127,.18);
+  overflow-x: auto; white-space: pre; }
+.fleet-root .tdDesc.md pre code { padding: 0; border-radius: 0; background: none; }
+.fleet-root .tdDesc.md table { display: block; max-width: 100%; overflow-x: auto; border-collapse: collapse; }
+.fleet-root .tdDesc.md th, .fleet-root .tdDesc.md td { padding: 2px 8px; text-align: left;
+  border-bottom: 1px solid rgba(127,127,127,.3); }
+.fleet-root .tdDesc.md blockquote { padding-left: 8px; border-left: 2px solid rgba(127,127,127,.4); color: #b8bcc4; }
+.fleet-root .tdDesc.md a { color: var(--sev-good); text-decoration: none; }
+.fleet-root .tdDesc.md a:hover { text-decoration: underline; }
+.fleet-root .tdDesc.md img { max-width: 100%; }
+.fleet-root .tdMore { background: none; border: none; padding: 2px 0; cursor: pointer; color: inherit;
+  opacity: .7; font-size: 11px; }
+.fleet-root .tdMore:hover { opacity: 1; text-decoration: underline; }
+.fleet-root .tdPr { display: flex; gap: 8px; align-items: baseline; padding: 3px 0; }
+.fleet-root .tdPr a { color: inherit; font-weight: 600; }
+.fleet-root .chip.tdState.merged { color: var(--p-review); }
+.fleet-root .chip.tdState.draft { opacity: .7; }
+.fleet-root .tdThread { margin-top: 2px; }
+.fleet-root .tdEvent { padding: 3px 0; border-top: 1px solid rgba(255,255,255,0.06); }
+.fleet-root .tdEventHead { display: flex; gap: 8px; align-items: baseline; }
+.fleet-root h2.tdFold { display: flex; align-items: center; gap: 6px; cursor: pointer; user-select: none;
+  padding: 4px 6px; margin-left: -6px; border-radius: 4px; }
+.fleet-root h2.tdFold:hover { background: rgba(127,127,127,.12); color: inherit; }
+.fleet-root .tdFoldArrow { font-size: 12px; width: 10px; }
+.fleet-root .tdFoldCount { font-weight: 400; padding: 0 6px; border-radius: 999px;
+  background: rgba(127,127,127,.18); }
+.fleet-root .tdEventHead .muted { flex-shrink: 0; font-size: 10.5px; }
+.fleet-root .tdEvent.open .tdDesc { margin: 3px 0 4px 52px; }
+.fleet-root .tdWhen { flex-shrink: 0; width: 44px; color: var(--muted); font-size: 10.5px;
+            font-variant-numeric: tabular-nums; }
+.fleet-root .tdKind { flex-shrink: 0; width: 64px; font-size: 9.5px; font-weight: 600;
+            text-transform: uppercase; letter-spacing: .4px; color: var(--muted); }
+.fleet-root .tdEvent.claim .tdKind { color: var(--p-impl); }
+.fleet-root .tdEvent.receipt .tdKind { color: var(--p-review); }
+.fleet-root .tdEvent.done .tdKind { color: var(--sev-good); }
+.fleet-root .tdEvent.blocked .tdKind { color: var(--sev-crit); }
+.fleet-root .tdEvent.returned .tdKind { color: var(--sev-warn); }
+.fleet-root .tdBody { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+            white-space: nowrap; color: #c8ccd2; }
+
+
+/* ---- live transcript pane (stage 4, #1283) ------------------------------
+   A tail of dispatch/smith-tail's own lines, so it is monospaced, wraps
+   rather than scrolls sideways, and is bounded in height: the pane follows a
+   run, it does not become the page. */
+.fleet-root .tdTranscript { margin: 4px 0 0; padding: 6px 8px; max-height: 260px; overflow-y: auto;
+                 font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10px;
+                 line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere;
+                 background: rgba(0, 0, 0, 0.28); border-radius: 6px; color: #c9cdd4; }
+/* Tool lines (→ Read, → Bash) recede so the Smith's prose stands out (#1023). */
+.fleet-root .tdTranscript .tdToolLine { color: #7d828b; }
+.fleet-root .tdLive { color: var(--sev-good); }
+/* A doctor run's transcript in the ticket detail's Doctor section (#705):
+   folded under its run until asked for, then the live pane's look. */
+.fleet-root .flDoctorLog { margin-top: 4px; }
+.fleet-root .flDoctorLogBtn { background: none; border: 0; padding: 0; color: inherit; opacity: 0.75;
+                 font: inherit; cursor: pointer; }
+.fleet-root .flDoctorLogBtn:hover { opacity: 1; text-decoration: underline; }
+
+/* ---- the summary panel (#423, #881) ----------------------------------------
+   Over the live transcript under the coding card: the Summarize button's
+   two-line answer (Session, Now), or its error. */
+.fleet-root .tdSummary { margin: 4px 0 6px; }
+.fleet-root .sessionSummary { margin: 6px 0 0; padding: 6px 8px; border-radius: 6px; background: rgba(255,255,255,0.04); }
+.fleet-root .sessionSummary dt { font-size: 9.5px; font-weight: 600; text-transform: uppercase;
+           letter-spacing: .4px; color: var(--muted); }
+.fleet-root .sessionSummary dd { margin: 1px 0 6px; color: var(--text); line-height: 1.4; }
+.fleet-root .sessionSummary dd:last-child { margin-bottom: 0; }
+
+/* The explorer shell: the tree on the left, the work area in the middle taking
+   all remaining width, First mate on the right. The two side widths come from
+   the splitters (splitter.jsx, #361) through --explorer-w / --first-mate-w. */
+/* The frame: the shell above, the status bar along the bottom (status-bar.jsx). */
+.frame { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+/* The title strip (#577): the window is titleBarStyle "hiddenInset", so this
+   thin drag region sits where the title was, right of the traffic lights
+   (~78px). The repo switcher is its leftmost item and does not drag. */
+.titleBar { flex: 0 0 28px; display: flex; align-items: center; gap: 10px; padding: 0 12px 0 78px;
+  background: var(--surface); border-bottom: 1px solid #262a31; color: var(--muted);
+  font: 12px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  -webkit-app-region: drag; user-select: none; position: relative; z-index: 20; }
+.titleBarNotice { color: var(--warn); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 40%; }
+/* The wrapper fills the strip's width, so it stays drag; only the button and
+   its menu are no-drag (#1687). */
+.repoSwitcher { position: relative; flex: 1; }
+.repoSwitcherBtn, .repoMenu { -webkit-app-region: no-drag; }
+.repoSwitcherBtn { background: none; border: 1px solid transparent; border-radius: 4px; color: #e6e9ee;
+  font: inherit; padding: 2px 8px; cursor: pointer; white-space: nowrap; }
+.repoSwitcherBtn:hover, .repoSwitcherBtn.open { background: #262a31; border-color: #333842; }
+.repoMenu { position: absolute; top: calc(100% + 4px); left: 0; min-width: 240px; padding: 4px 0;
+  background: #1f232a; border: 1px solid #333842; border-radius: 6px; box-shadow: 0 6px 24px rgba(0,0,0,.45); }
+.repoMenuItem { display: flex; width: 100%; align-items: center; gap: 12px; padding: 5px 12px;
+  background: none; border: 0; color: #d6dae0; font: inherit; text-align: left; cursor: pointer; }
+.repoMenuItem:hover { background: #2a3040; }
+.repoMenuItem.on { color: #fff; font-weight: 600; }
+.repoMenuName { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* vertical-align: middle puts the icon's centre on the baseline + half the x-height,
+   the label's optical centre, in the trigger and the menu rows alike. */
+.repoIcon { display: inline-block; vertical-align: middle; margin-right: 6px; flex: none; }
+.repoBadge { min-width: 16px; padding: 0 5px; border-radius: 8px; background: #2a2e36; color: #6f757e;
+  font-size: 11px; text-align: center; }
+.repoBadge.some { background: var(--warn); color: var(--bg); font-weight: 600; }
+.repoMenuSep { height: 1px; margin: 4px 0; background: #333842; }
+.repoMenuErr { padding: 5px 12px; color: var(--err); }
+.newIntakeRepo { color: var(--muted); margin-bottom: 6px; }
+.newIntakeRepoPick, .fmRepoSelect { margin-bottom: 6px; }
+.statusBar { flex: 0 0 22px; display: flex; align-items: center; gap: 12px; padding: 0 10px;
+             background: #0d1117; border-top: 1px solid rgba(255,255,255,0.08); font-size: 11px;
+             font-family: -apple-system, "SF Pro Text", Helvetica, sans-serif; color: var(--muted);
+             font-variant-numeric: tabular-nums; -webkit-font-smoothing: antialiased; user-select: none; }
+.statusBar .sbBranchIcon { font-size: 12px; }
+.statusBar .sbSpacer { flex: 1; }
+.statusBar .sb-ok { color: var(--muted); }
+.statusBar .sb-stale { color: var(--warn); font-weight: 600; }
+.statusBar .sb-muted { color: #6f757e; }
+.statusBar .sb-bad { color: var(--err); }
+.statusBar .sbEngine.sb-ok { color: var(--ok); }
+.statusBar .sbErr { color: var(--err); }
+.statusBar .sbButton { background: transparent; border: 1px solid rgba(255,255,255,0.14); border-radius: 3px;
+                       color: #b8bcc4; cursor: pointer; font-size: 11px; padding: 1px 7px; }
+.statusBar .sbButton:hover { color: var(--text); background: rgba(255,255,255,0.08); }
+.statusBar .sbButton:disabled { opacity: .5; cursor: default; }
+.statusBar .sbButton.lit { color: #0c1a0e; background: var(--warn); border-color: var(--warn); font-weight: 600; }
+.shell { display: flex; flex: 1 1 auto; min-height: 0; overflow: hidden;
+         font-family: -apple-system, "SF Pro Text", Helvetica, sans-serif; color: var(--text); }
+.explorer { flex: 0 0 var(--explorer-w, 260px); width: var(--explorer-w, 260px); overflow-y: auto; background: #101216;
+            border-right: 1px solid rgba(255,255,255,0.08); font-size: 12px; padding-bottom: 12px;
+            -webkit-font-smoothing: antialiased; user-select: none; }
+.exHead { display: flex; justify-content: space-between; align-items: center; padding: 10px 10px 6px 12px;
+          font-size: 10.5px; font-weight: 600; letter-spacing: .6px; color: var(--muted); }
+.exRefresh { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 13px; }
+.exRefresh:hover { color: var(--text); }
+.exRow { display: flex; align-items: center; gap: 4px; height: 22px; padding-right: 8px; cursor: pointer;
+         white-space: nowrap; color: #c8ccd2; }
+.exRow:hover { background: rgba(255,255,255,0.06); }
+.exRow.on { background: rgba(80,140,255,0.22); color: #fff; }
+.exBranch { color: var(--text); font-weight: 600; }
+.exChev { width: 12px; flex-shrink: 0; color: var(--muted); }
+.exLabel { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.exNum { color: var(--muted); font-variant-numeric: tabular-nums; }
+.exCount { color: var(--muted); font-weight: 400; font-size: 11px; }
+.exBadge { font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 999px;
+           background: var(--sev-warn, #e0a030); color: var(--bg); }
+.exEmpty { color: #6b7078; font-style: italic; height: 20px; line-height: 20px; }
+.exOutcome { flex-shrink: 0; color: #6dcf9a; font-size: 10.5px; font-variant-numeric: tabular-nums; }
+.exUnfinished { color: #6b7078; text-decoration: line-through; }
+.exRow:has(.exUnfinished) .exOutcome { color: #6b7078; }
+.exMore { color: var(--info); font-size: 11px; }
+.exPitch { margin-left: 4px; font-size: 9.5px; font-weight: 600; padding: 0 5px; border-radius: 999px;
+           background: var(--info); color: #0e1624; }
+.exErr { color: var(--sev-crit, #e5484d); font-size: 11px; padding: 2px 8px; white-space: normal; }
+/* The Proposals branch's status chips (proposals.jsx, #660): Explorer tokens only, dark in either scheme. */
+.exStatus { flex-shrink: 0; margin-left: 4px; font-size: 9.5px; font-weight: 600; padding: 0 5px; border-radius: 999px;
+            background: #2a2e36; color: #b8bec8; white-space: nowrap; }
+.exStatus.st-awaiting-decision { background: #f5b56b; color: #1b1300; }
+.exStatus.st-drafting, .exStatus.st-in-review, .exStatus.st-deciding, .exStatus.st-in-flow { background: var(--info); color: #0e1624; }
+.exStatus.st-accepted, .exStatus.st-built { background: #1f3a2b; color: #6dcf9a; }
+.exStatus.st-shelved, .exStatus.st-rejected, .exStatus.st-unknown { background: #24272d; color: #6b7078; }
+/* The Tickets tree of related work (explorer.jsx TicketNode, #571):
+   only the Explorer's own tokens. The Explorer is dark in either scheme, so none needs a light variant. */
+.exNode { position: relative; }
+.exGuide { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(255,255,255,0.08); pointer-events: none; }
+.exTwisty { cursor: pointer; }
+.exTwisty:hover { color: var(--text); }
+.exSuffix { flex-shrink: 0; color: var(--muted); font-size: 11px; }
+.exLabel .exSuffix { font-size: inherit; }
+.exRow.on .exSuffix { color: #c8ccd2; }
+.exDraft { cursor: default; color: #6b7078; }
+.exDraft:hover { background: none; }
+.exDraft .exLabel { font-style: italic; }
+.exDropped .exLabel { font-style: normal; }
+.exDot { flex-shrink: 0; width: 6px; height: 6px; border-radius: 50%; background: var(--sev-warn, #e0a030); }
+.exDot.crit { background: var(--sev-crit, #e5484d); }
+.exBadge.crit { background: var(--sev-crit, #e5484d); color: #fff; }
+/* Splitter bars (#361): a thin hit area over the column borders; highlighted on
+   hover and while dragging. While dragging, the body class keeps the cursor
+   and stops text selection and iframes from eating the pointer. */
+.splitter { flex: 0 0 4px; width: 4px; margin: 0 -2px; z-index: 2; cursor: col-resize;
+            background: transparent; transition: background .12s; touch-action: none; }
+.splitter:hover, body.colResizing .splitter:active { background: rgba(255,255,255,0.14); }
+body.colResizing, body.colResizing * { cursor: col-resize !important; user-select: none !important; }
+body.colResizing iframe, body.colResizing webview { pointer-events: none; }
+/* The horizontal bar (#675, HSplitter): the same hit area and highlight, turned. */
+.hsplitter { flex: 0 0 4px; height: 4px; margin: -2px 0; z-index: 2; cursor: row-resize;
+             background: transparent; transition: background .12s; touch-action: none; }
+.hsplitter:hover, body.rowResizing .hsplitter:active { background: rgba(255,255,255,0.14); }
+body.rowResizing, body.rowResizing * { cursor: row-resize !important; user-select: none !important; }
+body.rowResizing iframe, body.rowResizing webview { pointer-events: none; }
+.work { flex: 1 1 auto; min-width: 0; overflow: auto; padding: 12px; }
+/* Analytics > a Grafana dashboard (#332): the frame fills the work area. */
+.work:has(> iframe.grafana) { padding: 0; overflow: hidden; }
+.work > iframe.grafana { display: block; width: 100%; height: 100%; border: 0; background: var(--bg); }
+/* Build gate: the builds in progress above the frame (#1389). */
+.work:has(> .grafana-with-builds) { padding: 0; overflow: hidden; }
+.work > .grafana-with-builds { display: flex; flex-direction: column; width: 100%; height: 100%; }
+.grafana-with-builds > iframe.grafana { flex: 1; min-height: 0; width: 100%; border: 0; background: var(--bg); }
+.build-strip { flex: none; max-height: 40%; overflow-y: auto; padding: 8px 12px; background: var(--bg); border-bottom: 1px solid #2a2e37; font-size: 12px; }
+.build-strip-head { font-weight: 600; margin-bottom: 4px; }
+.build-row { display: grid; grid-template-columns: 180px 1fr 70px; align-items: center; gap: 8px; padding: 2px 0; }
+.build-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.build-track { height: 10px; background: #22262e; border-radius: 3px; overflow: hidden; }
+.build-bar { display: block; height: 100%; background: #3b82f6; border-radius: 3px; }
+.build-elapsed { font-variant-numeric: tabular-nums; text-align: right; }
+
+/* First mate (issue #100): a narrow strip docked on the right of `.shell`,
+   outside `.work`, so it is the same element regardless of which screen is
+   showing. Narrower than the explorer — it is a chat strip, not a tree.
+   Issue #366: it looks like Claude Code in the user's iTerm2. The transcript,
+   the File card's ask and the compose box are set in --fm-mono at
+   --fm-mono-size, which first-mate.jsx overrides inline with the default
+   iTerm2 profile's `Normal Font` (src/iterm-font.js); the values below are
+   the fallback. Colours are Claude Code's dark theme:
+     --fm-claude  #d77757  the `claude` accent, rgb(215,119,87): the ⏺ bullet
+     --fm-text    #ffffff  `text`, rgb(255,255,255): reply text
+     --fm-dim     #999999  `secondaryText`, rgb(153,153,153): the user's
+                           > line, system rows, placeholders, Send
+     --fm-border  #888888  `promptBorder`, rgb(136,136,136): the input box
+     --fm-subtle  #505050  `subtle`, rgb(80,80,80): the File card's rule
+     --fm-bg      #0c0c0c  near-black terminal background (iTerm2's default
+                           Dark Background is #000000; lifted a step so the
+                           strip still separates from the window edge) */
+.firstMate { --fm-mono: ui-monospace, SFMono-Regular, Menlo, monospace; --fm-mono-size: 12px; --fm-line: 1.3;
+             --fm-bg: #0c0c0c; --fm-text: #ffffff; --fm-dim: #999999; --fm-claude: #d77757;
+             --fm-border: #888888; --fm-subtle: #505050;
+             flex: 0 0 var(--first-mate-w, 260px); width: var(--first-mate-w, 260px); min-height: 0; overflow: hidden; background: var(--fm-bg);
+             border-left: 1px solid rgba(255,255,255,0.08); font-size: 11.5px; color: var(--text);
+             padding: 8px 10px 10px; display: flex; flex-direction: column; gap: 6px;
+             -webkit-font-smoothing: antialiased; }
+.fmHeader { font-size: 10.5px; font-weight: 600; letter-spacing: .6px; text-transform: uppercase;
+            color: var(--muted); display: flex; flex-direction: column; row-gap: 4px; }
+.fmHeaderButtons { display: flex; flex-wrap: wrap; align-items: center; row-gap: 4px; }
+/* "<-- chat about this" sits on its own row under the heading (#1752), so it
+   is left-aligned and carries no inline offset from the row above it. */
+.fmChatScreenRow { display: flex; }
+.fmNotice { font-size: 10.5px; color: var(--sev-warn); }
+/* First mate's model line (#240): what runs next. */
+.fmModel { display: flex; flex-direction: column; gap: 4px; }
+.fmModelLine { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.fmModelName { font-size: 10.5px; color: #c8ccd2; }
+
+/* Config > First mate model (#240): the standing tier picker. */
+.fmm .fmmHint, .fleet-root .acSetting .fmmHint { color: var(--muted); margin: 0 0 10px; }
+.fmmEmpty { color: var(--muted); }
+.fmRecovery { font-size: 10.5px; color: var(--sev-crit); }
+.fmOlder { align-self: flex-start; background: none; border: none; color: var(--fm-dim); font: inherit;
+           padding: 0; cursor: pointer; }
+.fmOlder::before { content: "… "; }
+.fmOlder:hover { color: var(--fm-text); }
+/* The scroll region (issue #235): everything else in .firstMate is a fixed
+   header/footer, so this is the only part that scrolls and the compose row
+   stays reachable without scrolling to the bottom of a long history. macOS
+   overlay scroll bars are invisible except while scrolling, so give this
+   region its own always-visible bar. Terminal spacing (#366): one line
+   height throughout, and one blank line (1lh) between turns — between
+   exchanges and between the rows inside one, as Claude Code draws them. */
+.fmTranscript { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 1lh;
+                font-family: var(--fm-mono); font-size: var(--fm-mono-size); line-height: var(--fm-line); color: var(--fm-text); }
+.fmTranscript::-webkit-scrollbar { width: 8px; }
+.fmTranscript::-webkit-scrollbar-track { background: rgba(255,255,255,0.03); }
+.fmTranscript::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
+.fmTranscript::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.32); }
+.fmExchange { display: flex; flex-direction: column; gap: 1lh; }
+/* A turn is its mark in a two-cell gutter, then the text hanging beside it. */
+.fmRow { display: grid; grid-template-columns: 2ch minmax(0, 1fr); }
+.fmMark { color: var(--fm-dim); user-select: none; }
+.fmRow-assistant .fmMark { color: var(--fm-claude); }
+.fmText { white-space: pre-wrap; overflow-wrap: anywhere; color: var(--fm-text); }
+.fmRow-user .fmText, .fmRow-system .fmText { color: var(--fm-dim); }
+.fmTruncated { color: var(--fm-dim); font-style: italic; }
+.fmThinking { display: inline-flex; gap: 3px; align-items: center; height: 1em; }
+.fmThinking span { width: 5px; height: 5px; border-radius: 50%; background: var(--fm-claude);
+                   animation: fmThinkingDot 1.2s ease-in-out infinite; }
+.fmThinking span:nth-child(2) { animation-delay: 0.2s; }
+.fmThinking span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes fmThinkingDot { 0%, 80%, 100% { opacity: 0.25; transform: translateY(0); }
+                           40% { opacity: 1; transform: translateY(-2px); } }
+@media (prefers-reduced-motion: reduce) { .fmThinking span { animation: none; opacity: 0.7; } }
+.fmFileCard { display: flex; flex-direction: column; gap: 5px; padding: 6px 1ch; border: 1px solid var(--fm-subtle); }
+.fmFileAsk { white-space: pre-wrap; overflow-wrap: anywhere; color: var(--fm-text);
+             font-family: var(--fm-mono); font-size: var(--fm-mono-size); line-height: var(--fm-line); }
+.fmFileRow { display: flex; align-items: center; gap: 8px; }
+.fmTierLabel { display: flex; align-items: center; gap: 5px; font-size: 10.5px; color: var(--muted); }
+.fmTierSelect { font: inherit; font-size: 11px; background: rgba(0,0,0,0.25); color: var(--text);
+                border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 1px 4px; }
+.fmFileButton { padding: 3px 9px; font: inherit; font-size: 11px; color: var(--text); cursor: pointer;
+                background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; }
+.fmFileButton:disabled { opacity: .5; cursor: default; }
+.fmFileError { font-size: 10.5px; color: var(--sev-crit); display: flex; align-items: center; gap: 6px; }
+.fmFileRetry { font: inherit; font-size: 10.5px; cursor: pointer; background: none; color: var(--info); border: none; }
+.fmHint { font-size: 10.5px; color: var(--sev-warn); background: color-mix(in srgb, var(--sev-warn) 12%, transparent);
+          border: 1px solid var(--sev-warn); border-radius: 5px; padding: 5px 6px; display: flex;
+          flex-direction: column; gap: 4px; align-items: flex-start; }
+.fmNewConversation { font: inherit; font-size: 10px; padding: 1px 6px; margin-left: 8px; cursor: pointer; color: var(--text);
+                     background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.14); border-radius: 4px; }
+/* "<-- chat about this" (#733): on its own row under the heading, left-aligned
+   (#1752 moved it off the header's button row, so it carries no margin-left
+   from a sibling that no longer precedes it); disabled (a ticket with no
+   repo) it dims like the pop. */
+.fmChatScreen { font: inherit; font-size: 10px; padding: 1px 6px; cursor: pointer; color: var(--text);
+                background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.14); border-radius: 4px; }
+.fmChatScreen:disabled { cursor: default; opacity: 0.5; color: var(--muted); }
+/* Back to previous conversation (#601): a header button like its neighbours,
+   with the Claude accent on its edge so it reads as the way back; disabled it
+   dims like Resume. The strip is terminal-dark in both OS themes (no
+   light-scheme override below), so these colours hold under light too. */
+/* Under the compose row on the live strip (#725): a right-aligned row. */
+.fmPopRow { display: flex; justify-content: flex-end; margin-top: 4px; }
+.fmHeader .fmPopConversation { margin-left: 6px; }
+.fmPopConversation { font: inherit; font-size: 10px; padding: 1px 6px; cursor: pointer; color: var(--text);
+                     background: color-mix(in srgb, var(--fm-claude) 14%, transparent);
+                     border: 1px solid color-mix(in srgb, var(--fm-claude) 55%, transparent); border-radius: 4px; }
+.fmPopConversation:hover:not(:disabled) { background: color-mix(in srgb, var(--fm-claude) 26%, transparent); }
+.fmPopConversation:disabled { cursor: default; opacity: 0.5; color: var(--muted);
+                              background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.14); }
+/* The History (#265) list/read-only
+   panels swapped in for the transcript area — same fixed width/position as
+   .fmTranscript, not a modal or a full-screen view. */
+.fmHistoryView, .fmHistoryList { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+.fmHistoryRow { display: flex; flex-direction: column; gap: 2px; padding: 4px 0; border-top: 1px solid rgba(255,255,255,0.06);
+                cursor: pointer; }
+.fmHistoryRow:first-child { border-top: none; padding-top: 0; }
+.fmHistoryRow:hover { background: rgba(255,255,255,0.05); }
+.fmHistoryWhen { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: .4px; color: var(--muted); }
+.fmHistoryClose { align-self: flex-start; font: inherit; font-size: 10px; padding: 1px 6px; cursor: pointer; color: var(--text);
+                   background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.14); border-radius: 4px; }
+/* Resume (#486): a button like Back, and a dim note when it is disabled. */
+.fmResumeRow { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.fmResume { font: inherit; font-size: 10px; padding: 1px 6px; cursor: pointer; color: var(--text);
+            background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.14); border-radius: 4px; }
+.fmResume:disabled { cursor: default; opacity: 0.5; }
+.fmResumeNote { font-size: 10px; color: var(--muted); }
+.fmResumeError { font-size: 10px; color: #e0a0a0; }
+/* Save for later (#598): a header button, and its refusal beside it. */
+.fmSaveButton { font: inherit; font-size: 10px; padding: 1px 6px; margin-left: 6px; cursor: pointer; color: var(--text);
+                background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.14); border-radius: 4px; }
+.fmSaveButton:disabled { cursor: default; opacity: 0.5; }
+.fmSaveError { font-size: 10px; color: #e0a0a0; margin-left: 6px; }
+/* Continue in terminal (#819, Saved Chats): a notice
+   with the copied command in the mono font. */
+.scHandoff:disabled { cursor: default; opacity: 0.5; }
+.fmHandoffNotice { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; color: #c8ccd2; }
+.fmHandoffCommand { flex-basis: 100%; display: block; padding: 3px 6px; overflow-wrap: anywhere; user-select: text;
+                    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; color: var(--text);
+                    background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.12); border-radius: 4px; }
+.fmHandoffDismiss { margin-left: auto; padding: 0 4px; font: inherit; color: var(--muted); cursor: pointer; background: none; border: none; }
+/* Open in Claude Code ⇗ (#820): last in the live header, with the Claude
+   accent like Back to previous conversation, so it reads as the way out to
+   Claude Code; dimmed when it cannot. Its refusal sits beside it. */
+.fmIterm { font: inherit; font-size: 10px; padding: 1px 6px; margin-left: 6px; cursor: pointer; color: var(--text);
+             background: color-mix(in srgb, var(--fm-claude) 14%, transparent);
+             border: 1px solid color-mix(in srgb, var(--fm-claude) 55%, transparent); border-radius: 4px; }
+.fmIterm:hover:not(:disabled) { background: color-mix(in srgb, var(--fm-claude) 26%, transparent); }
+.fmIterm:disabled { cursor: default; opacity: 0.5; }
+.fmItermError { font-size: 10px; color: #e0a0a0; margin-left: 6px; }
+/* A saved chat's view (#598): title, a two-column summary, the actions, and
+   the transcript drawn with First mate's own rows. */
+.scRoot { display: flex; flex-direction: column; gap: 10px; }
+.scTitle { font-size: 14px; font-weight: 600; }
+.scSummary { display: grid; grid-template-columns: max-content 1fr; gap: 3px 12px; }
+.scKey { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: .4px; color: var(--muted); align-self: center; }
+.scActions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.scRestore, .scHandoff, .scDelete, .scKeep { font: inherit; font-size: 11px; padding: 2px 8px; cursor: pointer; color: var(--text);
+                                 background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.14); border-radius: 4px; }
+.scRestore:disabled, .scDelete:disabled { cursor: default; opacity: 0.5; }
+.scNote, .scHidden { font-size: 10.5px; color: var(--muted); }
+.scError { font-size: 10.5px; color: #e0a0a0; }
+.scTranscript { flex: none; overflow: visible; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+/* Pasted images (#368): thumbnails by the input, and the sent row's marker,
+   which sits in the text column above the text like a dim terminal line. */
+.fmAttachments { display: flex; flex-wrap: wrap; gap: 4px; }
+.fmAttachment { position: relative; }
+.fmThumb { display: block; width: 48px; height: 48px; object-fit: cover; border-radius: 4px;
+           border: 1px solid rgba(255,255,255,0.14); }
+.fmAttachmentRemove { position: absolute; top: -4px; right: -4px; width: 16px; height: 16px; padding: 0; line-height: 14px;
+                      font: inherit; font-size: 11px; color: var(--text); cursor: pointer; background: rgba(0,0,0,0.75);
+                      border: 1px solid rgba(255,255,255,0.2); border-radius: 50%; }
+.fmImagesMarker { grid-column: 2; color: var(--fm-dim); font-style: italic; }
+.fmImagesMarker + .fmText { grid-column: 2; }
+/* Claude Code's input: a bordered box with a > prompt, in the terminal font. */
+.fmCompose { display: flex; align-items: flex-start; gap: 1ch; padding: 3px 1ch; border: 1px solid var(--fm-border); border-radius: 4px;
+             font-family: var(--fm-mono); font-size: var(--fm-mono-size); line-height: var(--fm-line); }
+.fmPrompt { color: var(--fm-text); user-select: none; }
+/* A textarea that grows with the draft up to 8 lines, then scrolls (#758). */
+.fmInput { flex: 1; min-width: 0; padding: 0; font: inherit; color: var(--fm-text);
+           background: transparent; border: none; outline: none;
+           display: block; field-sizing: content; min-height: 1lh; max-height: 8lh; overflow-y: auto; resize: none; }
+.fmInput::placeholder { color: var(--fm-dim); }
+.fmSend { padding: 0; font: inherit; color: var(--fm-dim); cursor: pointer; background: none; border: none; }
+.fmSend:hover:not(:disabled) { color: var(--fm-text); }
+.fmSend:disabled { opacity: .4; cursor: default; }
+.fmStop { padding: 0; font: inherit; color: var(--fm-dim); cursor: pointer; background: none; border: none; }
+.fmStop:hover { color: var(--fm-text); }
+.work .fleet-root { width: auto; }
+
+/* The issue detail the Issues board opens (flow.jsx): the engine's view of one flow. */
+.fleet-root .flSteps td, .fleet-root .flVars td { padding: 1px 8px 1px 0; vertical-align: top; }
+.fleet-root .flSteps tr.open td { color: var(--ok); font-weight: 600; }
+.fleet-root .tlCardBar { height: 6px; margin-top: 4px; }
+.fleet-root .isProgress.isProgressStep { margin: 0; width: 100%; height: 6px; border-radius: 3px; }
+.fleet-root .flWhen, .fleet-root .flProc { color: var(--muted); white-space: nowrap; }
+/* The ask card frame: the authorize notice at the top of an issue's detail
+   (detail.jsx AuthorizeNotice) and the box for an answer in the user's own words. */
+.fleet-root .askCard { margin: 10px 0 14px; padding: 10px 12px; border: 1px solid var(--warn); border-radius: 6px;
+             background: rgba(255,209,102,0.07); }
+.fleet-root .askHead { color: var(--warn); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+.fleet-root .askSummary { margin: 6px 0 8px; font-size: 14px; line-height: 1.35; color: #f2f3f5; }
+.fleet-root .askCompose { display: flex; gap: 6px; align-items: flex-end; }
+.fleet-root .askText { flex: 1; font: inherit; font-size: 12px; color: var(--text); background: rgba(0,0,0,0.25);
+             border: 1px solid rgba(255,255,255,0.16); border-radius: 6px; padding: 6px 8px; resize: vertical; }
+.fleet-root .askSend { padding: 6px 14px; font: inherit; font-size: 12px; font-weight: 600; color: #1a1d22;
+             background: var(--warn); border: none; border-radius: 6px; cursor: pointer; }
+.fleet-root .askSend:disabled { opacity: 0.45; cursor: default; }
+.fleet-root .askDone { margin-top: 6px; color: var(--ok); font-size: 11px; }
+.fleet-root .flQuestion { margin: 4px 0 10px; padding-left: 8px; border-left: 2px solid var(--warn); }
+.fleet-root .flQuestion.answered { border-left-color: #4a4f58; }
+.fleet-root .flQMeta { color: var(--muted); font-size: 11px; }
+.fleet-root .flText { margin: 4px 0 0; padding: 6px 8px; max-height: 260px; overflow-y: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10px;
+  line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; background: rgba(255,255,255,0.04); }
+.fleet-root .flAnswer { border-left: 2px solid var(--ok); }
+
+/* ---- the process view (src/renderer/process.jsx) ------------------------ */
+.fleet-root .pvList tr { cursor: pointer; }
+.fleet-root .pvList tr:hover td { background: rgba(255,255,255,0.04); }
+.fleet-root .pvList tr.open td { background: rgba(255,255,255,0.07); }
+.fleet-root .pvList .pvChev { width: 14px; color: #b8bcc4; font-size: 13px; line-height: 1; }
+.fleet-root .pvList .pvProc { font-weight: 600; white-space: nowrap; padding-right: 8px; }
+.fleet-root .pvList .pvState { color: var(--muted); }
+.fleet-root .pvList tr.is-running .pvState { color: var(--ok); }
+.fleet-root .pvList tr.is-incident .pvState { color: var(--err); font-weight: 600; }
+.fleet-root .pvCrumbs { margin: 8px 0 4px; font-size: 11.5px; }
+.fleet-root .pvLink { background: none; border: none; padding: 0; color: var(--info); cursor: pointer; font: inherit; }
+.fleet-root .pvLink:hover { text-decoration: underline; }
+.fleet-root .pvCrumbState { font-size: 10.5px; }
+.fleet-root .pvCanvas { height: 280px; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px;
+                        background: var(--surface); overflow: hidden; }
+/* bpmn-js draws for a white page; the same strokes in the app's palette. */
+.fleet-root .pvCanvas .djs-container svg { background: transparent; }
+.fleet-root .pvCanvas .djs-element .djs-visual > :not(text) { stroke: #c9ced6 !important; fill: var(--surface) !important; }
+.fleet-root .pvCanvas .djs-element .djs-visual text { fill: var(--text) !important; font-size: 11px; }
+.fleet-root .pvCanvas .djs-connection .djs-visual > path { stroke: var(--muted) !important; fill: none !important; }
+.fleet-root .pvCanvas .djs-connection .djs-visual > path[marker-end] { fill: none !important; }
+.fleet-root .pvCanvas marker path { stroke: var(--muted) !important; fill: var(--muted) !important; }
+.fleet-root .pvCanvas .pv-completed .djs-visual > :not(text) { stroke: var(--sev-good, var(--ok)) !important;
+                        fill: color-mix(in srgb, var(--sev-good, var(--ok)) 35%, var(--surface)) !important; stroke-width: 2px !important; }
+.fleet-root .pvCanvas .pv-active .djs-visual > :not(text) { stroke: var(--warn) !important; stroke-width: 2.5px !important;
+                        fill: color-mix(in srgb, var(--warn) 40%, var(--surface)) !important; }
+.fleet-root .pvCanvas .pv-incident .djs-visual > :not(text) { stroke: var(--sev-crit, var(--err)) !important; stroke-width: 2.5px !important;
+                        fill: color-mix(in srgb, var(--sev-crit, var(--err)) 45%, var(--surface)) !important; }
+.fleet-root .pvCanvas .djs-element.hover .djs-outline, .fleet-root .pvCanvas .djs-element.selected .djs-outline {
+                        stroke: var(--info); }
+.fleet-root .pvWait { font-size: 11px; color: var(--sev-warn, #f0b429); white-space: nowrap; }
+.fleet-root .pvBadge { width: 16px; height: 16px; border-radius: 50%; background: var(--sev-crit, var(--err)); color: #fff;
+                       font-weight: 700; font-size: 11px; line-height: 16px; text-align: center;
+                       box-shadow: 0 0 0 2px var(--surface); }
+.fleet-root .pvHint { margin-top: 6px; font-size: 11px; }
+.fleet-root .pvPanel { margin-top: 8px; padding: 8px; border-radius: 6px; background: rgba(255,255,255,0.04); }
+.fleet-root .pvPanelHead { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+.fleet-root .pvMark { font-size: 10px; text-transform: uppercase; letter-spacing: .4px; color: var(--muted); }
+.fleet-root .pvMark.is-completed { color: var(--sev-good, var(--ok)); }
+.fleet-root .pvMark.is-active { color: var(--warn); }
+.fleet-root .pvMark.is-incident { color: var(--sev-crit, var(--err)); font-weight: 700; }
+.fleet-root .pvIncident { margin-top: 4px; }
+.fleet-root .pvRetry { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 11px; flex-wrap: wrap; }
+.fleet-root .pvButton { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.18); color: inherit;
+  border-radius: 4px; padding: 2px 10px; font: inherit; cursor: pointer; }
+.fleet-root .pvButton:hover { background: rgba(255,255,255,0.14); }
+.fleet-root .pvButton.is-go { border-color: var(--err); color: #ff9a9a; }
+.fleet-root .pvCalled { margin: 4px 0; }
+/* A ticket's Fix and Propose a fix (incident-actions.jsx), above its Processes. */
+.fleet-root .incActions { display: flex; flex-direction: column; gap: 6px; margin: 10px 0 4px; font-size: 11px; }
+.fleet-root .incRow { display: flex; align-items: center; gap: 8px; }
+.fleet-root .pvButton:disabled { opacity: 0.5; cursor: default; }
+.fleet-root .incFailed { color: var(--sev-crit, var(--err)); font-weight: 600; }
+.fleet-root .incProposal { flex: 1; max-width: 40ch; resize: none; background: rgba(0,0,0,0.2); color: inherit;
+  border: 1px solid rgba(255,255,255,0.12); border-radius: 4px; padding: 2px 6px; font: inherit; }
+.fleet-root .pvValue { word-break: break-word; white-space: pre-wrap; font-family: ui-monospace, Menlo, monospace; font-size: 10.5px; }
+/* The Issues view's "New intake" composer (issues.jsx): the button beside the
+   refresh button, and the form it opens — same conventions as the ask card's
+   compose box (.askText/.askCompose/.askSend/.err). */
+.fleet-root .newIntakeBtn { background: transparent; border: 1px solid rgba(255,255,255,0.18); color: var(--text);
+             font: inherit; font-size: 11px; cursor: pointer; padding: 3px 9px; border-radius: 6px; margin-left: 8px; }
+.fleet-root .newIntakeBtn:hover { background: rgba(255,255,255,0.1); }
+.fleet-root .newIntakeBtn:disabled { opacity: 0.45; cursor: default; background: transparent; }
+.fleet-root .newIntakeForm { margin-top: 8px; padding: 10px 12px; border: 1px solid rgba(255,255,255,0.16);
+             border-radius: 6px; background: rgba(255,255,255,0.03); }
+.fleet-root .newIntakeText { width: 100%; box-sizing: border-box; margin-bottom: 6px; }
+.fleet-root .newIntakeCancel { padding: 6px 14px; font: inherit; font-size: 12px; color: var(--text);
+             background: transparent; border: 1px solid rgba(255,255,255,0.18); border-radius: 6px; cursor: pointer; }
+.fleet-root .newIntakeCancel:disabled { opacity: 0.45; cursor: default; }
+.fleet-root .newIntakeStatus { margin-top: 6px; font-size: 11px; color: var(--ok); }
+.fleet-root .newIntakeTier { display: block; margin-bottom: 6px; font-size: 11px; color: var(--text); background: transparent; border: 1px solid #3a3f46; border-radius: 4px; padding: 2px 4px; }
+.fleet-root .newIntakeTier option { background: #1c1f24; color: var(--text); }
+.fleet-root .newIntakeHint { margin-top: 6px; font-size: 11px; color: #aab0b8; }
+
+/* Ticket references in First mate replies (#374). */
+.fmTicketRef { color: inherit; text-decoration: underline; cursor: pointer; }
+/* The kick-starter row's ticket (#590): a link-like pill, apart from the dim text around it. */
+.fmKickRef { display: inline-block; padding: 0 6px; border-radius: 9px; border: 1px solid rgba(88,166,255,0.45);
+             background: rgba(88,166,255,0.14); color: #79b8ff; text-decoration: none; cursor: pointer;
+             font-variant-numeric: tabular-nums; line-height: 1.4; }
+.fmKickRef:hover { background: rgba(88,166,255,0.26); text-decoration: underline; }
+
+/* The issue detail's Cancel (cancel-flow.jsx): a button in the header, its confirm dropping below it. */
+.fleet-root .cfWrap { position: relative; display: inline-block; margin-left: 8px; }
+.fleet-root .cfButton { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.18); color: inherit;
+                        border-radius: 5px; padding: 2px 10px; font-size: 11px; cursor: pointer; }
+.fleet-root .cfButton:hover { background: rgba(255,255,255,0.14); }
+.fleet-root .cfButton:disabled { opacity: 0.5; cursor: default; }
+.fleet-root .cfButton.cfDanger { border-color: var(--err); color: #ff9a9a; }
+.fleet-root .cfConfirm { position: absolute; right: 0; top: calc(100% + 4px); z-index: 20; width: 340px;
+                         background: #1d2026; border: 1px solid rgba(255,255,255,0.18); border-radius: 8px;
+                         padding: 10px; box-shadow: 0 6px 20px rgba(0,0,0,0.45); color: var(--text); }
+.fleet-root .cfWhat { font-size: 11px; color: var(--muted); margin-bottom: 6px; }
+.fleet-root .cfReason { width: 100%; box-sizing: border-box; resize: vertical; font: inherit; font-size: 12px;
+                        background: rgba(0,0,0,0.25); color: inherit; border: 1px solid rgba(255,255,255,0.18);
+                        border-radius: 5px; padding: 4px 6px; }
+.fleet-root .cfRow { display: flex; gap: 8px; margin-top: 6px; }
+.fleet-root .cfFailed { position: absolute; right: 0; top: calc(100% + 4px); width: 340px; z-index: 20; }
+
+/* The Jev decisions page and the ticket detail's Jev section (src/renderer/jev.jsx,
+   #553). Colours only through the palette vars and currentColor, so the page
+   reads on a light background as well as the dark one. */
+.fleet-root.jev { position: relative; }
+.fleet-root .jevStrip { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; margin: 8px 0 4px; padding: 8px 10px;
+                        border: 1px solid color-mix(in srgb, currentColor 14%, transparent); border-radius: 8px; }
+.fleet-root .jevWindows { display: flex; gap: 2px; margin-right: 6px; }
+.fleet-root .jevWindows button { background: transparent; border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+                                 color: inherit; font: inherit; font-size: 11px; padding: 2px 8px; border-radius: 5px; cursor: pointer; opacity: .7; }
+.fleet-root .jevWindows button.on { opacity: 1; border-color: var(--p-impl); color: var(--p-impl); }
+.fleet-root .jevStat { display: flex; flex-direction: column; min-width: 70px; }
+.fleet-root .jevStat b { font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.fleet-root .jevStat span { font-size: 10.5px; opacity: .65; }
+.fleet-root .jevUseCase { margin-top: 12px; padding-top: 4px; border-top: 1px solid color-mix(in srgb, currentColor 10%, transparent); }
+.fleet-root .jevUcMeta { margin-left: 8px; text-transform: none; letter-spacing: 0; font-weight: 400; opacity: .75; }
+.fleet-root .jevLabel { font-size: 10.5px; opacity: .65; margin: 8px 0 2px; }
+.fleet-root .jevQ { font-size: 11px; margin: 2px 0; }
+.fleet-root .jevChart { display: block; max-width: 100%; }
+.fleet-root svg.jevChart text { fill: currentColor; fill-opacity: .7; }
+.fleet-root .jevActions { display: flex; gap: 6px; flex-wrap: wrap; }
+.fleet-root .jevSaved { margin-top: 6px; }
+.fleet-root .jevSaved b { color: var(--sev-good); }
+.fleet-root .jevCalls { margin-top: 2px; table-layout: fixed; }
+.fleet-root .jevCalls th { padding-right: 8px; }
+.fleet-root .jevCalls td { padding-right: 8px; }
+.fleet-root .jevRow { cursor: pointer; }
+.fleet-root .jevRow:hover td { background: color-mix(in srgb, currentColor 7%, transparent); }
+.fleet-root .jevRow.noAnswer td { opacity: .7; }
+.fleet-root .jevWhen { white-space: nowrap; width: 128px; }
+.fleet-root .jevText { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fleet-root .jevRow a { color: var(--p-impl); }
+.fleet-root .jevDrawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(520px, 90vw); overflow-y: auto; z-index: 20;
+                         padding: 12px 14px; background: var(--surface); color: var(--text);
+                         border-left: 1px solid color-mix(in srgb, currentColor 18%, transparent); box-shadow: -8px 0 30px rgba(0,0,0,0.35); }
+@media (prefers-color-scheme: light) {
+  .fleet-root .jevDrawer { background: #ffffff; color: var(--surface); }
+}
+.fleet-root .jevDrawer h3 { font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .6px; opacity: .7; margin: 12px 0 4px; }
+.fleet-root .jevDrawerHead { display: flex; justify-content: space-between; align-items: center; }
+.fleet-root .jevClose { background: transparent; border: none; color: inherit; font-size: 18px; cursor: pointer; opacity: .7; }
+.fleet-root .jevMeta { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 4px; opacity: .85; }
+.fleet-root .jevMeta a { color: var(--p-impl); }
+.fleet-root .jevProbs { margin-bottom: 8px; }
+
+/* The Doctor page (src/renderer/doctor.jsx, #706): jev.jsx's strip and table,
+   plus a run's verdict and its detail row. */
+.fleet-root .doctorOk b { color: var(--sev-good); }
+.fleet-root .doctorBad b { color: var(--sev-crit); }
+.fleet-root .doctorRuns .verdict-succeeded .doctorVerdict { color: var(--sev-good); }
+.fleet-root .doctorRuns .verdict-failed .doctorVerdict { color: var(--sev-crit); }
+.fleet-root .doctorRow.open td { background: color-mix(in srgb, currentColor 5%, transparent); }
+.fleet-root .doctorDetail td { padding: 4px 8px 8px; background: color-mix(in srgb, currentColor 5%, transparent); }
+.fleet-root .doctorVerdict { overflow-wrap: anywhere; }
+.fleet-root .doctorDetail td > div { overflow-wrap: anywhere; }
+.fleet-root .doctorDetailText { margin-top: 4px; white-space: pre-wrap; word-break: break-word; }
+/* Analytics > Friction notes (#1046, friction.jsx): the Jev strip and the Doctor table's detail row, plus these. */
+.fleet-root .frictionSep { align-self: stretch; width: 1px; background: color-mix(in srgb, currentColor 15%, transparent); }
+.fleet-root .frictionFilters { display: flex; gap: 14px; margin: 2px 0 6px; font-size: 11px; }
+.fleet-root .frictionFilters label { display: flex; align-items: center; gap: 4px; opacity: .8; }
+.fleet-root .frictionRow.open td { background: color-mix(in srgb, currentColor 5%, transparent); }
+.fleet-root .frictionNotes .severity-high td:nth-child(6) { color: var(--sev-crit); }
+.fleet-root .frictionNotes .severity-medium td:nth-child(6) { color: var(--sev-warn); }
+.fleet-root .frictionMeta { display: flex; flex-wrap: wrap; gap: 14px; font-size: 11px; overflow-wrap: anywhere; }
+/* The group rows (#1098): the highest severity colours the row's severity cell as a note's does; an open group holds
+   its members' table and the Merge into… line in its detail row. */
+.fleet-root .frictionGroups .severity-high td:nth-child(6) { color: var(--sev-crit); }
+.fleet-root .frictionGroups .severity-medium td:nth-child(6) { color: var(--sev-warn); }
+.fleet-root .frictionGroupRow.open td { background: color-mix(in srgb, currentColor 5%, transparent); }
+.fleet-root .frictionCount { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.fleet-root .frictionGrouping { font-size: 10.5px; }
+.fleet-root .frictionGroupDetail td { padding: 4px 8px 8px 24px; }
+.fleet-root .frictionGroupDetail .frictionNotes { margin: 2px 0 6px; }
+.fleet-root .frictionJoined { white-space: nowrap; font-size: 11px; opacity: .85; }
+.fleet-root .frictionActions { white-space: nowrap; }
+.fleet-root .frictionTwoThings { margin-left: 6px; font-size: 11px; opacity: .85; color: var(--p-impl); white-space: nowrap; }
+.fleet-root .frictionBug { white-space: nowrap; }
+.fleet-root .frictionActions .pvButton, .fleet-root .frictionMerge .pvButton { padding: 1px 7px; font-size: 11px; }
+.fleet-root .frictionMerge { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 11px; }
+.fleet-root .frictionMerge label { display: flex; align-items: center; gap: 6px; }
+.fleet-root .frictionMerge select { max-width: 360px; }
+.fleet-root .frictionGroupRow.frictionRecurred td { background: color-mix(in srgb, #d97706 14%, transparent); }
+.fleet-root .frictionFixField { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 11px; margin-bottom: 6px; }
+.fleet-root .frictionFixField .pvButton { padding: 1px 7px; font-size: 11px; }
+.fleet-root .frictionShowFixed { display: flex; align-items: center; gap: 6px; font-size: 11px; margin: 4px 0; }
+.fleet-root .frictionConfirm { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.fleet-root .jevProb { display: flex; align-items: center; gap: 6px; font-size: 11px; margin: 2px 0; }
+.fleet-root .jevProbOpt { width: 110px; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; }
+.fleet-root .jevProbBar { flex: 1; height: 8px; border-radius: 3px; background: color-mix(in srgb, currentColor 10%, transparent); }
+.fleet-root .jevProbBar i { display: block; height: 100%; border-radius: 3px; background: var(--p-impl); }
+.fleet-root .jevProbVal { width: 34px; text-align: right; font-variant-numeric: tabular-nums; }
+.fleet-root .jevPre { white-space: pre-wrap; word-break: break-word; font-size: 11px; margin: 2px 0 6px; padding: 6px 8px; border-radius: 6px;
+                      background: color-mix(in srgb, currentColor 6%, transparent); }
+/* Raw request/response JSON (#607, json-view.jsx): its own background so the
+   highlight colours hold AA (4.5:1) against it; ratios in the README. */
+.fleet-root .jevJson { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: #13151a; color: var(--text); overflow-x: auto; }
+.fleet-root .jevJson .jsonKey { color: var(--info); }
+.fleet-root .jevJson .jsonStr { color: #a8e08a; }
+.fleet-root .jevJson .jsonNum { color: #f5b56b; }
+.fleet-root .jevJson .jsonLit { color: #d7a6ff; }
+@media (prefers-color-scheme: light) {
+  .fleet-root .jevJson { background: #f6f8fa; color: var(--surface); }
+  .fleet-root .jevJson .jsonKey { color: #0550ae; }
+  .fleet-root .jevJson .jsonStr { color: #116329; }
+  .fleet-root .jevJson .jsonNum { color: #953800; }
+  .fleet-root .jevJson .jsonLit { color: #6f42c1; }
+}
+
+/* A ticket's inline HITLP task (hitlp-task.jsx TicketTask): the task view in
+   the detail's flow, its error line, and a decided task's outcome, who and when. */
+.fleet-root .htTicketErr, .fleet-root .htTicketWait { margin: 10px 0 14px; }
+.fleet-root .htDecided .htOutcome { font-weight: 600; }
+
+/* The Pitch view (pitch.jsx, #563): the decision controls above, the pitch below at full width.
+   The frame is white-backed only by the page itself; `color-scheme` on it
+   (set inline) lets the page's prefers-color-scheme rules follow the OS. */
+.fleet-root .pitchView { display: flex; flex-direction: column; gap: 12px; align-items: stretch; margin: 6px 0 12px; }
+.fleet-root .pitchChoices { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.fleet-root .pitchOptions { display: flex; flex-wrap: wrap; gap: 10px; width: 100%; margin: 0; padding: 0; list-style: none; }
+.fleet-root .pitchOption { display: inline-flex; gap: 4px; align-items: center; }
+.fleet-root .pitchMain { width: 100%; min-width: 0; }
+.fleet-root .pitchFrame { display: block; width: 100%; height: 70vh; border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 6px; background: transparent; }
+.fleet-root .pitchDoc { max-height: 70vh; overflow: auto; padding: 8px 12px; border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 6px; }
+.fleet-root .pitchControls { width: 220px; max-width: 100%; display: flex; flex-direction: column; gap: 6px; }
+.fleet-root .pitchChat { display: flex; flex-direction: column; align-items: center; text-align: center; margin-top: 4px;
+             padding: 6px 10px; font: inherit; color: var(--text); background: rgba(255,255,255,0.06);
+             border: 1px solid rgba(255,255,255,0.16); border-radius: 6px; cursor: pointer; }
+.fleet-root .pitchChat:hover:not(:disabled) { background: rgba(255,255,255,0.1); }
+.fleet-root .pitchChat:disabled { opacity: 0.6; cursor: default; }
+
+/* The ticket detail's Pitch section (pitch.jsx, #579): a proposal's pitch page
+   in a tall frame the user can resize by its bottom edge, and the same page
+   over the whole window. The frame is dark before the page paints. */
+.fleet-root h2.pitchHead { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.fleet-root h2.pitchHead.tdFold { justify-content: flex-start; }
+.fleet-root h2.pitchHead.tdFold .pitchOpen { margin-left: auto; }
+.fleet-root .pitchOpen, .fleet-root .pitchClose { font-size: 11px; text-transform: none; letter-spacing: 0; padding: 2px 10px;
+                                                  cursor: pointer; border-radius: 5px; color: inherit; background: transparent;
+                                                  border: 1px solid color-mix(in srgb, currentColor 30%, transparent); }
+.fleet-root .pitchBox { height: 78vh; min-height: 280px; resize: vertical; overflow: hidden; border-radius: 6px;
+                        border: 1px solid color-mix(in srgb, currentColor 18%, transparent); }
+.fleet-root .ticketPitchFrame { display: block; width: 100%; height: 100%; border: 0; border-radius: 0; background: var(--bg); color-scheme: dark; }
+.fleet-root .pitchOverlay { position: fixed; inset: 0; z-index: 40; display: flex; flex-direction: column; background: var(--bg); color: var(--text); }
+.fleet-root .pitchOverlayBar { display: flex; justify-content: space-between; align-items: center; padding: 6px 12px;
+                               border-bottom: 1px solid rgba(255,255,255,0.12); }
+.fleet-root .ticketPitchFrame.full { flex: 1; height: auto; }
+
+/* The proposal view (proposals.jsx, #660): its facts above the Pitch view's parts. The
+   chips reuse the Explorer's, which read in either scheme on their own backgrounds. */
+.fleet-root .proposalFacts { display: flex; flex-direction: column; gap: 4px; margin: 4px 0 10px; }
+.fleet-root .proposalLine { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.fleet-root .proposalLine .exStatus { margin-left: 0; font-size: 11px; padding: 1px 8px; }
+.fleet-root .proposalFacts a { color: var(--p-impl); }
+.fleet-root .proposalLog summary { cursor: pointer; font-size: 11px; opacity: .8; }
+.fleet-root .proposalLog ol { margin: 4px 0 0; padding-left: 22px; font-size: 12px; }
+/* The issue and ticket details' way to the proposal view (#660). */
+.proposalLink { display: flex; align-items: center; gap: 6px; margin: 6px 0; }
+.proposalLink .exStatus { margin-left: 0; font-size: 11px; padding: 1px 8px; }
+.proposalLink a { color: var(--p-impl); }
+/* The explorer's Repos branch and its file view (#674): a repo's files at its default branch. */
+.exRow .reposRefresh { margin-left: auto; padding: 0 4px; font-size: 12px; }
+.exSubmodule { cursor: default; color: var(--muted); }
+.exSuffix { color: #6b7078; font-size: 10.5px; margin-left: 6px; }
+.fleet-root.repoFileView { position: relative; }
+/* Room for Chat about this whether it is drawn or not, so the path line never moves. */
+.fleet-root.repoFileView h2 { font-size: 14px; word-break: break-all; padding-right: 120px; }
+/* Chat about this (#683): over the view's top-right corner, on the path line's row. */
+.fleet-root .repoChat { position: absolute; top: 10px; right: 14px; z-index: 2; padding: 3px 10px; font-size: 11px;
+  border-radius: 5px; border: 1px solid rgba(88,166,255,0.45); background: #1f2f45; color: #cfe3ff; cursor: pointer; }
+.fleet-root .repoChat:hover { background: #274063; }
+/* Chat about this on a ticket detail (#699): in the head's meta row. */
+.fleet-root .ticketChat { padding: 2px 8px; font-size: 11px; border-radius: 5px; border: 1px solid rgba(88,166,255,0.45);
+  background: #1f2f45; color: #cfe3ff; cursor: pointer; }
+.fleet-root .ticketChat:hover { background: #274063; }
+@media (prefers-color-scheme: light) {
+  .fleet-root .ticketChat { background: #ddf4ff; color: #0550ae; border-color: rgba(9,105,218,0.4); }
+  .fleet-root .ticketChat:hover { background: #b6e3ff; }
+}
+@media (prefers-color-scheme: light) {
+  .fleet-root .repoChat { background: #ddf4ff; color: #0550ae; border-color: rgba(9,105,218,0.4); }
+  .fleet-root .repoChat:hover { background: #b6e3ff; }
+}
+.fleet-root .repoText { margin: 0; padding: 8px 10px; border-radius: 4px; background: rgba(127,127,127,.10); color: #d6d9de;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; line-height: 1.45;
+  white-space: pre; overflow: auto; tab-size: 4; }
+.fleet-root .repoTruncated, .fleet-root .repoBinary { margin-top: 8px; font-style: italic; }
+.fleet-root .repoDoc { color: #d6d9de; font-size: 13px; line-height: 1.55; max-width: 920px; }
+.fleet-root .repoDoc h1, .fleet-root .repoDoc h2 { border-bottom: 1px solid rgba(127,127,127,.25); padding-bottom: 4px; }
+.fleet-root .repoDoc a { color: #7cb1ff; }
+.fleet-root .repoDoc code { font-size: 12px; padding: 0 3px; border-radius: 3px; background: rgba(127,127,127,.15); }
+.fleet-root .repoDoc pre { padding: 8px 10px; border-radius: 4px; background: rgba(127,127,127,.12); overflow: auto; }
+.fleet-root .repoDoc pre code { padding: 0; background: none; }
+.fleet-root .repoDoc blockquote { margin: 6px 0; padding-left: 10px; border-left: 3px solid rgba(127,127,127,.35); color: #a9aeb6; }
+.fleet-root .repoDoc table { border-collapse: collapse; }
+.fleet-root .repoDoc th, .fleet-root .repoDoc td { border: 1px solid rgba(127,127,127,.3); padding: 3px 8px; }
+.fleet-root .repoDoc .mdImage { color: var(--muted); font-style: italic; }
+/* The file view's highlighting (#675, highlight.js): GitHub's two stock themes,
+   github-dark and github, ported as rules on .repoCode, switched on the same
+   prefers-color-scheme signal as the rest of the app (no reload). Each has its
+   own solid background so the token colours hold AA (4.5:1) against it; three
+   stock colours did not and are overridden (marked); ratios in the README. */
+.fleet-root .repoCode { background: #0d1117; color: #c9d1d9; }
+.fleet-root .repoCode code { font: inherit; background: none; padding: 0; }
+.repoCode .hljs-doctag, .repoCode .hljs-keyword, .repoCode .hljs-meta .hljs-keyword, .repoCode .hljs-template-tag,
+.repoCode .hljs-template-variable, .repoCode .hljs-type, .repoCode .hljs-variable.language_ { color: #ff7b72; }
+.repoCode .hljs-title, .repoCode .hljs-title.class_, .repoCode .hljs-title.class_.inherited__, .repoCode .hljs-title.function_ { color: #d2a8ff; }
+.repoCode .hljs-attr, .repoCode .hljs-attribute, .repoCode .hljs-literal, .repoCode .hljs-meta, .repoCode .hljs-number,
+.repoCode .hljs-operator, .repoCode .hljs-variable, .repoCode .hljs-selector-attr, .repoCode .hljs-selector-class,
+.repoCode .hljs-selector-id { color: #79c0ff; }
+.repoCode .hljs-regexp, .repoCode .hljs-string, .repoCode .hljs-meta .hljs-string { color: #a5d6ff; }
+.repoCode .hljs-built_in, .repoCode .hljs-symbol { color: #ffa657; }
+.repoCode .hljs-comment, .repoCode .hljs-code, .repoCode .hljs-formula { color: #8b949e; }
+.repoCode .hljs-name, .repoCode .hljs-quote, .repoCode .hljs-selector-tag, .repoCode .hljs-selector-pseudo { color: #7ee787; }
+.repoCode .hljs-subst, .repoCode .hljs-emphasis, .repoCode .hljs-strong { color: #c9d1d9; }
+.repoCode .hljs-section { color: #58a6ff; font-weight: bold; } /* override: stock #1f6feb is 4.1:1 */
+.repoCode .hljs-bullet { color: #f2cc60; }
+.repoCode .hljs-emphasis { font-style: italic; }
+.repoCode .hljs-strong { font-weight: bold; }
+.repoCode .hljs-addition { color: #aff5b4; background-color: #033a16; }
+.repoCode .hljs-deletion { color: #ffdcd7; background-color: #67060c; }
+@media (prefers-color-scheme: light) {
+  .fleet-root .repoCode { background: #ffffff; color: #24292e; }
+  .repoCode .hljs-doctag, .repoCode .hljs-keyword, .repoCode .hljs-meta .hljs-keyword, .repoCode .hljs-template-tag,
+  .repoCode .hljs-template-variable, .repoCode .hljs-type, .repoCode .hljs-variable.language_ { color: #d73a49; }
+  .repoCode .hljs-title, .repoCode .hljs-title.class_, .repoCode .hljs-title.class_.inherited__, .repoCode .hljs-title.function_ { color: #6f42c1; }
+  .repoCode .hljs-attr, .repoCode .hljs-attribute, .repoCode .hljs-literal, .repoCode .hljs-meta, .repoCode .hljs-number,
+  .repoCode .hljs-operator, .repoCode .hljs-variable, .repoCode .hljs-selector-attr, .repoCode .hljs-selector-class,
+  .repoCode .hljs-selector-id { color: #005cc5; }
+  .repoCode .hljs-regexp, .repoCode .hljs-string, .repoCode .hljs-meta .hljs-string { color: #032f62; }
+  .repoCode .hljs-built_in, .repoCode .hljs-symbol { color: #bc4c00; } /* override: stock #e36209 is 3.5:1 */
+  .repoCode .hljs-comment, .repoCode .hljs-code, .repoCode .hljs-formula { color: #6a737d; }
+  .repoCode .hljs-name, .repoCode .hljs-quote, .repoCode .hljs-selector-tag, .repoCode .hljs-selector-pseudo { color: #22863a; }
+  .repoCode .hljs-subst, .repoCode .hljs-emphasis, .repoCode .hljs-strong { color: #24292e; }
+  .repoCode .hljs-section { color: #005cc5; }
+  .repoCode .hljs-bullet { color: #735c0f; }
+  .repoCode .hljs-addition { color: #1a7f37; background-color: #f0fff4; } /* override: stock #22863a is 4.48:1 here */
+  .repoCode .hljs-deletion { color: #b31d28; background-color: #ffeef0; }
+}
+/* The markdown split (#675, MarkdownSplit): rendered on top, source below, a
+   horizontal bar between (splitter.jsx HSplitter). Each panel scrolls on its
+   own and neither goes under 80px (MIN_PANEL_HEIGHT); unmeasured, they split evenly. */
+.fleet-root .repoSplit { display: flex; flex-direction: column; height: calc(100vh - 110px); min-height: 240px; }
+.fleet-root .repoPane { flex: 1 1 0; min-height: 80px; overflow: auto; }
+.fleet-root .repoRaw .repoText { min-height: 100%; box-sizing: border-box; overflow: visible; }
+/* The find bar (find.jsx, #703): its own small view over the window's top
+   right (main.js FIND_BAR), so the bar fills that view edge to edge. */
+body.findBody { background: transparent; overflow: hidden; }
+.findBar { box-sizing: border-box; height: 100vh; display: flex; align-items: center; gap: 6px; padding: 0 8px;
+  background: #1f232a; border: 1px solid #333842; border-radius: 8px; color: var(--text);
+  font: 12px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+.findInput { flex: 1; min-width: 0; background: var(--bg); border: 1px solid #333842; border-radius: 5px;
+  color: var(--text); font: inherit; padding: 4px 7px; outline: none; }
+.findInput:focus { border-color: #5794F2; }
+.findCount { flex: 0 0 auto; min-width: 48px; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+.findBtn { background: none; border: 1px solid transparent; border-radius: 4px; color: #c9ced6; font: inherit;
+  font-size: 13px; line-height: 1; width: 24px; height: 24px; cursor: pointer; }
+.findBtn:hover:not(:disabled) { background: #262a31; border-color: #333842; }
+.findBtn:disabled { color: #555b66; cursor: default; }
+
+/* AI Accounts' FAQ (accounts.jsx, #738): how the picker chooses an account. */
+.fleet-root .acFaq { margin: 6px 0 12px; padding: 8px 12px; border-radius: 6px;
+                     border: 1px solid color-mix(in srgb, currentColor 25%, transparent); }
+.fleet-root .acFaqBar { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.fleet-root .acFaqBar h2 { margin: 0; font-size: 14px; }
+.fleet-root .acFaqEntry p { margin: 4px 0; }
+.fleet-root .acFaqEntry { margin-top: 8px; }
+.fleet-root .acFaqBtn, .fleet-root .acFaqClose { font-size: 11px; padding: 2px 10px; cursor: pointer; border-radius: 5px;
+                                                 color: inherit; background: transparent;
+                                                 border: 1px solid color-mix(in srgb, currentColor 30%, transparent); }
+
+/* The engine's event stream (renderer/engine-events.js): the status bar's badge and the stale line above a view while it is down. */
+.statusBar .sbStream.sb-ok { color: var(--ok); }
+.statusBar .sbStream.sb-bad { color: var(--sev-crit, #e5484d); }
+.staleLine { padding: 4px 12px; font-size: 12px; color: var(--sev-warn, #d8a200); background: rgba(216, 162, 0, 0.08); border-bottom: 1px solid rgba(216, 162, 0, 0.3); }
+
+/* The Update engine overlay (update-overlay.jsx, #1053): a modal over the
+   whole window while the update runs, dark first, with its light variant. The
+   status bar's "restarting for update" phrase and the stale line's restarting
+   form are the muted colour, never the red of a down engine. The scrim is
+   plain semi-opaque colour, no backdrop-filter: a blur over a running card
+   (or this panel's spinner) is re-blurred every frame (#1110). */
+.uoBackdrop { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center;
+  background: rgba(8, 10, 14, 0.74);
+  font-family: -apple-system, "SF Pro Text", Helvetica, sans-serif; -webkit-font-smoothing: antialiased; }
+.uoPanel { width: min(620px, 92vw); max-height: 86vh; overflow-y: auto; box-sizing: border-box; padding: 16px 18px 14px;
+  background: var(--surface); color: var(--text); border: 1px solid #333842; border-radius: 10px; box-shadow: 0 12px 40px rgba(0,0,0,0.5); font-size: 12px; }
+.uoTitle { font-size: 14px; font-weight: 600; margin-bottom: 10px; }
+.uoTitle.uo-ok { color: var(--ok); }
+.uoTitle.uo-bad { color: var(--err); }
+.uoSteps { list-style: none; margin: 0; padding: 0; }
+.uoStep { padding: 5px 0; border-top: 1px solid rgba(255,255,255,0.06); }
+.uoStep:first-child { border-top: none; }
+.uoStepHead { display: flex; align-items: baseline; gap: 8px; }
+.uoMark { width: 14px; text-align: center; font-weight: 600; }
+.uoLabel { flex: 1; }
+.uoSource { color: #6f757e; font-size: 11px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.uo-pending .uoMark, .uo-pending .uoLabel { color: #6f757e; }
+.uo-running .uoMark { color: var(--warn); display: inline-block; animation: uoSpin 1.1s linear infinite; }
+.uo-running .uoLabel { font-weight: 600; }
+.uo-done .uoMark { color: var(--ok); }
+.uo-failed .uoMark, .uo-failed .uoLabel { color: var(--err); }
+@keyframes uoSpin { to { transform: rotate(360deg); } }
+/* No motion: the running mark is drawn still, in its running colour. */
+@media (prefers-reduced-motion: reduce) {
+  .uo-running .uoMark { animation: none; }
+}
+.uoDetail { margin: 2px 0 0 22px; color: var(--muted); font-size: 11px; overflow-wrap: anywhere; }
+.uo-failed .uoDetail { color: var(--err); }
+.uoNotes { margin: 4px 0 0 22px; color: #b8bcc4; font-size: 11px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.uoChecklist { margin: 4px 0 0 22px; }
+.uoTail { margin: 4px 0 2px 22px; padding: 6px 8px; border-radius: 6px; background: #0d1117; color: #c9d1d9;
+  font-size: 11px; line-height: 1.4; white-space: pre-wrap; word-break: break-all; }
+.uoFail { margin-top: 10px; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--err); color: var(--err);
+  background: rgba(255, 107, 107, 0.1); overflow-wrap: anywhere; }
+.uoFoot { margin-top: 12px; display: flex; justify-content: flex-end; align-items: center; }
+.uoNote { color: var(--muted); font-size: 11px; }
+/* Config > Repos' Edit check dialog (repos.jsx, #1252) in the same panel. */
+.ecProse { margin: 0 0 8px; line-height: 1.5; color: #c9cdd3; }
+ul.ecProse { padding-left: 18px; }
+.ecProse code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11px; }
+.ecField { display: block; width: 100%; box-sizing: border-box; margin: 0 0 12px; }
+.ecPaths { resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.ecFoot { gap: 8px; }
+/* Config > Repos' Edit… modal (#1255): a wider panel, a row of tabs, a page per tab. */
+.uoPanel.erPanel { width: min(760px, 94vw); }
+.erTabs { display: flex; flex-wrap: wrap; gap: 2px; margin: 0 0 12px; border-bottom: 1px solid #333842; }
+.erTab { font: inherit; font-size: 12px; padding: 5px 10px; cursor: pointer; color: var(--muted); background: none;
+  border: none; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.erTab:hover { color: var(--text); }
+.erTab.on { color: var(--text); border-bottom-color: #58a6ff; font-weight: 600; }
+.erTitle { font-size: 13px; font-weight: 600; margin: 0 0 8px; }
+.erControls { display: flex; flex-direction: column; gap: 6px; margin: 8px 0 4px; padding: 8px 10px; border-radius: 6px;
+  background: rgba(255,255,255,0.04); }
+.fleet-root .erSwitch { font-size: 12px; color: var(--text); }
+.fleet-root .erChoice { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text); }
+.fleet-root .erChoice .ecInput { flex: 1; }
+.fleet-root .erPanel .acDim { white-space: normal; }
+/* Config > AI Accounts' Edit… modal (#1955): its pages reuse the inline forms. */
+.erPanel .acPage .erTitle { margin-top: 10px; }
+.erPanel .acPage .acEdit { margin: 0; }
+.fleet-root .acVerdict { font-size: 12px; }
+.fleet-root .acVerdict.ok { color: var(--ok); }
+.fleet-root .acVerdict.bad { color: #ff7b72; }
+/* Config > Repos' Configure First Mate modal (#1801): the Edit… modal's panel and tabs; its MCP servers page's rows and form. */
+.fmcList { list-style: none; margin: 8px 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.fmcRow { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px; padding: 6px 8px; border-radius: 6px;
+  background: rgba(255,255,255,0.04); font-size: 12px; }
+.fmcWhere { font-family: ui-monospace, Menlo, monospace; overflow-wrap: anywhere; flex: 1 1 200px; }
+.fmcResult { flex-basis: 100%; font-size: 11px; }
+.fmcOk { color: #3fb950; }
+.fmcValues { display: flex; flex-direction: column; gap: 4px; }
+.fmcValue { display: flex; gap: 6px; align-items: center; }
+.fmcValue .ecInput { flex: 1; }
+.fmcSecret { font-size: 11px; white-space: nowrap; }
+.fmNotice.fmMcpNotice { color: #d29922; }
+.uoClose { font: inherit; font-size: 12px; padding: 4px 16px; border-radius: 5px; cursor: pointer;
+  color: var(--text); background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2); }
+.uoClose:hover { background: rgba(255,255,255,0.14); }
+.staleLine.restarting { color: var(--muted); background: rgba(154, 160, 168, 0.08); border-bottom-color: rgba(154, 160, 168, 0.3); }
+.fleet-root .nmEmpty.restarting { color: var(--muted); }
+@media (prefers-color-scheme: light) {
+  /* Rendered descriptions on a light panel: darker chip, block and rule tints, and a blockquote grey passing 4.5:1 on white. */
+  .fleet-root .tdDesc.md code, .fleet-root .tdDesc.md pre { background: rgba(0,0,0,.07); }
+  .fleet-root .tdDesc.md pre code { background: none; }
+  .fleet-root .tdDesc.md th, .fleet-root .tdDesc.md td { border-bottom-color: rgba(0,0,0,.15); }
+  .fleet-root .tdDesc.md blockquote { color: #57606a; border-left-color: rgba(0,0,0,.25); }
+  .uoBackdrop { background: rgba(240, 242, 245, 0.78); }
+  .uoPanel { background: #ffffff; color: var(--surface); border-color: #d0d4da; box-shadow: 0 12px 40px rgba(0,0,0,0.18); }
+  .uoTitle.uo-ok, .uo-done .uoMark { color: #1a7f37; }
+  .uoTitle.uo-bad, .uo-failed .uoMark, .uo-failed .uoLabel, .uo-failed .uoDetail { color: #cf222e; }
+  .uoStep { border-top-color: rgba(0,0,0,0.08); }
+  .uo-pending .uoMark, .uo-pending .uoLabel, .uoSource { color: #6e7781; }
+  .uo-running .uoMark { color: #9a6700; }
+  .uoDetail, .uoNote { color: #57606a; }
+  .ecProse { color: #24292e; }
+  .erTabs { border-bottom-color: #d0d4da; }
+  .erTab { color: #57606a; }
+  .erTab:hover, .erTab.on { color: var(--surface); }
+  .erTab.on { border-bottom-color: #0969da; }
+  .erControls { background: rgba(0,0,0,0.04); }
+  .fleet-root .erSwitch { color: var(--surface); }
+  /* .fleet-root stays dark; the Edit… modal's panel is white here, so its amber, bands, formula and inputs follow it. */
+  .fleet-root .erPanel .acDim { color: #57606a; }
+  .fleet-root .erPanel .acConfirm, .fleet-root .erPanel .acWarn, .fleet-root .erPanel .acBand.warn { color: #9a6700; }
+  .fleet-root .erPanel .acBand.ok { color: #1a7f37; }
+  .fleet-root .erPanel .acBand.danger, .fleet-root .erPanel .acProblem { color: #cf222e; }
+  .fleet-root .erPanel .acFormula { background: #f6f8fa; color: #24292e; }
+  .fleet-root .erPanel .acInput { background: #ffffff; color: var(--surface); border-color: #d0d4da; }
+  .fleet-root .wiImportPanel .acInput { background: #ffffff; color: var(--surface); border-color: #d0d4da; }
+  .fleet-root .wiImportPanel .acBtn:not(.primary) { color: var(--surface); background: rgba(0,0,0,0.04); border-color: rgba(0,0,0,0.2); }
+  .fleet-root .erPanel .acBtn:not(.primary) { color: var(--surface); background: rgba(0,0,0,0.04); border-color: rgba(0,0,0,0.2); }
+  .fleet-root .erPanel .acBtn.danger { color: #cf222e; border-color: rgba(207,34,46,0.45); }
+  .uoNotes { color: #424a53; }
+  .uoTail { background: #f6f8fa; color: #24292e; }
+  .uoFail { border-color: #cf222e; color: #cf222e; background: rgba(207, 34, 46, 0.06); }
+  .uoClose { color: var(--surface); background: rgba(0,0,0,0.04); border-color: rgba(0,0,0,0.2); }
+  .uoClose:hover { background: rgba(0,0,0,0.08); }
+  .staleLine.restarting { color: #57606a; }
+}
+
+/* Config > Jobs (#1228): layout only; every colour is the existing classes' (.acInput, .acBtn, .err, .muted, .pvLink). */
+.fleet-root.jobs .jbScroll { max-width: 100%; overflow-x: auto; margin-top: 8px; }
+.fleet-root.jobs .jbTable { border-collapse: collapse; }
+.fleet-root.jobs .jbTable th, .fleet-root.jobs .jbTable td { padding: 4px 10px 4px 0; vertical-align: middle; white-space: nowrap; text-align: left; }
+.fleet-root.jobs .jbName { font-weight: 600; display: flex; align-items: center; max-width: 260px; }
+.fleet-root.jobs .jbNameText, .fleet-root.jobs .jbOutcome { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.fleet-root.jobs .jbOutcome { max-width: 220px; }
+.fleet-root.jobs .jbActions { white-space: nowrap; }
+.fleet-root.jobs .jbSystem { flex: none; margin-left: 6px; padding: 0 5px; border: 1px solid currentColor; border-radius: 3px; font-size: 10px; font-weight: 500; opacity: 0.75; }
+.rfForm { display: flex; flex-direction: column; gap: 8px; }
+.fleet-root .rfForm .acInput.err { margin-top: 0; border-color: var(--sev-crit); }
+.rfRow { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; }
+.rfField { display: flex; flex-direction: column; gap: 2px; }
+.rfValues { width: 100%; font-family: var(--mono, monospace); min-height: 10em; }
+.rfRuns { margin-top: 12px; display: flex; flex-direction: column; gap: 4px; }
+.rfRun { font-size: 0.92em; }
+.rfBadge { padding: 0 6px; border-radius: 8px; border: 1px solid currentColor; font-size: 0.85em; }
+.rfBadge.filed { color: var(--ok, #2e9d5b); }
+.rfBadge.nothing { color: var(--muted, #888); }
+.rfBadge.failed { color: var(--err, #c0392b); }
+.fleet-root.jobs .jbErr { white-space: pre-wrap; }
+/* #1684: the table follows the jobs pane, not the window. Wide: every column;
+   below ~900px kind becomes a tag and next/last one `when` cell; below ~620px
+   instance folds into outcome and the actions into a ⋯ menu. The menu is
+   position: fixed (#1758): .jbScroll's overflow-x: auto makes overflow-y auto
+   too, which clipped an absolute menu at the table's bottom edge. Fixed escapes
+   that clip while the wrapper keeps scrolling sideways. container-type does not
+   make .fleet-root.jobs a fixed box's containing block (#1777): the viewport
+   is, so jobs.jsx's jobMenuPos places it from the summary's viewport rect on
+   open, against the window's width and height. The ⋯ menu (.jbMore) is a
+   narrow-layout element: it is shown only under the 620px container
+   breakpoint, alongside the inline buttons it replaces being hidden there. */
+.fleet-root.jobs { container-type: inline-size; }
+.fleet-root.jobs .jbMid, .fleet-root.jobs .jbNarrow { display: none; }
+.fleet-root.jobs .jbKindTag { flex: none; margin-left: 6px; padding: 0 5px; border-radius: 3px; font-size: 10px; font-weight: 400; opacity: 0.6; border: 1px solid currentColor; }
+.fleet-root.jobs .jbWhen { flex-direction: column; font-size: 11px; }
+.fleet-root.jobs .jbMore > summary { list-style: none; cursor: pointer; }
+.fleet-root.jobs .jbMore > summary::-webkit-details-marker { display: none; }
+.fleet-root.jobs .jbMenu { position: fixed; z-index: 50; min-width: 90px; display: flex; flex-direction: column; gap: 4px; padding: 6px; background: var(--bg, #1e1e1e); border: 1px solid var(--border, #444); border-radius: 4px; }
+@container (max-width: 900px) {
+  .fleet-root.jobs .jbWide { display: none; }
+  .fleet-root.jobs .jbMid { display: inline; }
+  .fleet-root.jobs .jbWhen { display: flex; }
+}
+@container (max-width: 620px) {
+  .fleet-root.jobs .jbInst, .fleet-root.jobs .jbBtns { display: none; }
+  .fleet-root.jobs .jbNarrow { display: inline; }
+  .fleet-root.jobs details.jbNarrow { display: inline-block; }
+  .fleet-root.jobs .jbMore { display: inline-block; }
+}
+.fleet-root.jobs .jbForm { margin-top: 16px; display: flex; flex-direction: column; gap: 6px; max-width: 720px; }
+.uoPanel.jbPanel { width: min(760px, 94vw); }
+/* Tickets > Import from GitHub's modal (work-items.jsx ImportDialog). */
+.uoPanel.wiImportPanel { width: min(460px, 92vw); }
+.wiImportPanel .wiImportForm { display: flex; flex-direction: column; gap: 8px; }
+.wiImportPanel .wiImportButtons { display: flex; gap: 8px; }
+.fleet-root.jobs .jbPanel .jbForm { margin-top: 0; max-width: none; }
+.fleet-root.jobs .jbRegister { margin-top: 16px; }
+.fleet-root.jobs .jbRowFields { display: flex; flex-wrap: wrap; gap: 8px; }
+.fleet-root.jobs .jbField { display: flex; flex-direction: column; gap: 2px; font-size: 11px; }
+.fleet-root.jobs .jbPrompt { width: 100%; box-sizing: border-box; resize: vertical; font-family: inherit; }
+.fleet-root.jobs .jbInstance { margin-top: 16px; }
+/* What this update brings (#1398) */
+.uoChanges { margin-top: 10px; padding-top: 8px; border-top: 1px solid rgba(154, 160, 168, 0.25); }
+.uoChangesHead { font-weight: 600; margin-bottom: 4px; }
+.uoChangeList { margin: 4px 0 0 0; padding-left: 18px; max-height: 180px; overflow-y: auto; font-size: 12px; }
+.uoChangeList li { margin: 2px 0; }
+
+/* Analytics > AI Accounts > Account consumption (consumption.jsx, #1934). */
+.fleet-root .jevCalls.consumption { table-layout: auto; }
+.fleet-root .consumption tr.total td { font-weight: 600; border-top: 1px solid var(--line, #3334); }
+.fleet-root .consumption tr.caller td:first-child { font-style: italic; }
+.fleet-root .consumptionPage .note { margin-top: 8px; font-size: 11px; }
+/* Analytics > Builds (builds.jsx, #1935): the kind chips, and a finished run's conclusion coloured as the Issues view colours states. */
+.fleet-root.builds .head select.cibLimit { margin-left: 12px; }
+.fleet-root .cibChips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 6px 0; }
+.fleet-root .cibChip { border: 1px solid #3a3f47; background: #1f3a2b; color: #6dcf9a; border-radius: 10px; padding: 1px 9px; cursor: pointer; font-size: 12px; }
+.fleet-root .cibChip.off { background: #24272d; color: #6b7078; text-decoration: line-through; }
+.fleet-root .cibRunning .build-elapsed { color: var(--ok); font-variant-numeric: tabular-nums; }
+.fleet-root .ci-success .cibConclusion { color: var(--ok); }
+.fleet-root .ci-failure .cibConclusion, .fleet-root .ci-timed_out .cibConclusion, .fleet-root .ci-startup_failure .cibConclusion { color: var(--err); font-weight: 600; }
+.fleet-root .ci-cancelled .cibConclusion, .fleet-root .ci-skipped .cibConclusion, .fleet-root .ci-neutral .cibConclusion { color: #6b7078; }
+.fleet-root .ci-action_required .cibConclusion { color: var(--warn); font-weight: 600; }
+
+/* Utils > HITLP producer (#1947): the page's root is itself a .fleet-root (index.jsx mounts it bare);
+   its inputs, selects and buttons take Config's styles (.acInput, .acBtn). */
+.fleet-root.hitlpProducer { max-width: 980px; }
+.fleet-root.hitlpProducer .acInput, .fleet-root.hitlpProducer .hpJson { width: 100%; box-sizing: border-box; }
+.fleet-root.hitlpProducer .hpOption .acInput { width: auto; flex: 1; }
+.fleet-root .hpHead { margin-bottom: 0; }
+.fleet-root .hpForm { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; margin: 10px 0; }
+.fleet-root .hpField { display: flex; flex-direction: column; gap: 3px; margin: 6px 0; }
+.fleet-root .hpField .hpCheck { align-self: flex-start; width: 16px; height: 16px; margin: 4px 0; }
+.fleet-root .hpForm .hpField[data-field="context"], .fleet-root .hpForm .hpField[data-field="payload"],
+.fleet-root .hpForm .hpField[data-field="question"], .fleet-root .hpForm .hpField[data-field="responseSchema"] { grid-column: 1 / -1; }
+.fleet-root .hpLabel { font-size: 11px; color: var(--muted); }
+.fleet-root .hpJson, .fleet-root .hpRaw { font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
+.fleet-root .hpJson { width: 100%; box-sizing: border-box; background: #14161a; color: inherit; border: 1px solid #2a2e35; border-radius: 4px; padding: 4px 6px; }
+.fleet-root .hpOption { display: flex; gap: 6px; margin-bottom: 4px; }
+.fleet-root .hpButtons { display: flex; gap: 8px; align-items: center; margin: 8px 0; }
+.fleet-root .hpPanes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.fleet-root .hpPane h2 { display: flex; gap: 8px; align-items: center; font-size: 13px; }
+.fleet-root .hpStatus { color: var(--muted); font-weight: normal; }
+.fleet-root .hpRaw { white-space: pre-wrap; word-break: break-all; background: #14161a; padding: 8px; max-height: 480px; overflow: auto; user-select: text; }
+
+/* The urgent HITLP popup (#2196, hitlp-popup.jsx): the task view (.htView,
+   hitlp-task.jsx) in the one modal, the app blurred behind it, the panel edged
+   in the urgent red, capped at 86% of the window with its own scroll. */
+.uoBackdrop:has(> .uoPanel.hpPanel) { backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.uoPanel.hpPanel { width: min(920px, 94vw); max-height: 86vh; overflow-y: auto; padding: 18px 22px;
+  background: var(--bg); border: 2px solid #e5604f; border-radius: 16px; box-shadow: 0 24px 64px rgba(0,0,0,0.55); }
+.fleet-root.hpRoot { width: auto; }
+.fleet-root .htPopup { max-width: none; padding: 0; }
+.fleet-root .htNeeds { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; letter-spacing: .08em; color: #ff9a8e; }
+.fleet-root .htLater { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-top: 12px; border-top: 1px solid var(--border); font-size: 12px; color: var(--muted); }
+.fleet-root .htHint { width: 100%; text-align: center; }
+
+/* Config > Palettes (palettes.jsx, #2213). */
+.fleet-root .palGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; margin-top: 10px; }
+.fleet-root .palCard { text-align: left; font: inherit; color: var(--text); cursor: pointer; padding: 8px;
+                border-radius: 8px; background: var(--surface); border: 1px solid var(--border); }
+.fleet-root .palCard:hover { border-color: var(--muted); }
+.fleet-root .palCard.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.fleet-root .palName { font-weight: 600; }
+.fleet-root .palMood { color: var(--muted); font-size: 11px; margin: 2px 0 6px; }
+.fleet-root .palSample { border: 1px solid; border-radius: 6px; padding: 6px; }
+.fleet-root .palDots { display: flex; gap: 8px; font-size: 11px; margin-top: 4px; }
+
+/* The chat's repo chip in First mate's header (#2343); amber with none chosen. */
+.fmChatRepoRow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+.fmChatRepoMismatch { font-size: 11px; color: #c90; }
+.fmNewConversationRepo { opacity: 0.8; }
+.fmChatRepo { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; padding: 1px 6px;
+  border: 1px solid var(--border, #555); border-radius: 10px; margin: 2px 0; }
+.fmChatRepoNone { border-color: #d9a400; color: #d9a400; }
+.fmChatRepoSelect { background: transparent; color: inherit; border: none; font: inherit; }
+
+/* The HITLP task view (hitlp-task.jsx): decision first, the story below. */
+.fleet-root .htView { --ht-ok: #5fd3a5; --ht-warn: #f2a541; --ht-bad: #ff7a6b; --ht-code: #ffe2b0; --ht-raised: color-mix(in srgb, var(--surface) 88%, var(--text) 12%);
+  max-width: 920px; padding: 8px 4px 32px; display: flex; flex-direction: column; gap: 20px; }
+@media (prefers-color-scheme: light) { .fleet-root .htView { --ht-ok: #0f7a52; --ht-warn: #9a5b00; --ht-bad: #b3261e; --ht-code: #7a4a00; } }
+.fleet-root .htMuted { color: var(--muted); font-size: 12px; }
+.fleet-root .htMono { font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+.fleet-root .htGrow { flex-grow: 1; }
+.fleet-root .htTop { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.fleet-root .htBack { background: none; border: none; color: var(--muted); cursor: pointer; padding: 0; font: inherit; }
+.fleet-root .htBack:hover { color: var(--text); }
+.fleet-root .htWhen { display: flex; align-items: center; gap: 10px; }
+.fleet-root .htWhenText { display: flex; flex-direction: column; font-weight: 600; }
+.fleet-root .htWhenText .nmDeadline { font-size: 14px; }
+.fleet-root .htPriority { font-size: 11px; font-weight: 700; letter-spacing: .08em; padding: 3px 9px; border-radius: 999px; color: #1a1205; background: var(--ht-warn); }
+.fleet-root .htPriority.urgent { background: var(--ht-bad); color: #fff; }
+.fleet-root .htPriority.low { background: none; color: var(--muted); border: 1px solid var(--border); }
+.fleet-root .htRingTrack { stroke: var(--border); }
+.fleet-root .htRingFill { stroke: var(--ht-ok); }
+.fleet-root .htRing.mid .htRingFill { stroke: var(--ht-warn); }
+.fleet-root .htRing.low .htRingFill { stroke: var(--ht-bad); }
+.fleet-root .htAsk { display: flex; flex-direction: column; gap: 8px; }
+.fleet-root .htEyebrow { font-size: 11px; font-weight: 600; letter-spacing: .1em; color: var(--muted); }
+.fleet-root .htVerified { color: var(--ht-ok); display: inline-flex; align-items: center; gap: 3px; }
+.fleet-root .htReported { color: var(--ht-warn); }
+.fleet-root .htHeadline { margin: 0; font-size: 26px; line-height: 1.25; font-weight: 600; color: var(--text); }
+.fleet-root .htHeadline.long { font-size: 20px; }
+.fleet-root .htQuestionMore { margin: 0; font-size: 15px; line-height: 1.5; white-space: pre-wrap; max-width: 780px; }
+.fleet-root .htInline { font-family: ui-monospace, "SF Mono", Menlo, monospace; color: var(--ht-code); background: var(--ht-raised); padding: 1px 8px; border-radius: 6px; }
+.fleet-root .htWhy, .fleet-root .htContext { margin: 0; font-size: 14px; line-height: 1.5; max-width: 780px; }
+.fleet-root .htContext { color: var(--muted); }
+.fleet-root .htScript { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: color-mix(in srgb, var(--bg) 80%, #000); }
+.fleet-root .htScriptBar { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-bottom: 1px solid var(--border); font-size: 12px; color: var(--muted); flex-wrap: wrap; }
+.fleet-root .htSmallBtn { height: 28px; padding: 0 10px; border-radius: 6px; border: 1px solid var(--border); background: none; color: var(--text); font: inherit; cursor: pointer; }
+.fleet-root .htScriptBody { margin: 0; max-height: 300px; overflow: auto; padding: 10px 12px; font: 12.5px/1.6 ui-monospace, "SF Mono", Menlo, monospace; color: var(--text); }
+.fleet-root .htScript.compact .htScriptBody { max-height: 160px; }
+.fleet-root .htScriptBody.open { max-height: none; }
+.fleet-root .htLine { white-space: pre; }
+.fleet-root .htLineNo { color: var(--muted); opacity: .6; margin-right: 14px; user-select: none; }
+.fleet-root .htDecide { display: flex; flex-direction: column; gap: 12px; padding: 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+.fleet-root .htOdds { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 13px; }
+.fleet-root .htLean.allow { color: var(--ht-ok); }
+.fleet-root .htLean.escalate { color: var(--ht-warn); }
+.fleet-root .htLean.deny { color: var(--ht-bad); }
+.fleet-root .htOddsBar { display: flex; width: 220px; height: 8px; border-radius: 4px; overflow: hidden; background: var(--border); }
+.fleet-root .htOddsBar .allow { background: var(--ht-ok); }
+.fleet-root .htOddsBar .escalate { background: var(--ht-warn); }
+.fleet-root .htOddsBar .deny { background: var(--ht-bad); }
+.fleet-root .htButtons { display: flex; gap: 10px; flex-wrap: wrap; }
+.fleet-root .htBtn { min-height: 44px; padding: 0 18px; border-radius: 10px; border: 1px solid var(--border); background: none; color: var(--text); font: inherit; font-size: 14px; font-weight: 500; cursor: pointer; }
+.fleet-root .htBtn:disabled { opacity: .5; cursor: default; }
+.fleet-root .htBtn.approve { background: var(--ht-ok); border-color: var(--ht-ok); color: #06231a; font-weight: 600; }
+.fleet-root .htBtn.reject { border-color: var(--ht-bad); color: var(--ht-bad); font-weight: 600; }
+.fleet-root .htBtn.picked { border-color: var(--accent, var(--text)); font-weight: 600; }
+.fleet-root .htBtn kbd { font: 11px ui-monospace, monospace; opacity: .7; margin-left: 8px; }
+.fleet-root .htAnswer, .fleet-root .htComment input { height: 40px; box-sizing: border-box; padding: 0 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font: inherit; }
+.fleet-root .htComment { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--muted); }
+.fleet-root .htDone { color: var(--ht-ok); font-weight: 600; }
+.fleet-root .htStory { display: flex; flex-direction: column; gap: 14px; margin-top: 6px; }
+.fleet-root .htStep { display: flex; gap: 14px; }
+.fleet-root .htRail { display: flex; flex-direction: column; align-items: center; width: 34px; flex-shrink: 0; }
+.fleet-root .htAvatar { width: 34px; height: 34px; border-radius: 50%; background: var(--ht-raised); color: var(--muted); display: flex; align-items: center; justify-content: center; font: 600 11px ui-monospace, monospace; }
+.fleet-root .htStep.self .htAvatar { color: var(--ht-ok); background: color-mix(in srgb, var(--ht-ok) 18%, var(--surface)); }
+.fleet-root .htRailLine { flex-grow: 1; width: 2px; background: var(--border); margin-top: 6px; min-height: 14px; }
+.fleet-root .htStepBody { display: flex; flex-direction: column; gap: 6px; min-width: 0; flex-grow: 1; max-width: 760px; padding-bottom: 4px; }
+.fleet-root .htStepHead { font-size: 12px; color: var(--muted); }
+.fleet-root .htStepHead strong { color: var(--text); font-weight: 600; }
+.fleet-root .htBubble { background: var(--surface); border-radius: 4px 12px 12px 12px; padding: 12px 14px; font-size: 14px; line-height: 1.45; display: flex; flex-direction: column; gap: 6px; }
+.fleet-root .htStep.self .htBubble { border: 1px solid var(--ht-ok); }
+.fleet-root .htBubbleWhy { color: var(--muted); }
+.fleet-root .htThis { font-size: 12px; color: var(--ht-ok); }
+.fleet-root .htChips { display: flex; gap: 6px; flex-wrap: wrap; }
+.fleet-root .htChip { font: 12px ui-monospace, monospace; background: var(--ht-raised); padding: 2px 8px; border-radius: 6px; color: var(--muted); overflow-wrap: anywhere; }
+.fleet-root .htChip.code { color: var(--ht-code); }
+.fleet-root .htFold { border-radius: 10px; padding: 10px 14px; background: var(--surface); font-size: 13px; color: var(--muted); }
+.fleet-root .htFold summary { cursor: pointer; }
+.fleet-root .htTech { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; font: 12px ui-monospace, monospace; overflow-wrap: anywhere; color: var(--text); }
+
+/* HITLP Requests and Closed (hitlp-requests.jsx). */
+.hrView .head .hrHost { color: var(--muted); font-size: 12px; margin-right: 8px; }
+.hrCountOpen { color: var(--warn, #d9a53a); }
+.hrFilters { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin: 8px 0 10px; font-size: 12px; }
+.hrFilter select { font: inherit; }
+.hrSearch { flex: 1; min-width: 160px; max-width: 320px; }
+.hrTable { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: auto; }
+.hrTable th { text-align: left; font-weight: 600; color: var(--muted); font-size: 11px; text-transform: uppercase; padding: 4px 8px; border-bottom: 1px solid var(--border, #3333); }
+.hrTable td { padding: 6px 8px; vertical-align: top; border-bottom: 1px solid var(--border, #3332); }
+.hrRow { cursor: pointer; }
+.hrRow:hover { background: var(--hover, #8881); }
+/* Closed's rows by decision (#100085, style A): a full tint over the theme's bg, stronger on hover. */
+.hrRow-approved { background: color-mix(in srgb, #4caf50 22%, var(--bg, transparent)); }
+.hrRow-rejected { background: color-mix(in srgb, var(--urgent, #e0564f) 22%, var(--bg, transparent)); }
+.hrRow-answered { background: color-mix(in srgb, var(--accent, #4c86e0) 22%, var(--bg, transparent)); }
+.hrRow-approved:hover { background: color-mix(in srgb, #4caf50 34%, var(--bg, transparent)); }
+.hrRow-rejected:hover { background: color-mix(in srgb, var(--urgent, #e0564f) 34%, var(--bg, transparent)); }
+.hrRow-answered:hover { background: color-mix(in srgb, var(--accent, #4c86e0) 34%, var(--bg, transparent)); }
+.hrRow.on { background: var(--selected, #4a90e222); }
+.hrRow.muted { opacity: 0.5; }
+.hrMono, .hrAge { font-family: var(--mono, ui-monospace, monospace); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.hrPrio { font-size: 12px; }
+.hrPrio.urgent { color: var(--urgent, #e0564f); font-weight: 600; }
+.hrQuestion { min-width: 0; max-width: 60ch; }
+.hrSub { color: var(--muted); font-size: 12px; }
+.hrDetail { margin-top: 14px; border-top: 1px solid var(--border, #3333); padding-top: 8px; }
+.hrDetailHead { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+.hrOutcome-rejected, .hrOutcome-failed { color: var(--urgent, #e0564f); }
+.hrOutcome-timed_out, .hrOutcome-cancelled { color: var(--muted); }
+
+/* The merged PR's main build, after the ticket detail's progress bar (main-build.jsx). */
+.mainBuild { margin: 6px 0 10px; padding: 4px 10px; border-radius: 4px; border: 1px solid var(--border, #444); font-size: 12px; }
+.mainBuild a { color: inherit; text-decoration: none; }
+.mainBuild a:hover { text-decoration: underline; }
+.mainBuild.mb-queued, .mainBuild.mb-running { background: #3a3216; border-color: #f0c040; color: #f0c040; }
+.mainBuild.mb-success { background: #1d3320; border-color: #4caf50; color: #7fd384; }
+.mainBuild.mb-failure { background: #3a1d1d; border-color: #e05252; color: #f08080; }
+.mainBuild.mb-other, .mainBuild.mb-none { color: #aaa; }
+
+/* Tickets > Board view (#100094, stage-board.jsx): seven stage columns while the
+   pane has room (layout A); squished, the empty columns go (layout B); narrower
+   still, the columns stack as collapsible lanes. Container queries on the
+   board, so the pane's width decides. */
+.fleet-root .sbWrap { container: stageboard / inline-size; }
+.fleet-root .sbBoard { display: flex; gap: 8px; align-items: flex-start; }
+.fleet-root .sbCol { flex: 1 1 0; min-width: 0; background: var(--surface); border-radius: 4px;
+            border-top: 3px solid var(--sb-accent); padding: 4px; --sb-accent: var(--muted); }
+.fleet-root .sb-intake { --sb-accent: var(--ok); }
+.fleet-root .sb-designing { --sb-accent: var(--p-impl); }
+.fleet-root .sb-coding { --sb-accent: var(--tl-coding); }
+.fleet-root .sb-building { --sb-accent: var(--warn); }
+.fleet-root .sb-reviewing { --sb-accent: var(--p-review); }
+.fleet-root .sb-merging { --sb-accent: var(--accent); }
+.fleet-root .sb-waiting { --sb-accent: var(--muted); }
+.fleet-root .sbHead { font-weight: 600; padding: 2px 4px 6px; list-style: none; pointer-events: none; }
+.fleet-root .sbHead::-webkit-details-marker { display: none; }
+.fleet-root .sbCard { position: relative; overflow: hidden; display: block; margin-bottom: 6px; padding: 6px 8px 8px 10px;
+            border: 1px solid var(--border); border-left: 4px solid var(--sb-accent); border-radius: 5px;
+            background: var(--bg); color: var(--text); text-decoration: none; }
+.fleet-root .sbTop { display: flex; gap: 6px; align-items: baseline; font-size: 11px; }
+.fleet-root .sbNum { color: var(--muted); }
+.fleet-root .sbRepo { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fleet-root .sbMark { margin-left: auto; color: var(--warn); }
+.fleet-root .sbTitle { margin: 2px 0 4px; }
+.fleet-root .sbState, .fleet-root .sbParts { font-size: 11px; margin-top: 3px; }
+/* The running card: a band in the column's accent sweeps along the bottom edge
+   on `transform` only (#1110), the timeline's tlSweep path. */
+.fleet-root .sbSweep { position: absolute; left: 0; bottom: 0; width: 40%; height: 2px; pointer-events: none;
+            background: linear-gradient(90deg, transparent, var(--sb-accent), transparent);
+            animation: tlSweep 1.8s ease-in-out infinite; }
+@container stageboard (max-width: 900px) {
+  .fleet-root .sbEmpty { display: none; }
+}
+@container stageboard (max-width: 480px) {
+  .fleet-root .sbBoard { flex-direction: column; align-items: stretch; }
+  .fleet-root .sbHead { pointer-events: auto; cursor: pointer; list-style: disclosure-closed; }
+  .fleet-root .sbCol[open] > .sbHead { list-style: disclosure-open; }
+}
+/* No motion: a static accent stripe along the bottom edge instead. */
+@media (prefers-reduced-motion: reduce) {
+  .fleet-root .sbSweep { animation: none; width: 100%; background: var(--sb-accent); }
+}
+
+/* The update preview modal (#100091, src/renderer/update-preview.jsx; the
+   mockups in docs/mockups/update-preview/). The app behind it is blurred
+   once: in Electron a captured snapshot under the scrim (`upSnap`), a static
+   bitmap, so nothing re-blurs while a card animates (#1110); in the web
+   version a backdrop-filter (`upBlur`), as the HITLP popup's. */
+.uoBackdrop.upSnap { background: transparent; }
+.uoBackdrop.upBlur { background: rgba(8, 10, 14, 0.45); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.upSnapshot { position: fixed; inset: -12px; background-size: calc(100% - 24px) calc(100% - 24px); background-position: center; background-repeat: no-repeat; filter: blur(6px); }
+.upScrim { position: fixed; inset: 0; background: rgba(8, 10, 14, 0.45); }
+.uoPanel.upPanel { position: relative; width: min(560px, 92vw); }
+.upHeader { font-family: ui-monospace, "SF Mono", Menlo, monospace; color: var(--muted); padding-bottom: 10px; border-bottom: 1px solid #30363d; }
+.upVer { color: var(--text); }
+.upLines { color: var(--muted); font-size: 11px; padding: 10px 0; border-bottom: 1px solid #30363d; }
+.upBrings { font-weight: 600; margin: 12px 0 6px; }
+.upRows { list-style: none; margin: 0; padding: 0; max-height: 60vh; overflow-y: auto; }
+.upRow { display: flex; gap: 10px; padding: 3px 0; }
+.upNum { color: #4493f8; min-width: 44px; }
+.upPr { color: var(--muted); min-width: 56px; text-decoration: none; }
+.upUnknown { color: var(--muted); font-style: italic; }
+.upMore { color: var(--muted); }
+.upMissing { margin: 12px 0; padding: 8px 10px; border: 1px solid #9e6a03; border-radius: 6px; background: #2a2416; color: var(--muted); font-size: 11px; }
+.upMissingWhy { color: #d29922; }
+.upEmpty { margin: 12px 0; color: var(--muted); font-style: italic; }
+.upFooter { margin-top: 12px; padding-top: 10px; border-top: 1px solid #30363d; color: var(--muted); font-size: 11px; }
+.upActions { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
+.upHint { flex: 1; color: #6e7681; font-size: 10px; }
+.upCancel { padding: 5px 12px; border-radius: 6px; border: 1px solid #444c56; background: none; color: var(--text); }
+.upUpdate { padding: 5px 12px; border-radius: 6px; border: none; background: #1f6feb; color: #fff; font-weight: 600; }
+@media (prefers-color-scheme: light) {
+  .upScrim, .uoBackdrop.upBlur { background: rgba(240, 242, 245, 0.55); }
+  .upHeader, .upLines, .upFooter { border-color: #d0d4da; }
+  .upVer, .upCancel { color: #1f2328; }
+  .upNum { color: #0969da; }
+  .upCancel { border-color: #d0d4da; }
+  .upMissing { background: #fff8c5; border-color: #d4a72c; color: #59636e; }
+  .upMissingWhy { color: #9a6700; }
+  .upUpdate { background: #0969da; }
+}

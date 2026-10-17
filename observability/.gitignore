@@ -1,0 +1,6 @@
+# Filled deployment values: the real scrape config is gitignored.
+.env
+vmetrics/scrape.yml
+node_modules/
+dist/
+release/

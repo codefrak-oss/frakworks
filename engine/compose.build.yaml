@@ -1,0 +1,33 @@
+# The local build of the engine and Smith images, the default path
+# (engine/README.md, "Images"; scripts/local-up.sh uses it when
+# FRAKWORKS_REGISTRY is unset): on top of the stack, it builds the registry-less
+# frakworks-engine:main from engine/ and frakworks-smith:main from engine/smith,
+# and points Smith runs at the latter.
+#
+#   docker compose -f compose.yaml -f engine/compose.build.yaml build engine smith
+#   docker compose -f compose.yaml -f engine/compose.build.yaml up -d engine
+#
+# or set COMPOSE_FILE=compose.yaml:engine/compose.build.yaml in .env and use
+# plain `docker compose`. `docker compose build engine` needs this file: the
+# default engine service has no `build:`. Paths here resolve against the first
+# -f file's directory (the repo root), hence `context: engine`, and `root: .`:
+# the build's tests read root files (engine/README.md, "Configuration"). The
+# engine's tests alone, with no stack, from the repo root:
+# `docker build --build-context root=. --target build engine/`.
+services:
+  engine:
+    build:
+      context: engine
+      additional_contexts:
+        root: .
+    image: frakworks-engine:main
+    environment:
+      ENGINE_SMITH_IMAGE: frakworks-smith:main
+  # compose.local.yaml's smith tool service, with its build contexts named from
+  # the repo root: the framework docs and the desktop's package files (smith/Dockerfile).
+  smith:
+    build:
+      context: engine/smith
+      additional_contexts:
+        framework: bots
+        desktop: observability/desktop

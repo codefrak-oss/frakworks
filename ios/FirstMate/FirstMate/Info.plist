@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDisplayName</key>
+	<string>First mate</string>
+	<key>NSCameraUsageDescription</key>
+	<string>The camera scans the pairing QR from the engine's Pair a phone page.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>In voice mode the microphone hears what you say to the first mate.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>In voice mode your speech is turned into a chat message on this phone.</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.codefrak.firstmate</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>frakworks</string>
+			</array>
+		</dict>
+	</array>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
+	<key>UILaunchScreen</key>
+	<dict/>
+</dict>
+</plist>

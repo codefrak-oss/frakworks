@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=812, height=720">
+<title>AI accounts</title>
+<style>
+  html, body { margin: 0; width: 812px; height: 720px; overflow: hidden; background: #0b0d12; color: #e6e8ee;
+    font: 20px/1.3 system-ui, -apple-system, "Segoe UI", sans-serif; cursor: none; user-select: none; }
+  body.cursor { cursor: auto; }
+  header { display: flex; justify-content: space-between; align-items: baseline; padding: 20px 28px 8px; }
+  h1 { margin: 0; font-size: 28px; font-weight: 600; }
+  #at { color: #8a90a0; font-size: 16px; }
+  #rows { padding: 4px 28px; display: flex; flex-direction: column; gap: 10px; }
+  .row { background: #151923; border-radius: 12px; padding: 8px 16px; }
+  .top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+  .name { font-weight: 600; } .provider { color: #8a90a0; font-size: 16px; margin-left: 10px; }
+  .badge { font-size: 15px; padding: 3px 12px; border-radius: 999px; font-weight: 600; }
+  .badge.enabled { background: #173d2a; color: #6fe3a1; } .badge.disabled { background: #2a2e38; color: #9aa0ad; }
+  .badge.blocked { background: #4a1c1f; color: #ff8a8a; }
+  .fablelimit { margin-top: 4px; font-size: 15px; font-weight: 600; color: #ff8a8a; background: #4a1c1f; border-radius: 6px; padding: 1px 10px; display: inline-block; }
+  .meter { display: grid; grid-template-columns: 56px 1fr 150px; align-items: center; gap: 12px; font-size: 16px; margin-top: 2px; }
+  .bar { height: 12px; background: #262b36; border-radius: 7px; overflow: hidden; }
+  .fill { height: 100%; background: #5b8def; } .fill.hot { background: #f0a24a; } .fill.full { background: #ef5b5b; }
+  /* A disabled account keeps its bars, drawn gray. */
+  .row.disabled .fill, .row.disabled .fill.hot, .row.disabled .fill.full { background: #5c6170; }
+  .row.disabled .name { color: #9aa0ad; } .row.disabled .val, .row.disabled .meter { color: #7a8090; }
+  .val { color: #b8bdc9; text-align: right; white-space: nowrap; }
+  #error { color: #ff8a8a; padding: 0 28px; font-size: 16px; }
+</style>
+</head>
+<body>
+<header><h1>AI accounts</h1><span id="at"></span></header>
+<div id="error"></div>
+<div id="rows"></div>
+<script>
+  if (new URLSearchParams(location.search).get('cursor') === '1') document.body.classList.add('cursor');
+  // Relative, so the tile works loaded directly from the engine or behind a relay.
+  const STATE = location.pathname.endsWith('/') ? 'state' : 'ai-accounts/state';
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
+  // Matches the desktop's Countdown/Meter (observability/desktop/src/renderer/accounts.jsx): a reset
+  // more than STALE_RESET_MS in the past describes a window that has already rolled over, so the
+  // reading is unknown rather than a lingering "reset".
+  const STALE_RESET_MS = 5 * 60 * 1000;
+  function stale(reset) {
+    const t = new Date(reset).getTime();
+    return Number.isFinite(t) && Date.now() - t > STALE_RESET_MS;
+  }
+  function until(reset) {
+    if (!reset) return '';
+    const ms = new Date(reset) - Date.now();
+    if (ms <= 0) return ' · reset';
+    const h = Math.floor(ms / 3600000), m = Math.floor(ms % 3600000 / 60000);
+    return h >= 24 ? ` · ${Math.floor(h / 24)}d ${h % 24}h` : ` · ${h}h ${m}m`;
+  }
+  function meter(label, w) {
+    const u = w && w.utilization;
+    if (u == null) return `<div class="meter"><span>${label}</span><div class="bar"></div><span class="val">no reading</span></div>`;
+    if (stale(w.reset)) return `<div class="meter"><span>${label}</span><div class="bar"></div><span class="val">no reading · awaiting new reading</span></div>`;
+    const pct = Math.max(0, Math.min(100, Math.round(u * 100)));
+    const cls = pct >= 100 ? 'full' : pct >= 80 ? 'hot' : '';
+    return `<div class="meter"><span>${label}</span><div class="bar"><div class="fill ${cls}" style="width:${pct}%"></div></div>` +
+      `<span class="val">${pct}%${until(w.reset)}</span></div>`;
+  }
+  // The engine's commit from the first state; a later one that differs is a new engine, so reload for its page.
+  let commit;
+  async function load() {
+    try {
+      const r = await fetch(STATE, {cache: 'no-store'});
+      if (!r.ok) throw new Error('engine answered ' + r.status);
+      const t = await r.json();
+      if (commit === undefined) commit = t.commit;
+      else if (t.commit !== commit) { location.reload(); return; }
+      document.getElementById('rows').innerHTML = t.accounts.length ? t.accounts.map(a =>
+        `<div class="row ${esc(a.state)}"><div class="top"><span><span class="name">${esc(a.name)}</span><span class="provider">${esc(a.provider)}</span></span>` +
+        `<span class="badge ${esc(a.state)}">${esc(a.state)}</span></div>${meter('5h', a.fiveHour)}${meter('7d', a.sevenDay)}${meter('Fable', a.fable)}` +
+        (a.fableLimit && a.fableLimit.reached ? `<div class="fablelimit">Fable limit reached${until(a.fableLimit.reset)}</div>` : '') + `</div>`).join('')
+        : '<div class="row">No AI accounts.</div>';
+      document.getElementById('at').textContent = new Date(t.at).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+      document.getElementById('error').textContent = '';
+    } catch (e) {
+      document.getElementById('error').textContent = String(e.message || e);
+    }
+  }
+  load();
+  setInterval(load, 30000);
+</script>
+</body>
+</html>

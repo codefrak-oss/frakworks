@@ -1,0 +1,4 @@
+# Puts the shared flow-test fakes back to a fresh state before each test class (ProcessFakes.Fresh).
+org.springframework.test.context.TestExecutionListener=com.codefrak.engine.ProcessFakes.Fresh
+# Every test context's engine has a HITLP server to file its ask waits on (SharedHitlpStub, #2462).
+org.springframework.context.ApplicationContextInitializer=com.codefrak.engine.hitlp.SharedHitlpStub

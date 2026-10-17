@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- callable-smith (engine/README.md, "Custom jobs and the SDK"): runs one Smith in mode job on the prompt a
+     caller gives as `prompt`, in `repo`, and sets `result`, the run's result JSON, before it ends. A plugin's own
+     diagram calls it; `jobId` is taken from the caller when given, else the instance's id. The SDK's
+     CallableSmith object names the process key and the variables. -->
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:operaton="http://operaton.org/schema/1.0/bpmn" id="Definitions_callable_smith" targetNamespace="http://codefrak.com/engine">
+  <bpmn:process id="callable-smith" name="callable smith" isExecutable="true" operaton:historyTimeToLive="30">
+    <bpmn:documentation>in: prompt, repo (jobId optional; model, effort, dryRun, account as any smith run); out: result, the run's result JSON ({outcome: done|failed, summary}), and outcome</bpmn:documentation>
+    <bpmn:startEvent id="start-callable-smith">
+      <bpmn:outgoing>flow-callable-start</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:serviceTask id="task-prepare-job" name="prepare the job" operaton:delegateExpression="${prepareCallableSmith}">
+      <bpmn:documentation>PrepareCallableSmithDelegate: jobId from the caller or this instance's id; mode job; refuses a missing prompt or repo</bpmn:documentation>
+      <bpmn:incoming>flow-callable-start</bpmn:incoming>
+      <bpmn:outgoing>flow-callable-run</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:callActivity id="call-run-prompt" name="run the prompt&#10;(smith run)" calledElement="reusable-smith-run">
+      <bpmn:documentation>reusable-smith-run in mode job: a smith-job-&lt;jobId&gt; sandbox on a job/&lt;jobId&gt; branch, given the prompt verbatim in its brief; no issue, so nothing is written to GitHub</bpmn:documentation>
+      <bpmn:extensionElements>
+        <operaton:in variables="all" />
+        <operaton:in sourceExpression="${'job'}" target="mode" />
+        <operaton:out source="output" target="output" />
+        <operaton:out source="outcome" target="outcome" />
+        <operaton:out source="exitCode" target="exitCode" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>flow-callable-run</bpmn:incoming>
+      <bpmn:outgoing>flow-callable-result</bpmn:outgoing>
+    </bpmn:callActivity>
+    <bpmn:serviceTask id="task-set-result" name="set the result" operaton:delegateExpression="${setCallableResult}">
+      <bpmn:documentation>SetCallableResultDelegate: result = the run's result.json as text (CallableSmith.RESULT)</bpmn:documentation>
+      <bpmn:incoming>flow-callable-result</bpmn:incoming>
+      <bpmn:outgoing>flow-callable-end</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="end-callable-smith">
+      <bpmn:incoming>flow-callable-end</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="flow-callable-start" sourceRef="start-callable-smith" targetRef="task-prepare-job" />
+    <bpmn:sequenceFlow id="flow-callable-run" sourceRef="task-prepare-job" targetRef="call-run-prompt" />
+    <bpmn:sequenceFlow id="flow-callable-result" sourceRef="call-run-prompt" targetRef="task-set-result" />
+    <bpmn:sequenceFlow id="flow-callable-end" sourceRef="task-set-result" targetRef="end-callable-smith" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_callable_smith">
+    <bpmndi:BPMNPlane id="BPMNPlane_callable_smith" bpmnElement="callable-smith">
+      <bpmndi:BPMNShape id="start-callable-smith-di" bpmnElement="start-callable-smith">
+        <dc:Bounds x="152" y="102" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-prepare-job-di" bpmnElement="task-prepare-job">
+        <dc:Bounds x="250" y="80" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="call-run-prompt-di" bpmnElement="call-run-prompt">
+        <dc:Bounds x="410" y="80" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-set-result-di" bpmnElement="task-set-result">
+        <dc:Bounds x="570" y="80" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="end-callable-smith-di" bpmnElement="end-callable-smith">
+        <dc:Bounds x="732" y="102" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="flow-callable-start-di" bpmnElement="flow-callable-start">
+        <di:waypoint x="188" y="120" />
+        <di:waypoint x="250" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-callable-run-di" bpmnElement="flow-callable-run">
+        <di:waypoint x="350" y="120" />
+        <di:waypoint x="410" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-callable-result-di" bpmnElement="flow-callable-result">
+        <di:waypoint x="510" y="120" />
+        <di:waypoint x="570" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-callable-end-di" bpmnElement="flow-callable-end">
+        <di:waypoint x="670" y="120" />
+        <di:waypoint x="732" y="120" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

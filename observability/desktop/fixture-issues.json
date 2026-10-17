@@ -1,0 +1,454 @@
+{
+    "issues": [
+        {
+            "repo": "codefrak-oss/frakworks",
+            "number": 64,
+            "points": 3,
+            "title": "Chore: coding",
+            "author": "lundmatt1",
+            "labels": [
+                "chore",
+                "authorized"
+            ],
+            "url": "https://github.com/codefrak-oss/frakworks/issues/64",
+            "createdAt": "2026-09-25T11:00:30Z",
+            "updatedAt": "2026-09-25T11:20:00Z",
+            "kind": "chore",
+            "authorized": true,
+            "flow": {
+                "flow": "chore",
+                "outcome": "started",
+                "detail": null,
+                "instance": "c4a1c4a1-b8d9-11f1-b24f-ca55748747ba",
+                "startedAt": "2026-09-25T11:01:00Z",
+                "endedAt": null,
+                "ended": false,
+                "step": "poll smith",
+                "stage": "call-do-work",
+                "prUrl": null,
+                "ticketUrl": null,
+                "incident": null,
+                "stageStartedAt": "2026-09-25T11:02:00Z",
+                "stageEstimateMs": 1800000,
+                "stageRound": 1
+            },
+            "pendingQuestion": null,
+            "blockedBy": [],
+            "deferred": false,
+            "children": [],
+            "parent": null
+        },
+        {
+            "repo": "codefrak-oss/frakworks",
+            "number": 65,
+            "title": "Chore: merged, flow ended, issue still open",
+            "author": "lundmatt1",
+            "labels": [
+                "chore",
+                "authorized"
+            ],
+            "url": "https://github.com/codefrak-oss/frakworks/issues/65",
+            "createdAt": "2026-09-25T11:00:30Z",
+            "updatedAt": "2026-09-25T11:10:00Z",
+            "kind": "chore",
+            "authorized": true,
+            "flow": {
+                "flow": "chore",
+                "outcome": "started",
+                "detail": null,
+                "instance": "e4d0e4d0-b8d9-11f1-b24f-ca55748747ba",
+                "startedAt": "2026-09-25T09:00:00Z",
+                "endedAt": "2026-09-25T10:00:00Z",
+                "ended": true,
+                "step": null,
+                "stage": null,
+                "prUrl": "https://github.com/codefrak-oss/frakworks/pull/66",
+                "ticketUrl": null,
+                "incident": null,
+                "stageStartedAt": null,
+                "stageEstimateMs": null,
+                "stageRound": null
+            },
+            "pendingQuestion": null,
+            "blockedBy": [],
+            "deferred": false,
+            "children": [],
+            "parent": null
+        },
+        {
+            "repo": "codefrak-oss/frakworks",
+            "number": 60,
+            "title": "Engine: a wide feature, split into parts",
+            "author": "lundmatt1",
+            "labels": [
+                "feature",
+                "feature:auto",
+                "authorized"
+            ],
+            "url": "https://github.com/codefrak-oss/frakworks/issues/60",
+            "createdAt": "2026-09-25T09:00:00Z",
+            "updatedAt": "2026-09-25T11:00:00Z",
+            "kind": "feature",
+            "authorized": true,
+            "flow": {
+                "flow": "feature",
+                "outcome": "started",
+                "detail": "waiting on #62",
+                "instance": "c0ffee00-b8d9-11f1-b24f-ca55748747ba",
+                "startedAt": "2026-09-25T09:01:00Z",
+                "endedAt": null,
+                "ended": false,
+                "step": "waiting on #62",
+                "stage": "event-child-closed",
+                "prUrl": "https://github.com/codefrak-oss/frakworks/pull/70",
+                "ticketUrl": null,
+                "stageStartedAt": "2026-09-25T10:30:00Z",
+                "stageEstimateMs": null,
+                "stageRound": 1
+            },
+            "pendingQuestion": null,
+            "blockedBy": [
+                {
+                    "number": 61,
+                    "state": "closed"
+                },
+                {
+                    "number": 62,
+                    "state": "open"
+                }
+            ],
+            "deferred": true,
+            "children": [
+                {
+                    "index": 0,
+                    "title": "Part one: the results",
+                    "kind": "chore",
+                    "state": "merged",
+                    "number": 61,
+                    "url": "https://github.com/codefrak-oss/frakworks/issues/61",
+                    "prNumber": 70
+                },
+                {
+                    "index": 1,
+                    "title": "Part two: the flow",
+                    "kind": "feature",
+                    "state": "open",
+                    "number": 62,
+                    "url": "https://github.com/codefrak-oss/frakworks/issues/62",
+                    "prNumber": null
+                },
+                {
+                    "index": 2,
+                    "title": "Part three: the desktop",
+                    "kind": "chore",
+                    "state": "pending",
+                    "number": null,
+                    "url": null,
+                    "prNumber": null
+                }
+            ],
+            "parent": null,
+            "intake": {
+                "id": "b3261118-ba12-11f1-8612-3af9552b2820",
+                "number": 59,
+                "url": "https://github.com/codefrak-oss/frakworks/issues/59"
+            }
+        },
+        {
+            "repo": "codefrak-oss/frakworks",
+            "number": 62,
+            "title": "Part two: the flow",
+            "author": "lundmatt1-smith",
+            "labels": [
+                "feature",
+                "feature:auto"
+            ],
+            "url": "https://github.com/codefrak-oss/frakworks/issues/62",
+            "createdAt": "2026-09-25T10:30:00Z",
+            "updatedAt": "2026-09-25T10:59:00Z",
+            "kind": "feature",
+            "authorized": false,
+            "flow": {
+                "flow": "feature",
+                "outcome": "started",
+                "detail": "authorized by @lundmatt1 via parent #60",
+                "instance": "d0d0d0d0-b8d9-11f1-b24f-ca55748747ba",
+                "startedAt": "2026-09-25T10:31:00Z",
+                "endedAt": null,
+                "ended": false,
+                "step": "poll smith",
+                "stage": "call-do-work",
+                "prUrl": null,
+                "ticketUrl": null,
+                "stageStartedAt": "2026-09-25T10:32:00Z",
+                "stageEstimateMs": 1800000,
+                "stageRound": 1
+            },
+            "pendingQuestion": null,
+            "blockedBy": [],
+            "deferred": false,
+            "children": [],
+            "parent": {
+                "number": 60,
+                "url": "https://github.com/codefrak-oss/frakworks/issues/60"
+            }
+        },
+        {
+            "repo": "codefrak-oss/frakworks",
+            "number": 28,
+            "title": "Intake: Tier: 4 (opus low) — prescribed by the user; do not re-judge",
+            "author": "lundmatt1-smith",
+            "labels": [
+                "intake"
+            ],
+            "url": "https://github.com/codefrak-oss/frakworks/issues/28",
+            "createdAt": "2026-09-24T13:20:33Z",
+            "updatedAt": "2026-09-24T13:21:45Z",
+            "kind": "intake",
+            "authorized": false,
+            "flow": null,
+            "pendingQuestion": {
+                "id": 1,
+                "intake": "b89b453e-b81a-11f1-8e2f-de53398f0b08",
+                "repo": "codefrak-oss/frakworks",
+                "issue": 28,
+                "question": "The ask says to \"find and remove anything in the repo's MD files or claude.md files that reference the VMs or even Tailscale,\" reasoning that frakworks is starting fresh with a desktop Docker Compose stack and \"will not integrate with anything running on VMs.\" I looked for the README it names (\"What's here\" table + Deploy section assuming the collector VM) and found `observability/README.md` — but VM/Tailscale references aren't confined to that one stale doc. They're load-bearing across ~25 files, including ones describing infrastructure this repo's own CLAUDE.md still treats as live today: `bots/operator.md` (\"the fleet's runtime is the Linux VMs\"), `dispatch/README.md`, `bots/README.md` (the Oracle, \"a dedicated VM\"), `bots/webhook-wake/README.md` and `bots/secrets-mcp/README.md` (both front real endpoints with Tailscale Funnel/Serve), and `macrodata-refiner/server/README.md` / `macrodata-refiner/CLAUDE.md` (MDR itself is reached over Tailscale Funnel per this repo's own CLAUDE.md). `docs/framework-vs-deployment.md` also already treats tailnet names and VM numbers as *deployment values* to templatize, not concepts to delete — the repo's existing convention is placeholder-ize (`<collector-ip>`, `<tailnet>`), not erase.\n\nA blanket removal would delete accurate documentation of systems that are still running (the Oracle, MDR, webhook receiver, Smith-runner VMs) and contradicts the repo's own current CLAUDE.md description of the fleet. I don't want to guess which of these two the user meant and file a ticket that either guts working runbooks or misses the actual ask.\n\n```ask\nkind: choice\nquestion: How wide should the VM/Tailscale cleanup go?\noptions:\n  - id: narrow\n    label: Narrow — just observability/README.md's What's here/Deploy sections and the local-compose/framework-vs-deployment docs, to describe the desktop Compose path without erasing the (still-real) collector VM deploy notes\n  - id: broad\n    label: Broad — strip VM/Tailscale mentions everywhere, including bots/operator.md, webhook-wake, secrets-mcp and MDR docs, because those VMs are also going away, not just the observability collector\n  - id: other\n    label: Something else — I'll explain in a reply\nreply: label:answered\n```",
+                "askedAt": "2026-09-24T13:21:44.625606Z",
+                "answer": null,
+                "answeredBy": null,
+                "answeredAt": null
+            }
+        },
+        {
+            "repo": "codefrak-oss/frakworks",
+            "number": 19,
+            "title": "Test intake 2026-09-24T00:58Z-b: append safe-to-delete comment to engine/README.md",
+            "author": "lundmatt1-smith",
+            "labels": [
+                "chore"
+            ],
+            "url": "https://github.com/codefrak-oss/frakworks/issues/19",
+            "createdAt": "2026-09-24T01:00:48Z",
+            "updatedAt": "2026-09-24T01:00:49Z",
+            "kind": "chore",
+            "authorized": false,
+            "flow": null,
+            "pendingQuestion": null
+        },
+        {
+            "repo": "codefrak-oss/frakworks",
+            "number": 15,
+            "title": "Append test-intake marker line to engine/README.md",
+            "author": "lundmatt1-smith",
+            "labels": [],
+            "url": "https://github.com/codefrak-oss/frakworks/issues/15",
+            "createdAt": "2026-09-23T23:02:04Z",
+            "updatedAt": "2026-09-23T23:02:04Z",
+            "kind": null,
+            "authorized": false,
+            "flow": null,
+            "pendingQuestion": null
+        },
+        {
+            "repo": "codefrak-oss/frakworks",
+            "number": 13,
+            "title": "Append test marker line to engine/README.md",
+            "author": "lundmatt1-smith",
+            "labels": [],
+            "url": "https://github.com/codefrak-oss/frakworks/issues/13",
+            "createdAt": "2026-09-23T23:00:34Z",
+            "updatedAt": "2026-09-23T23:00:34Z",
+            "kind": null,
+            "authorized": false,
+            "flow": null,
+            "pendingQuestion": null
+        },
+        {
+            "repo": "codefrak-oss/frakworks",
+            "number": 11,
+            "title": "Intake: Tier: 1 (haiku low) — prescribed by Matt; do not re-judge",
+            "author": "lundmatt1-smith",
+            "labels": [
+                "intake"
+            ],
+            "url": "https://github.com/codefrak-oss/frakworks/issues/11",
+            "createdAt": "2026-09-23T22:51:56Z",
+            "updatedAt": "2026-09-23T22:51:56Z",
+            "kind": "intake",
+            "authorized": false,
+            "flow": null,
+            "pendingQuestion": null
+        },
+        {
+            "repo": "codefrak-oss/frakworks",
+            "number": 10,
+            "title": "engine: add GET /health returning {\"status\":\"ok\"}",
+            "author": "lundmatt1-smith",
+            "labels": [],
+            "url": "https://github.com/codefrak-oss/frakworks/issues/10",
+            "createdAt": "2026-09-23T19:45:56Z",
+            "updatedAt": "2026-09-23T19:45:56Z",
+            "kind": null,
+            "authorized": false,
+            "flow": null,
+            "pendingQuestion": null
+        },
+        {
+            "repo": "codefrak-oss/frakworks",
+            "number": 8,
+            "title": "Intake: Add a GET /health endpoint to the engine that returns {\"status\":\"ok\"} w…",
+            "author": "lundmatt1-smith",
+            "labels": [
+                "intake"
+            ],
+            "url": "https://github.com/codefrak-oss/frakworks/issues/8",
+            "createdAt": "2026-09-23T19:42:55Z",
+            "updatedAt": "2026-09-23T19:42:55Z",
+            "kind": "intake",
+            "authorized": false,
+            "flow": null,
+            "pendingQuestion": null
+        },
+        {
+            "repo": "codefrak-oss/frakworks",
+            "number": 7,
+            "title": "Intake: Add a GET /health endpoint to the engine that returns {\"status\":\"ok\"} w…",
+            "author": "lundmatt1-smith",
+            "labels": [
+                "intake"
+            ],
+            "url": "https://github.com/codefrak-oss/frakworks/issues/7",
+            "createdAt": "2026-09-23T19:13:45Z",
+            "updatedAt": "2026-09-23T19:14:23Z",
+            "kind": "intake",
+            "authorized": false,
+            "flow": null,
+            "pendingQuestion": null
+        },
+        {
+            "repo": "codefrak-oss/frakworks",
+            "number": 6,
+            "title": "Intake: Engine intake live test (dry run): please ignore and close this issue",
+            "author": "lundmatt1-smith",
+            "labels": [
+                "intake"
+            ],
+            "url": "https://github.com/codefrak-oss/frakworks/issues/6",
+            "createdAt": "2026-09-23T19:07:49Z",
+            "updatedAt": "2026-09-23T19:07:49Z",
+            "kind": "intake",
+            "authorized": false,
+            "flow": null,
+            "pendingQuestion": null
+        },
+        {
+            "repo": "codefrak-oss/frakworks",
+            "number": 5,
+            "title": "Intake: Engine intake live test: please ignore and close this issue",
+            "author": "lundmatt1-smith",
+            "labels": [
+                "intake"
+            ],
+            "url": "https://github.com/codefrak-oss/frakworks/issues/5",
+            "createdAt": "2026-09-23T19:00:57Z",
+            "updatedAt": "2026-09-23T19:00:57Z",
+            "kind": "intake",
+            "authorized": false,
+            "flow": null,
+            "pendingQuestion": null
+        },
+        {
+            "repo": "codefrak-oss/frakworks",
+            "number": 3,
+            "title": "Smith sandbox smoke test: document run-smith's environment in engine/smith/README.md",
+            "author": "lundmatt1",
+            "labels": [],
+            "url": "https://github.com/codefrak-oss/frakworks/issues/3",
+            "createdAt": "2026-09-23T15:58:27Z",
+            "updatedAt": "2026-09-23T17:09:41Z",
+            "kind": null,
+            "authorized": false,
+            "flow": null,
+            "pendingQuestion": null
+        },
+        {
+            "repo": "codefrak-oss/frakworks",
+            "number": 90,
+            "title": "Intake: a progress bar for intakes",
+            "author": "lundmatt1",
+            "labels": [
+                "intake"
+            ],
+            "url": "https://github.com/codefrak-oss/frakworks/issues/90",
+            "createdAt": "2026-09-25T10:50:00Z",
+            "updatedAt": "2026-09-25T10:58:00Z",
+            "kind": "intake",
+            "authorized": false,
+            "flow": {
+                "flow": "intake",
+                "detail": null,
+                "startedAt": "2026-09-25T10:50:00Z",
+                "endedAt": null,
+                "ended": false,
+                "step": "poll smith",
+                "prUrl": null,
+                "ticketUrl": null,
+                "incident": null,
+                "stageRound": 1,
+                "stageEstimateBasis": "default",
+                "stageEstimateRuns": 0,
+                "outcome": null,
+                "instance": "e1e1e1e1-b8d9-11f1-b24f-ca55748747ba",
+                "stage": "call-refine-ask",
+                "stageStartedAt": "2026-09-25T10:55:00Z",
+                "stageEstimateMs": 600000
+            },
+            "pendingQuestion": null,
+            "blockedBy": [],
+            "deferred": false,
+            "children": [],
+            "parent": null,
+            "intake": null
+        },
+        {
+            "repo": "codefrak-oss/frakworks",
+            "number": 91,
+            "title": "Proposal: a timeline of the fleet",
+            "author": "lundmatt1",
+            "labels": [
+                "proposal"
+            ],
+            "url": "https://github.com/codefrak-oss/frakworks/issues/91",
+            "createdAt": "2026-09-25T10:50:00Z",
+            "updatedAt": "2026-09-25T10:58:00Z",
+            "kind": "proposal",
+            "authorized": true,
+            "flow": {
+                "flow": "proposal",
+                "detail": null,
+                "startedAt": "2026-09-25T10:50:00Z",
+                "endedAt": null,
+                "ended": false,
+                "step": "poll smith",
+                "prUrl": null,
+                "ticketUrl": null,
+                "incident": null,
+                "stageRound": 1,
+                "stageEstimateBasis": "default",
+                "stageEstimateRuns": 0,
+                "outcome": "started",
+                "instance": "f2f2f2f2-b8d9-11f1-b24f-ca55748747ba",
+                "stage": "call-draft",
+                "stageStartedAt": "2026-09-25T10:52:00Z",
+                "stageEstimateMs": 600000
+            },
+            "pendingQuestion": null,
+            "blockedBy": [],
+            "deferred": false,
+            "children": [],
+            "parent": null,
+            "intake": null
+        }
+    ],
+    "failures": []
+}

@@ -1,0 +1,31 @@
+{
+  "_comment": "The engine's not-yet-shipped GET /ticket/{owner}/{repo}/{n}/timeline (#91), built ahead of it for the Timeline widget (src/renderer/timeline.jsx, #101). One full round (coding/security/correctness, all terminal) plus a second coding round after 'changes requested' (a rework card, not a replacement; `catchUp` is true only for a security/correctness step in a round opened by merging main into the branch), one wait of each cause (`ci` the engine check's wait, between the coding card and the security card it fell between, its payload's `check` and `conclusion` null when the flow recorded none), and totals consistent with the steps/waits below. `_blockedIntake` is another response's `ticket`: an intake whose refiner said `insufficient-permissions` carries `blocked` (#443), and every other ticket has no `blocked` key. Reconcile this shape against the real endpoint once #91 merges.",
+  "_blockedIntake": {
+    "ticket": { "number": 441, "title": "CI: build and publish signed releases", "state": "OPEN", "round": 1, "kind": "intake", "tier": 5,
+      "blocked": { "kind": "insufficient-permissions", "summary": "Needs a mac code-signing secret and hosts outside the fleet's scope (a build VM and a container)", "reason": "The CI signed-release feature needs a mac code-signing secret the fleet does not hold, and build hosts outside the fleet's scope: a build-runner VM and a container on the hypervisor. A human must grant the secret and the hosts before a Smith can build it." } }
+  },
+  "ticket": { "number": 101, "title": "Ticket detail: replace Lifecycle/Cost/Runs with one Timeline widget", "state": "OPEN", "round": 2, "kind": "feature", "tier": 5 },
+  "steps": [
+    { "role": "coding", "round": 1, "start": 1789900000, "end": 1789903600, "durationMs": 3600000, "model": "sonnet", "effort": "medium", "cost": 1.23, "turns": 42, "outcome": "done", "running": false, "catchUp": false, "account": "acct-1", "tokens": null },
+    { "role": "security", "round": 1, "start": 1789904200, "end": 1789904800, "durationMs": 600000, "model": "sonnet", "effort": "low", "cost": 0.31, "turns": 9, "outcome": "passed", "running": false, "catchUp": false, "account": "acct-1", "tokens": null },
+    { "role": "correctness", "round": 1, "start": 1789905100, "end": 1789906300, "durationMs": 1200000, "model": "sonnet", "effort": "medium", "cost": 0.62, "turns": 15, "outcome": "changes requested", "running": false, "catchUp": false, "account": "acct-1", "tokens": null },
+    { "role": "coding", "round": 2, "start": 1789908100, "end": null, "durationMs": 900000, "model": "sonnet", "effort": "medium", "cost": null, "turns": 12, "outcome": "in progress", "running": true, "catchUp": false, "account": "acct-1", "tokens": { "input": 41200, "output": 9300, "cacheRead": 1200000, "cacheWrite": 88000 } }
+  ],
+  "waits": [
+    { "start": 1789903600, "end": 1789904000, "durationMs": 400000, "cause": "ci", "payload": { "steps": [{ "name": "receive-ci-check", "start": 1789903600, "end": 1789904000 }], "conclusion": "success", "check": "engine" } },
+    { "start": 1789904000, "end": 1789904200, "durationMs": 200000, "cause": "person-authorization", "payload": { "steps": [{ "name": "await-authorization", "start": 1789904000, "end": 1789904200 }] } },
+    { "start": 1789904800, "end": 1789905100, "durationMs": 300000, "cause": "engine", "payload": { "steps": [{ "name": "route-to-correctness", "start": 1789904800, "end": 1789905100 }] } },
+    { "start": 1789906300, "end": 1789907000, "durationMs": 700000, "cause": "person-question", "payload": { "question": "Rename .tlBar to avoid the dashboard collision?", "answer": "Yes, use .tlSplitBar instead." } },
+    { "start": 1789907000, "end": 1789908100, "durationMs": 1100000, "cause": "stuck", "payload": { "incident": "task-start-smith: sandbox port already bound", "retrier": "example-smith", "steps": [{ "name": "retry-start", "start": 1789907400, "end": 1789908100 }] } }
+  ],
+  "totals": {
+    "elapsedMs": 9000000,
+    "workingMs": 6300000,
+    "waitingMs": 2700000,
+    "costUsd": 2.60,
+    "waitingPersonMs": 900000,
+    "stuckMs": 1100000,
+    "ciMs": 400000,
+    "engineMs": 300000
+  }
+}

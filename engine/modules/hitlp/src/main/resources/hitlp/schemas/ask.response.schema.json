@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/codefrak-oss/hitlp/spec/schemas/ask.response.schema.json",
+  "title": "HITLP human.ask result (decision record)",
+  "allOf": [{ "$ref": "decision-record.schema.json" }],
+  "properties": {
+    "primitive": { "const": "ask" },
+    "outcome": { "enum": ["answered", "timed_out", "cancelled"] }
+  }
+}

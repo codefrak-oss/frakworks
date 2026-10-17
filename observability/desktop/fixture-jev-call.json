@@ -1,0 +1,100 @@
+{
+ "id": "9a8b7c6d-1111-4222-8333-444455556666",
+ "called_at": "2026-09-26T07:59:30Z",
+ "use_case": "refine-pick",
+ "process_instance": "a0",
+ "repo": "codefrak-oss/frakworks",
+ "issue": 553,
+ "model": "jev-1",
+ "latency_ms": 1200,
+ "threshold": 0.6,
+ "action": "filed: kind feature (0.91), mode direct (0.88), tier 7 (0.55<floor)",
+ "outcome": "started as feature direct tier 6; jev: differs (picked feature direct tier 7), relabelled from feature direct tier 7",
+ "pick": "feature \u00b7 direct \u00b7 tier 7",
+ "confidence": 0.55,
+ "no_answer": false,
+ "outcome_at": "2026-09-26T08:03:00Z",
+ "state": {
+  "ask": "Jev decisions dashboard in the desktop app",
+  "repo": "codefrak-oss/frakworks"
+ },
+ "questions": {
+  "kind": {
+   "type": "choice",
+   "instructions": "What kind of work is this?",
+   "criteria": {
+    "feature": "new behaviour",
+    "chore": "upkeep"
+   }
+  },
+  "featureMode": {
+   "type": "choice",
+   "instructions": "How should it be built?",
+   "criteria": {
+    "direct": null,
+    "proposal": null
+   }
+  },
+  "tier": {
+   "type": "score",
+   "instructions": "Which tier?",
+   "criteria": [
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "10"
+   ]
+  }
+ },
+ "request": {
+  "model": "jev-1",
+  "prompt_version": "refine-pick-v3",
+  "temperature": 0,
+  "stream": false
+ },
+ "response": {
+  "answers": {},
+  "usage_tokens": 812,
+  "cached": null
+ },
+ "error": null,
+ "picks": [
+  {
+   "question": "kind",
+   "type": "choice",
+   "pick": "feature",
+   "confidence": 0.91,
+   "probabilities": {
+    "feature": 0.91,
+    "chore": 0.09
+   }
+  },
+  {
+   "question": "featureMode",
+   "type": "choice",
+   "pick": "direct",
+   "confidence": 0.88,
+   "probabilities": {
+    "direct": 0.88,
+    "proposal": 0.12
+   }
+  },
+  {
+   "question": "tier",
+   "type": "score",
+   "pick": "tier 7",
+   "confidence": 0.55,
+   "probabilities": {
+    "4": 0.15,
+    "5": 0.3,
+    "6": 0.55
+   }
+  }
+ ]
+}

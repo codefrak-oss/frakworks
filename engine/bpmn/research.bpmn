@@ -1,0 +1,308 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:camunda="http://camunda.org/schema/1.0/bpmn" xmlns:modeler="http://camunda.org/schema/modeler/1.0" id="Definitions_research" targetNamespace="http://codefrak.com/agent-army/bpmn" exporter="Camunda Modeler" exporterVersion="5.51.1" modeler:executionPlatform="Camunda Platform" modeler:executionPlatformVersion="7.23.0">
+  <bpmn:message id="message-research-filed" name="research filed" />
+  <bpmn:process id="research" name="research" isExecutable="true" camunda:historyTimeToLive="180">
+    <bpmn:documentation>The flow for a ticket of kind research (engine/README.md, "Research"): a research Smith answers the question in the ticket with answer.md and a self-contained answer.html page, asking the user through the question path when it must; the engine keeps the pair in engine.research_answer keyed by ticket and round and serves the page through GET /ticket/{owner}/{repo}/{n}/pitch, committing nothing; then it asks the asker for the ack (accept, save, drop, or a follow-up). A follow-up is the next round: the Smith runs again with the whole thread. Started by the issue scanner or POST /chore with kind research; an intake refined as research waits for its own authorized label.</bpmn:documentation>
+    <bpmn:startEvent id="start-research-filed" name="research filed">
+      <bpmn:outgoing>flow-start-answer</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="MessageEventDefinition_research" messageRef="message-research-filed" />
+    </bpmn:startEvent>
+    <bpmn:callActivity id="call-answer" name="answer the question&#10;(smith run)" camunda:asyncBefore="true" calledElement="reusable-smith-run">
+      <bpmn:documentation>A research Smith on the ticket, at its tier: answers the question with answer.md and answer.html inline in result.json, citing what it read, changing no file and cutting no bundle; on round 2 and later the brief's research thread carries every earlier answer and the follow-ups; outcome answered or ask</bpmn:documentation>
+      <bpmn:extensionElements>
+        <camunda:in variables="all" />
+        <camunda:in sourceExpression="${&#39;research&#39;}" target="mode" />
+        <camunda:out variables="all" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>flow-start-answer</bpmn:incoming>
+      <bpmn:incoming>flow-answer-question</bpmn:incoming>
+      <bpmn:incoming>flow-ack-follow-up</bpmn:incoming>
+      <bpmn:outgoing>flow-answer-outcome</bpmn:outgoing>
+    </bpmn:callActivity>
+    <bpmn:exclusiveGateway id="gateway-answer-outcome" name="outcome?">
+      <bpmn:incoming>flow-answer-outcome</bpmn:incoming>
+      <bpmn:outgoing>flow-answer-answered</bpmn:outgoing>
+      <bpmn:outgoing>flow-answer-ask</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="task-post-question" name="post the smith&#39;s question&#10;(work item)" camunda:asyncBefore="true" camunda:delegateExpression="${postFeatureQuestion}">
+      <bpmn:documentation>PostFeatureQuestionDelegate: records the research Smith's question in engine.intake_question and comments it on the ticket</bpmn:documentation>
+      <bpmn:incoming>flow-answer-ask</bpmn:incoming>
+      <bpmn:outgoing>flow-question-answer</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:userTask id="user-task-answer-question" name="answer the smith&#39;s question">
+      <bpmn:documentation>Waits for POST /intake/{id}/answer from someone with research access; the answers join the brief of the next run</bpmn:documentation>
+      <bpmn:incoming>flow-question-answer</bpmn:incoming>
+      <bpmn:outgoing>flow-answer-question</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:serviceTask id="task-keep-answer" name="keep the answer&#10;(engine)" camunda:asyncBefore="true" camunda:delegateExpression="${keepAnswer}">
+      <bpmn:documentation>KeepAnswerDelegate: the next round number; upserts answer.md and answer.html into engine.research_answer for the ticket and round, appends the round to the researchThread variable the next brief carries, and comments the summary with the round on the ticket; nothing is pushed</bpmn:documentation>
+      <bpmn:incoming>flow-answer-answered</bpmn:incoming>
+      <bpmn:outgoing>flow-keep-ack</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="task-post-ack" name="ask for the ack&#10;(work item)" camunda:asyncBefore="true" camunda:delegateExpression="${postAck}">
+      <bpmn:documentation>PostAckDelegate: records the ack question with its verbs in engine.intake_question (a decision in GET /needs) and comments it on the ticket with the summary and the round; after a refused save path it says why first</bpmn:documentation>
+      <bpmn:incoming>flow-keep-ack</bpmn:incoming>
+      <bpmn:incoming>flow-saved-refused</bpmn:incoming>
+      <bpmn:outgoing>flow-post-ack-answer</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:userTask id="user-task-answer-decision" name="ack the answer">
+      <bpmn:documentation>Waits for POST /intake/{id}/answer from someone with research access: accept, save, drop, or anything else as a follow-up question</bpmn:documentation>
+      <bpmn:incoming>flow-post-ack-answer</bpmn:incoming>
+      <bpmn:outgoing>flow-answer-read</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:serviceTask id="task-read-ack" name="read the ack" camunda:asyncBefore="true" camunda:delegateExpression="${readAck}">
+      <bpmn:documentation>ReadAckDelegate: the last answer read by Jev (use case research-decision) and AckVerb into decision (accept, save, drop or follow-up), decisionWhy and decidedBy; a pick below the floor, no Jev answer or an unreadable answer is a follow-up, never a re-ask</bpmn:documentation>
+      <bpmn:incoming>flow-answer-read</bpmn:incoming>
+      <bpmn:outgoing>flow-read-ack</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="gateway-ack" name="verb?" default="flow-ack-follow-up">
+      <bpmn:incoming>flow-read-ack</bpmn:incoming>
+      <bpmn:outgoing>flow-ack-accept</bpmn:outgoing>
+      <bpmn:outgoing>flow-ack-save</bpmn:outgoing>
+      <bpmn:outgoing>flow-ack-drop</bpmn:outgoing>
+      <bpmn:outgoing>flow-ack-follow-up</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="task-save-answer" name="save to the repo&#10;(git)" camunda:asyncBefore="true" camunda:delegateExpression="${saveAnswer}">
+      <bpmn:documentation>SaveAnswerDelegate: one commit by the engine's identity on the default branch adding &lt;dir&gt;/&lt;yyyy-mm-dd&gt;-&lt;slug&gt;.md and .html (dir from the answer, default bots/research/; must be under bots/research/ or docs/), commented on the ticket; a path outside them is refused with a comment and saved is false</bpmn:documentation>
+      <bpmn:incoming>flow-ack-save</bpmn:incoming>
+      <bpmn:outgoing>flow-save-outcome</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="gateway-saved" name="saved?">
+      <bpmn:incoming>flow-save-outcome</bpmn:incoming>
+      <bpmn:outgoing>flow-saved-close</bpmn:outgoing>
+      <bpmn:outgoing>flow-saved-refused</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="task-close-accepted" name="close completed&#10;(work item)" camunda:asyncBefore="true" camunda:delegateExpression="${closeResearch}">
+      <bpmn:documentation>CloseResearchDelegate: comments the decision (and the commit, after a save) on the ticket and closes it as completed</bpmn:documentation>
+      <bpmn:incoming>flow-ack-accept</bpmn:incoming>
+      <bpmn:incoming>flow-saved-close</bpmn:incoming>
+      <bpmn:outgoing>flow-accepted-end</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="task-close-dropped" name="close not planned&#10;(work item)" camunda:asyncBefore="true" camunda:delegateExpression="${closeResearch}">
+      <bpmn:documentation>CloseResearchDelegate: comments the decision on the ticket and closes it as not planned</bpmn:documentation>
+      <bpmn:incoming>flow-ack-drop</bpmn:incoming>
+      <bpmn:outgoing>flow-dropped-end</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="end-research-decided" name="research decided">
+      <bpmn:incoming>flow-accepted-end</bpmn:incoming>
+      <bpmn:incoming>flow-dropped-end</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="flow-start-answer" sourceRef="start-research-filed" targetRef="call-answer" />
+    <bpmn:sequenceFlow id="flow-answer-outcome" sourceRef="call-answer" targetRef="gateway-answer-outcome" />
+    <bpmn:sequenceFlow id="flow-answer-answered" name="answered" sourceRef="gateway-answer-outcome" targetRef="task-keep-answer">
+      <bpmn:conditionExpression xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="bpmn:tFormalExpression">${outcome == 'answered'}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow-answer-ask" name="ask" sourceRef="gateway-answer-outcome" targetRef="task-post-question">
+      <bpmn:conditionExpression xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="bpmn:tFormalExpression">${outcome == 'ask'}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow-question-answer" sourceRef="task-post-question" targetRef="user-task-answer-question" />
+    <bpmn:sequenceFlow id="flow-answer-question" sourceRef="user-task-answer-question" targetRef="call-answer" />
+    <bpmn:sequenceFlow id="flow-keep-ack" sourceRef="task-keep-answer" targetRef="task-post-ack" />
+    <bpmn:sequenceFlow id="flow-post-ack-answer" sourceRef="task-post-ack" targetRef="user-task-answer-decision" />
+    <bpmn:sequenceFlow id="flow-answer-read" sourceRef="user-task-answer-decision" targetRef="task-read-ack" />
+    <bpmn:sequenceFlow id="flow-read-ack" sourceRef="task-read-ack" targetRef="gateway-ack" />
+    <bpmn:sequenceFlow id="flow-ack-accept" name="accept" sourceRef="gateway-ack" targetRef="task-close-accepted">
+      <bpmn:conditionExpression xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="bpmn:tFormalExpression">${decision == 'accept'}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow-ack-save" name="save" sourceRef="gateway-ack" targetRef="task-save-answer">
+      <bpmn:conditionExpression xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="bpmn:tFormalExpression">${decision == 'save'}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow-ack-drop" name="drop" sourceRef="gateway-ack" targetRef="task-close-dropped">
+      <bpmn:conditionExpression xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="bpmn:tFormalExpression">${decision == 'drop'}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow-ack-follow-up" name="follow-up: next round" sourceRef="gateway-ack" targetRef="call-answer" />
+    <bpmn:sequenceFlow id="flow-save-outcome" sourceRef="task-save-answer" targetRef="gateway-saved" />
+    <bpmn:sequenceFlow id="flow-saved-close" name="saved" sourceRef="gateway-saved" targetRef="task-close-accepted">
+      <bpmn:conditionExpression xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="bpmn:tFormalExpression">${saved}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow-saved-refused" name="path refused: ask again" sourceRef="gateway-saved" targetRef="task-post-ack">
+      <bpmn:conditionExpression xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="bpmn:tFormalExpression">${!saved}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow-accepted-end" sourceRef="task-close-accepted" targetRef="end-research-decided" />
+    <bpmn:sequenceFlow id="flow-dropped-end" sourceRef="task-close-dropped" targetRef="end-research-decided" />
+    <bpmn:textAnnotation id="annotation-engine-kept">
+      <bpmn:text>the page is kept by the engine and served through the pitch endpoint, never committed unless the asker says save. engine/readme.md, "research"</bpmn:text>
+    </bpmn:textAnnotation>
+    <bpmn:association id="association-engine-kept" sourceRef="task-keep-answer" targetRef="annotation-engine-kept" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_research">
+    <bpmndi:BPMNPlane id="BPMNPlane_research" bpmnElement="research">
+      <bpmndi:BPMNShape id="start-research-filed-di" bpmnElement="start-research-filed">
+        <dc:Bounds x="162" y="262" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="146" y="305" width="68" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="call-answer-di" bpmnElement="call-answer">
+        <dc:Bounds x="250" y="240" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="gateway-answer-outcome-di" bpmnElement="gateway-answer-outcome" isMarkerVisible="true">
+        <dc:Bounds x="410" y="255" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="410" y="312" width="49" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-post-question-di" bpmnElement="task-post-question">
+        <dc:Bounds x="385" y="80" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="user-task-answer-question-di" bpmnElement="user-task-answer-question">
+        <dc:Bounds x="250" y="80" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-keep-answer-di" bpmnElement="task-keep-answer">
+        <dc:Bounds x="530" y="240" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-post-ack-di" bpmnElement="task-post-ack">
+        <dc:Bounds x="690" y="240" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="user-task-answer-decision-di" bpmnElement="user-task-answer-decision">
+        <dc:Bounds x="850" y="240" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-read-ack-di" bpmnElement="task-read-ack">
+        <dc:Bounds x="1010" y="240" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="gateway-ack-di" bpmnElement="gateway-ack" isMarkerVisible="true">
+        <dc:Bounds x="1170" y="255" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1228" y="300" width="30" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-save-answer-di" bpmnElement="task-save-answer">
+        <dc:Bounds x="1280" y="80" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="gateway-saved-di" bpmnElement="gateway-saved" isMarkerVisible="true">
+        <dc:Bounds x="1430" y="95" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1490" y="113" width="40" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-close-accepted-di" bpmnElement="task-close-accepted">
+        <dc:Bounds x="1280" y="240" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-close-dropped-di" bpmnElement="task-close-dropped">
+        <dc:Bounds x="1280" y="400" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="end-research-decided-di" bpmnElement="end-research-decided">
+        <dc:Bounds x="1442" y="262" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1418" y="236" width="84" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="annotation-engine-kept-di" bpmnElement="annotation-engine-kept">
+        <dc:Bounds x="530" y="110" width="200" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="association-engine-kept-di" bpmnElement="association-engine-kept">
+        <di:waypoint x="580" y="240" />
+        <di:waypoint x="600" y="170" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-start-answer-di" bpmnElement="flow-start-answer">
+        <di:waypoint x="198" y="280" />
+        <di:waypoint x="250" y="280" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-answer-outcome-di" bpmnElement="flow-answer-outcome">
+        <di:waypoint x="350" y="280" />
+        <di:waypoint x="410" y="280" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-answer-answered-di" bpmnElement="flow-answer-answered">
+        <di:waypoint x="460" y="280" />
+        <di:waypoint x="530" y="280" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="470" y="262" width="50" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-answer-ask-di" bpmnElement="flow-answer-ask">
+        <di:waypoint x="435" y="255" />
+        <di:waypoint x="435" y="160" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="444" y="200" width="22" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-question-answer-di" bpmnElement="flow-question-answer">
+        <di:waypoint x="385" y="120" />
+        <di:waypoint x="350" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-answer-question-di" bpmnElement="flow-answer-question">
+        <di:waypoint x="300" y="160" />
+        <di:waypoint x="300" y="240" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-keep-ack-di" bpmnElement="flow-keep-ack">
+        <di:waypoint x="630" y="280" />
+        <di:waypoint x="690" y="280" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-post-ack-answer-di" bpmnElement="flow-post-ack-answer">
+        <di:waypoint x="790" y="280" />
+        <di:waypoint x="850" y="280" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-answer-read-di" bpmnElement="flow-answer-read">
+        <di:waypoint x="950" y="280" />
+        <di:waypoint x="1010" y="280" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-read-ack-di" bpmnElement="flow-read-ack">
+        <di:waypoint x="1110" y="280" />
+        <di:waypoint x="1170" y="280" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-ack-accept-di" bpmnElement="flow-ack-accept">
+        <di:waypoint x="1220" y="280" />
+        <di:waypoint x="1280" y="280" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1230" y="262" width="36" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-ack-save-di" bpmnElement="flow-ack-save">
+        <di:waypoint x="1195" y="255" />
+        <di:waypoint x="1195" y="120" />
+        <di:waypoint x="1280" y="120" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1203" y="180" width="26" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-ack-drop-di" bpmnElement="flow-ack-drop">
+        <di:waypoint x="1195" y="305" />
+        <di:waypoint x="1195" y="440" />
+        <di:waypoint x="1280" y="440" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1203" y="400" width="26" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-ack-follow-up-di" bpmnElement="flow-ack-follow-up">
+        <di:waypoint x="1183" y="292" />
+        <di:waypoint x="1183" y="380" />
+        <di:waypoint x="300" y="380" />
+        <di:waypoint x="300" y="320" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="680" y="358" width="110" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-save-outcome-di" bpmnElement="flow-save-outcome">
+        <di:waypoint x="1380" y="120" />
+        <di:waypoint x="1430" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-saved-close-di" bpmnElement="flow-saved-close">
+        <di:waypoint x="1455" y="145" />
+        <di:waypoint x="1455" y="200" />
+        <di:waypoint x="1330" y="200" />
+        <di:waypoint x="1330" y="240" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1462" y="160" width="30" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-saved-refused-di" bpmnElement="flow-saved-refused">
+        <di:waypoint x="1455" y="95" />
+        <di:waypoint x="1455" y="40" />
+        <di:waypoint x="740" y="40" />
+        <di:waypoint x="740" y="240" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1050" y="18" width="120" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-accepted-end-di" bpmnElement="flow-accepted-end">
+        <di:waypoint x="1380" y="280" />
+        <di:waypoint x="1442" y="280" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-dropped-end-di" bpmnElement="flow-dropped-end">
+        <di:waypoint x="1380" y="440" />
+        <di:waypoint x="1460" y="440" />
+        <di:waypoint x="1460" y="298" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

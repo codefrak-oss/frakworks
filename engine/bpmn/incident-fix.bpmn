@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:camunda="http://camunda.org/schema/1.0/bpmn" xmlns:modeler="http://camunda.org/schema/modeler/1.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" id="Definitions_incident_fix" targetNamespace="http://bpmn.io/schema/bpmn" exporter="Camunda Modeler" exporterVersion="5.51.1" modeler:executionPlatform="Camunda Platform" modeler:executionPlatformVersion="7.24.0">
+  <bpmn:process id="incident-fix" name="incident fix" isExecutable="true" camunda:historyTimeToLive="30">
+    <bpmn:documentation>Fix and Propose a fix (engine/README.md): one Smith run on a ticket's open incident, started by IncidentFixController. fixMode is fix or diagnose. The ticket's repo and issue ride as fixRepo and fixIssue, so this instance is not taken for the ticket's own flow.</bpmn:documentation>
+    <bpmn:startEvent id="start-incident-fix">
+      <bpmn:outgoing>flow-start-fix</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:exclusiveGateway id="gateway-jev-retry" name="jev retry?" camunda:asyncBefore="true" default="flow-to-diagnose">
+      <bpmn:documentation>fixJevRetry: Jev read a Fix's incident as retry at engine.jev.incident-triage-floor or above (IncidentFixController), so apply the fix retries it with no Smith run; otherwise the Smith runs as before</bpmn:documentation>
+      <bpmn:incoming>flow-start-fix</bpmn:incoming>
+      <bpmn:outgoing>flow-to-diagnose</bpmn:outgoing>
+      <bpmn:outgoing>flow-jev-retry</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:callActivity id="call-diagnose" name="diagnose the incident" calledElement="reusable-smith-run" camunda:asyncBefore="true">
+      <bpmn:documentation>reusable-smith-run in mode fix or diagnose; ReadResultDelegate records a failed run as outcome failed, not as an incident</bpmn:documentation>
+      <bpmn:extensionElements>
+        <camunda:in source="fixRepo" target="repo" />
+        <camunda:in source="fixIssue" target="issue" />
+        <camunda:in source="fixMode" target="mode" />
+        <camunda:in source="model" target="model" />
+        <camunda:in source="effort" target="effort" />
+        <camunda:in source="tier" target="tier" />
+        <camunda:in source="incident" target="incident" />
+        <camunda:in source="approvedTicket" target="approvedTicket" />
+        <camunda:in source="dryRun" target="dryRun" />
+        <camunda:in source="fakeOutcome" target="fakeOutcome" />
+        <camunda:out source="outcome" target="outcome" />
+        <camunda:out source="result" target="result" />
+        <camunda:out source="output" target="output" />
+        <camunda:out source="fixError" target="fixError" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>flow-to-diagnose</bpmn:incoming>
+      <bpmn:outgoing>flow-to-apply</bpmn:outgoing>
+    </bpmn:callActivity>
+    <bpmn:serviceTask id="task-apply-fix" name="apply the fix" camunda:delegateExpression="${applyIncidentFix}">
+      <bpmn:documentation>ApplyIncidentFixDelegate: a fix's retry through IncidentRetrier, a proposal cut to 40 characters, and fixOutcome</bpmn:documentation>
+      <bpmn:incoming>flow-to-apply</bpmn:incoming>
+      <bpmn:incoming>flow-jev-retry</bpmn:incoming>
+      <bpmn:outgoing>flow-to-end</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="end-incident-fix">
+      <bpmn:incoming>flow-to-end</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="flow-start-fix" sourceRef="start-incident-fix" targetRef="gateway-jev-retry" />
+    <bpmn:sequenceFlow id="flow-to-diagnose" sourceRef="gateway-jev-retry" targetRef="call-diagnose" />
+    <bpmn:sequenceFlow id="flow-jev-retry" name="jev: retry" sourceRef="gateway-jev-retry" targetRef="task-apply-fix">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${execution.getVariable('fixJevRetry') == true}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow-to-apply" sourceRef="call-diagnose" targetRef="task-apply-fix" />
+    <bpmn:sequenceFlow id="flow-to-end" sourceRef="task-apply-fix" targetRef="end-incident-fix" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_incident_fix">
+    <bpmndi:BPMNPlane id="BPMNPlane_incident_fix" bpmnElement="incident-fix">
+      <bpmndi:BPMNShape id="start-incident-fix-di" bpmnElement="start-incident-fix">
+        <dc:Bounds x="152" y="102" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="call-diagnose-di" bpmnElement="call-diagnose">
+        <dc:Bounds x="290" y="80" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-apply-fix-di" bpmnElement="task-apply-fix">
+        <dc:Bounds x="450" y="80" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="end-incident-fix-di" bpmnElement="end-incident-fix">
+        <dc:Bounds x="612" y="102" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="gateway-jev-retry-di" bpmnElement="gateway-jev-retry" isMarkerVisible="true">
+        <dc:Bounds x="215" y="95" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="215" y="71" width="50" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="flow-start-fix-di" bpmnElement="flow-start-fix">
+        <di:waypoint x="188" y="120" />
+        <di:waypoint x="215" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-to-diagnose-di" bpmnElement="flow-to-diagnose">
+        <di:waypoint x="265" y="120" />
+        <di:waypoint x="290" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-jev-retry-di" bpmnElement="flow-jev-retry">
+        <di:waypoint x="240" y="145" />
+        <di:waypoint x="240" y="210" />
+        <di:waypoint x="500" y="210" />
+        <di:waypoint x="500" y="160" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="345" y="192" width="50" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-to-apply-di" bpmnElement="flow-to-apply">
+        <di:waypoint x="390" y="120" />
+        <di:waypoint x="450" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-to-end-di" bpmnElement="flow-to-end">
+        <di:waypoint x="550" y="120" />
+        <di:waypoint x="612" y="120" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

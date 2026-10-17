@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/codefrak-oss/hitlp/spec/schemas/approve.request.schema.json",
+  "title": "HITLP human.approve arguments",
+  "allOf": [{ "$ref": "envelope.schema.json" }],
+  "type": "object",
+  "required": ["action", "payload"],
+  "properties": {
+    "action": { "type": "string", "minLength": 1 },
+    "payload": { "type": "object" },
+    "payloadDigest": { "type": "string" },
+    "scope": {
+      "type": "object",
+      "properties": {
+        "maxUses": { "type": "integer", "minimum": 1 },
+        "notAfter": { "type": "string", "format": "date-time" }
+      }
+    }
+  }
+}

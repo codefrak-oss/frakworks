@@ -1,0 +1,13 @@
+# The whole army on one laptop — docs/local-stack.md.
+#
+#   cp .env.example .env   # fill it
+#   docker compose up -d --build
+#
+# Each component keeps its own deploy/compose.yaml and stays runnable from its
+# own directory; this file only includes them. Add one line per step of the
+# proposal as each component comes back.
+include:
+  - path: observability/compose.local.yaml
+    env_file: .env
+  - path: engine/compose.local.yaml
+    env_file: .env

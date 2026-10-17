@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Test-only diagrams for the event stream (events/FlowEventsTest): a root with an async first step, a
+     wait state and a called process, so the history handler's started / step / waiting / ended frames
+     land in separate commands. Deployed in tests only (src/test/resources); drawn because BpmnStyleTest
+     holds every diagram on the classpath to the house style. -->
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:operaton="http://operaton.org/schema/1.0/bpmn" id="Definitions_events_test" targetNamespace="http://codefrak.com/engine/test">
+  <bpmn:message id="message-events-test-go" name="events-test-go" />
+  <bpmn:process id="events-test" name="events test" isExecutable="true" operaton:historyTimeToLive="1">
+    <bpmn:startEvent id="start-events-test">
+      <bpmn:outgoing>flow-to-first</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:serviceTask id="task-first" name="first step" operaton:delegateExpression="${noop}" operaton:asyncBefore="true">
+      <bpmn:incoming>flow-to-first</bpmn:incoming>
+      <bpmn:outgoing>flow-to-wait</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:receiveTask id="receive-wait" name="wait for go" messageRef="message-events-test-go">
+      <bpmn:incoming>flow-to-wait</bpmn:incoming>
+      <bpmn:outgoing>flow-to-child</bpmn:outgoing>
+    </bpmn:receiveTask>
+    <bpmn:callActivity id="call-child" name="child (called)" calledElement="events-test-child" operaton:asyncBefore="true">
+      <bpmn:incoming>flow-to-child</bpmn:incoming>
+      <bpmn:outgoing>flow-to-end</bpmn:outgoing>
+    </bpmn:callActivity>
+    <bpmn:endEvent id="end-events-test">
+      <bpmn:incoming>flow-to-end</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="flow-to-first" sourceRef="start-events-test" targetRef="task-first" />
+    <bpmn:sequenceFlow id="flow-to-wait" sourceRef="task-first" targetRef="receive-wait" />
+    <bpmn:sequenceFlow id="flow-to-child" sourceRef="receive-wait" targetRef="call-child" />
+    <bpmn:sequenceFlow id="flow-to-end" sourceRef="call-child" targetRef="end-events-test" />
+  </bpmn:process>
+  <bpmn:process id="events-test-child" name="events test child" isExecutable="true" operaton:historyTimeToLive="1">
+    <bpmn:startEvent id="start-events-test-child">
+      <bpmn:outgoing>flow-child-to-step</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:serviceTask id="task-child-step" name="child step" operaton:delegateExpression="${noop}" operaton:asyncBefore="true">
+      <bpmn:incoming>flow-child-to-step</bpmn:incoming>
+      <bpmn:outgoing>flow-child-to-end</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="end-events-test-child">
+      <bpmn:incoming>flow-child-to-end</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="flow-child-to-step" sourceRef="start-events-test-child" targetRef="task-child-step" />
+    <bpmn:sequenceFlow id="flow-child-to-end" sourceRef="task-child-step" targetRef="end-events-test-child" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_events_test">
+    <bpmndi:BPMNPlane id="BPMNPlane_events_test" bpmnElement="events-test">
+      <bpmndi:BPMNShape id="start-events-test-di" bpmnElement="start-events-test">
+        <dc:Bounds x="152" y="102" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-first-di" bpmnElement="task-first">
+        <dc:Bounds x="240" y="80" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="receive-wait-di" bpmnElement="receive-wait">
+        <dc:Bounds x="390" y="80" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="call-child-di" bpmnElement="call-child">
+        <dc:Bounds x="540" y="80" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="end-events-test-di" bpmnElement="end-events-test">
+        <dc:Bounds x="692" y="102" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="flow-to-first-di" bpmnElement="flow-to-first">
+        <di:waypoint x="188" y="120" />
+        <di:waypoint x="240" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-to-wait-di" bpmnElement="flow-to-wait">
+        <di:waypoint x="340" y="120" />
+        <di:waypoint x="390" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-to-child-di" bpmnElement="flow-to-child">
+        <di:waypoint x="490" y="120" />
+        <di:waypoint x="540" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-to-end-di" bpmnElement="flow-to-end">
+        <di:waypoint x="640" y="120" />
+        <di:waypoint x="692" y="120" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_events_test_child">
+    <bpmndi:BPMNPlane id="BPMNPlane_events_test_child" bpmnElement="events-test-child">
+      <bpmndi:BPMNShape id="start-events-test-child-di" bpmnElement="start-events-test-child">
+        <dc:Bounds x="152" y="102" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-child-step-di" bpmnElement="task-child-step">
+        <dc:Bounds x="240" y="80" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="end-events-test-child-di" bpmnElement="end-events-test-child">
+        <dc:Bounds x="392" y="102" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="flow-child-to-step-di" bpmnElement="flow-child-to-step">
+        <di:waypoint x="188" y="120" />
+        <di:waypoint x="240" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-child-to-end-di" bpmnElement="flow-child-to-end">
+        <di:waypoint x="340" y="120" />
+        <di:waypoint x="392" y="120" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

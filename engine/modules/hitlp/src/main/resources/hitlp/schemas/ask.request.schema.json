@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/codefrak-oss/hitlp/spec/schemas/ask.request.schema.json",
+  "title": "HITLP human.ask arguments",
+  "allOf": [{ "$ref": "envelope.schema.json" }],
+  "type": "object",
+  "required": ["question", "responseSchema"],
+  "properties": {
+    "question": { "type": "string", "minLength": 1 },
+    "responseSchema": { "$ref": "https://json-schema.org/draft/2020-12/schema" },
+    "options": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["value", "label"],
+        "properties": { "value": true, "label": { "type": "string" } }
+      }
+    }
+  }
+}

@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- A plugin jar's flow as an operator would write one (engine/README.md, "Custom jobs and the SDK": flow jobs), packed
+     as bpmn/fixture-flow.bpmn by PluginJarFixture: calls callable-smith with a literal prompt and the job's repo and
+     jobId, named (never variables="all"), then a service task bound to the jar's own fixtureDelegate with the jar's
+     fixtureListener on it. Called by job.bpmn's call-plugin-flow; result and outcome flow back to the job instance. -->
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:operaton="http://operaton.org/schema/1.0/bpmn" id="Definitions_fixture_flow" targetNamespace="http://codefrak.com/engine/test">
+  <bpmn:process id="fixture-flow" name="fixture flow" isExecutable="true" operaton:historyTimeToLive="1">
+    <bpmn:startEvent id="start-fixture-flow">
+      <bpmn:outgoing>flow-fixture-to-smith</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:callActivity id="call-callable-smith" name="callable smith" calledElement="callable-smith">
+      <bpmn:extensionElements>
+        <operaton:in sourceExpression="${'say hello'}" target="prompt" />
+        <operaton:in source="repo" target="repo" />
+        <operaton:in source="jobId" target="jobId" />
+        <operaton:out source="result" target="result" />
+        <operaton:out source="outcome" target="outcome" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>flow-fixture-to-smith</bpmn:incoming>
+      <bpmn:outgoing>flow-fixture-to-delegate</bpmn:outgoing>
+    </bpmn:callActivity>
+    <bpmn:serviceTask id="task-fixture-delegate" name="record the result" operaton:delegateExpression="${fixtureDelegate}">
+      <bpmn:extensionElements>
+        <operaton:executionListener event="start" delegateExpression="${fixtureListener}" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>flow-fixture-to-delegate</bpmn:incoming>
+      <bpmn:outgoing>flow-fixture-to-end</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="end-fixture-flow">
+      <bpmn:incoming>flow-fixture-to-end</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="flow-fixture-to-smith" sourceRef="start-fixture-flow" targetRef="call-callable-smith" />
+    <bpmn:sequenceFlow id="flow-fixture-to-delegate" sourceRef="call-callable-smith" targetRef="task-fixture-delegate" />
+    <bpmn:sequenceFlow id="flow-fixture-to-end" sourceRef="task-fixture-delegate" targetRef="end-fixture-flow" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_fixture_flow">
+    <bpmndi:BPMNPlane id="BPMNPlane_fixture_flow" bpmnElement="fixture-flow">
+      <bpmndi:BPMNShape id="start-fixture-flow-di" bpmnElement="start-fixture-flow">
+        <dc:Bounds x="152" y="102" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="call-callable-smith-di" bpmnElement="call-callable-smith">
+        <dc:Bounds x="250" y="80" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-fixture-delegate-di" bpmnElement="task-fixture-delegate">
+        <dc:Bounds x="410" y="80" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="end-fixture-flow-di" bpmnElement="end-fixture-flow">
+        <dc:Bounds x="572" y="102" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="flow-fixture-to-smith-di" bpmnElement="flow-fixture-to-smith">
+        <di:waypoint x="188" y="120" />
+        <di:waypoint x="250" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-fixture-to-delegate-di" bpmnElement="flow-fixture-to-delegate">
+        <di:waypoint x="350" y="120" />
+        <di:waypoint x="410" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-fixture-to-end-di" bpmnElement="flow-fixture-to-end">
+        <di:waypoint x="510" y="120" />
+        <di:waypoint x="572" y="120" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

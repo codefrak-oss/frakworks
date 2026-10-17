@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=812, height=720">
+<title>frakworks issues</title>
+<style>
+  html, body { margin: 0; width: 812px; height: 720px; overflow: hidden; background: #0b0d12; color: #e6e8ee;
+    font: 18px/1.3 system-ui, -apple-system, "Segoe UI", sans-serif; cursor: none; user-select: none; }
+  body.cursor { cursor: auto; }
+  body { display: flex; flex-direction: column; }
+  header { display: flex; justify-content: space-between; align-items: baseline; padding: 20px 28px 8px; }
+  h1 { margin: 0; font-size: 28px; font-weight: 600; }
+  #at { color: #8a90a0; font-size: 16px; }
+  #error { color: #ff8a8a; padding: 0 28px; font-size: 16px; }
+  #rows { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; touch-action: pan-y; padding: 0 28px 20px; }
+  h2 { margin: 14px 0 6px; font-size: 17px; font-weight: 600; color: #8fb0ff; }
+  .row { display: grid; grid-template-columns: 70px 1fr 64px; gap: 10px; background: #151923; border-radius: 10px;
+    padding: 9px 14px; margin-bottom: 6px; }
+  .row.hot { box-shadow: inset 4px 0 0 #ef5b5b; } .row.ask { box-shadow: inset 4px 0 0 #f0a24a; }
+  .num { color: #8a90a0; } .age { color: #8a90a0; text-align: right; font-size: 15px; }
+  .title { font-weight: 600; }
+  .meta { margin-top: 4px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 14px; }
+  .label { background: #262b36; color: #b8bdc9; border-radius: 999px; padding: 1px 9px; }
+  .points { background: #1d2a44; color: #8fb0ff; }
+  .state { color: #6fe3a1; font-size: 15px; margin-top: 4px; }
+  .mark { font-size: 13px; font-weight: 600; border-radius: 999px; padding: 1px 9px; margin-left: 6px; }
+  .mark.incident { background: #4a1c1f; color: #ff8a8a; } .mark.question { background: #4a3517; color: #f0c27a; }
+</style>
+</head>
+<body>
+<header><h1>frakworks issues</h1><span id="at"></span></header>
+<div id="error"></div>
+<div id="rows"></div>
+<script>
+  if (new URLSearchParams(location.search).get('cursor') === '1') document.body.classList.add('cursor');
+  // Relative, so the tile works loaded directly from the engine or behind a relay.
+  const STATE = location.pathname.endsWith('/') ? 'state' : 'frakworks-issues/state';
+  // The desktop's STAGE_PHRASES (observability/desktop/src/renderer/issues.jsx), copied as JSON;
+  // observability/desktop/test/frakpanel-tiles.test.js fails when the two differ.
+  const STAGE_PHRASES = /*stage-phrases*/{"start-chore-filed":"starting","start-bug-filed":"starting","start-feature-filed":"starting","start-ask-submitted":"starting","start-proposal-filed":"starting","start-research-filed":"starting","task-open-ask":"opening the ask","event-intake-authorized":"awaiting approval","task-check-duplicate":"checking for an open ticket on this","task-post-duplicate":"asking whether an open ticket covers this","user-task-answer-duplicate":"waiting on your answer","task-record-duplicate-answer":"recording your answer","call-refine-ask":"refining the ask","task-file-unlabeled":"refined, filing for triage","task-file-ticket":"refined, filing the ticket","task-start-work":"ticket filed, starting its work","task-close-intake":"ticket filed","task-close-withdrawn":"ask withdrawn","task-notify-session":"ticket filed, telling the session that filed it","end-intake-closed":"done","call-answer":"answering the question","task-keep-answer":"keeping the answer","task-post-ack":"answer ready, asking for your ack","task-read-ack":"reading your ack","task-save-answer":"saving the answer to the repo","task-close-accepted":"closing as completed","task-close-dropped":"closing as not planned","end-research-decided":"done","call-draft":"drafting the proposal","call-review":"reviewing the draft","task-post-decision":"pitch PR open, asking for your decision","user-task-answer-decision":"awaiting your decision","task-read-decision":"reading your decision","task-file-build":"accepted, filing the build ticket","task-log-decision":"logging the decision","task-push-catch-up":"bringing the PR up to date","task-start-build":"accepted, starting the build","call-reproduce":"reproducing the bug","user-task-answer-reproduce":"waiting on your answer","task-mark-not-reproduced":"could not reproduce, marking it","end-not-reproduced":"could not reproduce","call-design":"designing","task-file-child":"split, filing the next part","event-child-closed":"split, waiting on its parts","call-replan":"split, replanning the parts","call-parent":"split, a live parent watching the parts","task-reconcile-children":"split, checking which parts closed","task-note-live-ended":"split, the live parent ended; one part at a time","start-child-wait":"split, waiting on its parts","end-child-wait":"split, a part closed","event-restart-live-parent":"split, asked to watch its parts live again","task-restart-live-parent":"split, starting its live parent again","task-apply-replan":"split, updating the parts","task-post-question":"posting a question for you","task-post-work-question":"posting a question for you","task-post-reproduce-question":"posting a question for you","task-note-overflow":"too big to code in one go, noting it","call-do-work":"coding","user-task-answer-question":"waiting on your answer","user-task-answer-work":"waiting on your answer","task-close-nothing-to-do":"nothing to change, closing","task-close-split":"split into parts, handing back to the parent","end-nothing-to-do":"nothing to change","end-split":"split, handed back to the parent","call-security-review":"coded, in security review","task-open-pr":"coded, PR open, awaiting review","call-ci-check":"waiting on CI build","call-review-pr":"in review","task-rebase-pr":"reviewed, bringing the PR up to date","event-merge-conflict":"merge conflict, back to coding","task-merge-pr":"review done, awaiting merge","task-check-post-deploy":"reading the after-deploy check before merging","call-post-deploy-check":"merged, checking after the deploy","end-post-deploy-checked":"checked after the deploy","task-post-merge-acceptance":"hitlp change, asking you to accept the merge","user-task-answer-merge":"hitlp change, awaiting your acceptance to merge","task-read-merge-acceptance":"hitlp change, reading your answer","call-verify":"merged, checking the fix on main","task-report-still-broken":"merged, still broken","end-still-broken":"merged, still broken","call-accept":"merged, checking acceptance","task-post-acceptance":"merged, posting the acceptance checklist","task-post-acceptance-reask":"merged, asking whether you meant accepted","user-task-answer-acceptance":"awaiting your acceptance","task-read-acceptance":"reading your acceptance","task-report-unmet":"rejected at acceptance, reporting why","end-not-accepted":"rejected at acceptance","task-close-ticket":"merged, closing the ticket","end-chore-done":"done","end-bug-fixed":"done","end-feature-done":"done"}/*end*/;
+  const OUTCOME_PHRASES = { ignored: 'approval ignored, not started' };
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
+  // The desktop's fmtAgo: 4d 2h, 3h 07m, 12m.
+  function ago(iso) {
+    const t = Date.parse(iso);
+    if (!Number.isFinite(t)) return '';
+    const s = Math.max(0, Math.round((Date.now() - t) / 1000));
+    const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60);
+    if (d) return d + 'd ' + h + 'h';
+    if (h) return h + 'h ' + String(m).padStart(2, '0') + 'm';
+    return m + 'm';
+  }
+  // The desktop's stateOf, from the fields the tile's DTO carries.
+  function stateText(i) {
+    const s = i.state;
+    if (s.pendingQuestion) return 'asking you';
+    // An intake started by POST /intake has a flow but no approval row, so no outcome.
+    const started = s.outcome === 'started' || (s.outcome == null && (s.stage != null || s.ended));
+    if (started && s.ended) return 'done';
+    if (started) return STAGE_PHRASES[s.stage] || 'flow in progress';
+    if (s.outcome === 'refused') return 'refused';
+    if (s.outcome === 'deferred') return 'waiting on its blockers';
+    if (s.outcome) return OUTCOME_PHRASES[s.outcome] || 'approved, not started';
+    if (i.labels.includes('authorized')) return i.kind ? 'approved, not started yet' : 'approved, no kind label';
+    if (i.kind) return 'not approved yet';
+    return 'not triaged';
+  }
+  function row(i) {
+    const marks = (i.state.incident ? '<span class="mark incident">incident</span>' : '') +
+      (i.state.pendingQuestion ? '<span class="mark question">question</span>' : '');
+    const meta = i.labels.map(l => '<span class="label">' + esc(l) + '</span>').join('') +
+      (Number.isInteger(i.points) ? '<span class="label points">' + i.points + ' pts</span>' : '');
+    return '<div class="row' + (i.state.incident ? ' hot' : i.state.pendingQuestion ? ' ask' : '') + '">' +
+      '<span class="num">#' + i.number + '</span><div><div class="title">' + esc(i.title) + '</div>' +
+      (meta ? '<div class="meta">' + meta + '</div>' : '') + '<div class="state">' + esc(stateText(i)) + marks + '</div></div>' +
+      '<span class="age">' + ago(i.createdAt) + '</span></div>';
+  }
+  // The engine's commit from the first state; a later one that differs is a new engine, so reload for its page.
+  let commit;
+  async function load() {
+    try {
+      const r = await fetch(STATE, {cache: 'no-store'});
+      if (!r.ok) throw new Error('engine answered ' + r.status);
+      const t = await r.json();
+      if (commit === undefined) commit = t.commit;
+      else if (t.commit !== commit) { location.reload(); return; }
+      const groups = new Map();
+      t.issues.forEach(i => { if (!groups.has(i.repo)) groups.set(i.repo, []); groups.get(i.repo).push(i); });
+      const rows = document.getElementById('rows'), top = rows.scrollTop;
+      rows.innerHTML = groups.size ? [...groups.keys()].sort().map(repo =>
+        '<h2>' + esc(repo) + '</h2>' + groups.get(repo).map(row).join('')).join('') : '<div class="row">No open issues.</div>';
+      rows.scrollTop = top;
+      document.getElementById('at').textContent = new Date(t.at).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+      document.getElementById('error').textContent = t.failures.length ? 'could not read: ' + t.failures.join(', ') : '';
+    } catch (e) {
+      document.getElementById('error').textContent = String(e.message || e);
+    }
+  }
+  load();
+  setInterval(load, 30000);
+</script>
+</body>
+</html>

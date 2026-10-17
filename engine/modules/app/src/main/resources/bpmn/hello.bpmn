@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:operaton="http://operaton.org/schema/1.0/bpmn" id="Definitions_hello" targetNamespace="http://codefrak.com/agent-army/bpmn">
+  <bpmn:process id="hello" name="hello" isExecutable="true" operaton:historyTimeToLive="1">
+    <bpmn:startEvent id="start-hello">
+      <bpmn:outgoing>flow-start-delegate</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:serviceTask id="task-delegate-1" name="delegate 1" operaton:delegateExpression="${helloDelegate}">
+      <bpmn:incoming>flow-start-delegate</bpmn:incoming>
+      <bpmn:outgoing>flow-delegate-end</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="end-hello">
+      <bpmn:incoming>flow-delegate-end</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="flow-start-delegate" sourceRef="start-hello" targetRef="task-delegate-1" />
+    <bpmn:sequenceFlow id="flow-delegate-end" sourceRef="task-delegate-1" targetRef="end-hello" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_hello">
+    <bpmndi:BPMNPlane id="BPMNPlane_hello" bpmnElement="hello">
+      <bpmndi:BPMNShape id="start-hello-di" bpmnElement="start-hello">
+        <dc:Bounds x="152" y="102" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-delegate-1-di" bpmnElement="task-delegate-1">
+        <dc:Bounds x="240" y="80" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="end-hello-di" bpmnElement="end-hello">
+        <dc:Bounds x="392" y="102" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="flow-start-delegate-di" bpmnElement="flow-start-delegate">
+        <di:waypoint x="188" y="120" />
+        <di:waypoint x="240" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-delegate-end-di" bpmnElement="flow-delegate-end">
+        <di:waypoint x="340" y="120" />
+        <di:waypoint x="392" y="120" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

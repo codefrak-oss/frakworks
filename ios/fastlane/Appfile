@@ -1,0 +1,2 @@
+app_identifier(ENV.fetch("FIRSTMATE_BUNDLE_ID", "com.codefrak.firstmate"))
+team_id(ENV["FIRSTMATE_TEAM_ID"])

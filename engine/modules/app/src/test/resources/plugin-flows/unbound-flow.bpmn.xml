@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- A plugin flow FlowRules refuses: its service task names ${nobody}, no bean of the jar (PluginFlows refuses the
+     registration, JobControllerTest). Drawn, so the style rules pass and the refusal is for the binding alone. -->
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:operaton="http://operaton.org/schema/1.0/bpmn" id="Definitions_unbound_flow" targetNamespace="http://codefrak.com/engine/test">
+  <bpmn:process id="unbound-flow" name="unbound flow" isExecutable="true" operaton:historyTimeToLive="1">
+    <bpmn:startEvent id="start-unbound-flow">
+      <bpmn:outgoing>flow-unbound-to-task</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:serviceTask id="task-nobody" name="call nobody" operaton:delegateExpression="${nobody}">
+      <bpmn:incoming>flow-unbound-to-task</bpmn:incoming>
+      <bpmn:outgoing>flow-unbound-to-end</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="end-unbound-flow">
+      <bpmn:incoming>flow-unbound-to-end</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="flow-unbound-to-task" sourceRef="start-unbound-flow" targetRef="task-nobody" />
+    <bpmn:sequenceFlow id="flow-unbound-to-end" sourceRef="task-nobody" targetRef="end-unbound-flow" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_unbound_flow">
+    <bpmndi:BPMNPlane id="BPMNPlane_unbound_flow" bpmnElement="unbound-flow">
+      <bpmndi:BPMNShape id="start-unbound-flow-di" bpmnElement="start-unbound-flow">
+        <dc:Bounds x="152" y="102" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-nobody-di" bpmnElement="task-nobody">
+        <dc:Bounds x="250" y="80" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="end-unbound-flow-di" bpmnElement="end-unbound-flow">
+        <dc:Bounds x="412" y="102" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="flow-unbound-to-task-di" bpmnElement="flow-unbound-to-task">
+        <di:waypoint x="188" y="120" />
+        <di:waypoint x="250" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-unbound-to-end-di" bpmnElement="flow-unbound-to-end">
+        <di:waypoint x="350" y="120" />
+        <di:waypoint x="412" y="120" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

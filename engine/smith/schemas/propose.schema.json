@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/codefrak-oss/frakworks/engine/smith/schemas/propose.schema.json",
+  "title": "ProposeResult",
+  "description": "What a propose Smith writes to /work/out/result.json. The engine checks it (ReadResultDelegate) before its own rules; the Smith checks it with check-result propose. Strict types where the engine branches, any non-empty JSON where it only passes content on.",
+  "type": "object",
+  "required": [
+    "outcome"
+  ],
+  "properties": {
+    "outcome": {
+      "enum": [
+        "drafted",
+        "ask"
+      ],
+      "description": "Branched on by the engine and the BPMN."
+    },
+    "path": {
+      "type": "string",
+      "description": "The doc drafted, docs/proposals/<slug>.md; the engine checks the bundle against it."
+    },
+    "pitch": {
+      "type": "string",
+      "description": "The pitch page drafted beside the doc, docs/proposals/<same slug>.html; the engine checks the bundle and lints the page (PitchRules)."
+    },
+    "summary": {
+      "$ref": "#/$defs/content"
+    },
+    "questions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "question"
+        ],
+        "properties": {
+          "question": {
+            "$ref": "#/$defs/content"
+          },
+          "assumption": {
+            "$ref": "#/$defs/content"
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Branched on: below 0.7 goes to the user in confirm mode."
+          },
+          "impact": {
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ],
+            "description": "Branched on: high goes to the user in confirm mode."
+          }
+        }
+      }
+    },
+    "question": {
+      "$ref": "#/$defs/content"
+    },
+    "options": {
+      "type": "array",
+      "description": "The options the pitch lays out, each with a stable one-letter id; the page marks each with data-option-id and a disabled data-choose button (PitchRules), and the desktop's Pitch view picks it through POST /ticket/{owner}/{repo}/{n}/choice. Optional, since a page with nothing to choose lists none, but needed for every data-option-id the page marks: check-result propose lints the page against it.",
+      "items": {
+        "type": "object",
+        "required": ["id", "label"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^[a-z]$"},
+          "label": {"type": "string", "pattern": "\\S"}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "content": {
+      "description": "Passed on to a brief or a GitHub comment, never branched on: any non-empty JSON. A string is shown as itself; an object or array as a fenced JSON block.",
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        {
+          "type": "object",
+          "minProperties": 1
+        },
+        {
+          "type": "array",
+          "minItems": 1
+        },
+        {
+          "type": [
+            "number",
+            "boolean"
+          ]
+        }
+      ]
+    }
+  }
+}

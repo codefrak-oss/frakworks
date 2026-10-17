@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:camunda="http://camunda.org/schema/1.0/bpmn" xmlns:modeler="http://camunda.org/schema/modeler/1.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" id="Definitions_0emn8wr" targetNamespace="http://bpmn.io/schema/bpmn" exporter="Camunda Modeler" exporterVersion="5.51.1" modeler:executionPlatform="Camunda Platform" modeler:executionPlatformVersion="7.24.0">
+  <bpmn:process id="reusable-smith-run" name="reusable smith run" isExecutable="true" camunda:historyTimeToLive="30">
+    <bpmn:startEvent id="start-smith-run">
+      <bpmn:outgoing>flow-start-run</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:callActivity id="call-smith-run" name="smith run&#10;(sibling container)" calledElement="smith-run">
+      <bpmn:documentation>smith-run (src/main/resources/bpmn/smith-run.bpmn): starts the Smith container, waits for its exit, keeps its log</bpmn:documentation>
+      <bpmn:extensionElements>
+        <camunda:in variables="all" />
+        <camunda:out variables="all" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>flow-start-run</bpmn:incoming>
+      <bpmn:incoming>flow-rerun-now</bpmn:incoming>
+      <bpmn:incoming>flow-reset-reached</bpmn:incoming>
+      <bpmn:outgoing>flow-run-ended</bpmn:outgoing>
+    </bpmn:callActivity>
+    <bpmn:exclusiveGateway id="gateway-rerun" name="rerun?" default="flow-run-result">
+      <bpmn:documentation>smithRerun, set by collect result: the run failed only on its account's session or spend limit and another account is usable now or once the provider's first account resets (smithRerunAt), or it ended failed or with no result for the first time in this step (failRerunOf; engine/README.md, "Incidents")</bpmn:documentation>
+      <bpmn:incoming>flow-run-ended</bpmn:incoming>
+      <bpmn:outgoing>flow-run-result</bpmn:outgoing>
+      <bpmn:outgoing>flow-rerun</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="task-note-rerun" name="note rerun" camunda:delegateExpression="${noteSmithRerun}">
+      <bpmn:documentation>NoteSmithRerunDelegate: says on the issue why the Smith runs again (a session or spend limit, or its one automatic rerun after a failure) and when (smithRerunAt, for a timed rerun), then the call activity starts over with a new account pick</bpmn:documentation>
+      <bpmn:incoming>flow-rerun</bpmn:incoming>
+      <bpmn:outgoing>flow-rerun-again</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="gateway-rerun-wait" name="wait?" default="flow-rerun-now">
+      <bpmn:documentation>smithRerunAt, set by collect result with smithRerun for a timed rerun (engine/README.md, "Incidents"): the run ended on its account's session or spend limit with no other account of its provider usable now, so the rerun waits for the earliest reset of the provider's accounts (AiAccounts.blockedUntil). Null for an immediate rerun, which does not wait</bpmn:documentation>
+      <bpmn:incoming>flow-rerun-again</bpmn:incoming>
+      <bpmn:outgoing>flow-rerun-now</bpmn:outgoing>
+      <bpmn:outgoing>flow-rerun-later</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:intermediateCatchEvent id="event-wait-reset" name="wait for the reset">
+      <bpmn:documentation>Fires at smithRerunAt (a date variable collect result set: the earliest rejectedUntil of the provider's enabled, credentialed accounts), then the call activity starts over on a new pick; with still no usable account, start smith parks on its "no account available until" incident as for any run</bpmn:documentation>
+      <bpmn:incoming>flow-rerun-later</bpmn:incoming>
+      <bpmn:outgoing>flow-reset-reached</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="timer-wait-reset">
+        <bpmn:timeDate xsi:type="bpmn:tFormalExpression">${smithRerunAt}</bpmn:timeDate>
+      </bpmn:timerEventDefinition>
+    </bpmn:intermediateCatchEvent>
+    <bpmn:serviceTask id="task-read-result" name="read result" camunda:delegateExpression="${readResult}">
+      <bpmn:documentation>ReadResultDelegate: checks the smith's result.json and sets outcome</bpmn:documentation>
+      <bpmn:incoming>flow-run-result</bpmn:incoming>
+      <bpmn:outgoing>flow-result-end</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="end-smith-run">
+      <bpmn:incoming>flow-result-end</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="flow-start-run" sourceRef="start-smith-run" targetRef="call-smith-run" />
+    <bpmn:sequenceFlow id="flow-run-ended" sourceRef="call-smith-run" targetRef="gateway-rerun" />
+    <bpmn:sequenceFlow id="flow-run-result" sourceRef="gateway-rerun" targetRef="task-read-result" />
+    <bpmn:sequenceFlow id="flow-rerun" name="rerun" sourceRef="gateway-rerun" targetRef="task-note-rerun">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${execution.getVariable('smithRerun') == true}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow-rerun-again" sourceRef="task-note-rerun" targetRef="gateway-rerun-wait" />
+    <bpmn:sequenceFlow id="flow-rerun-now" sourceRef="gateway-rerun-wait" targetRef="call-smith-run" />
+    <bpmn:sequenceFlow id="flow-rerun-later" name="at reset" sourceRef="gateway-rerun-wait" targetRef="event-wait-reset">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">${execution.getVariable('smithRerunAt') != null}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow-reset-reached" sourceRef="event-wait-reset" targetRef="call-smith-run" />
+    <bpmn:sequenceFlow id="flow-result-end" sourceRef="task-read-result" targetRef="end-smith-run" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="reusable-smith-run">
+      <bpmndi:BPMNShape id="start-smith-run-di" bpmnElement="start-smith-run">
+        <dc:Bounds x="152" y="102" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="call-smith-run-di" bpmnElement="call-smith-run">
+        <dc:Bounds x="270" y="80" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="gateway-rerun-di" bpmnElement="gateway-rerun" isMarkerVisible="true">
+        <dc:Bounds x="425" y="95" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="433" y="71" width="35" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-note-rerun-di" bpmnElement="task-note-rerun">
+        <dc:Bounds x="400" y="200" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="gateway-rerun-wait-di" bpmnElement="gateway-rerun-wait" isMarkerVisible="true">
+        <dc:Bounds x="295" y="215" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="306" y="272" width="28" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="event-wait-reset-di" bpmnElement="event-wait-reset">
+        <dc:Bounds x="212" y="222" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="186" y="265" width="88" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-read-result-di" bpmnElement="task-read-result">
+        <dc:Bounds x="530" y="80" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="end-smith-run-di" bpmnElement="end-smith-run">
+        <dc:Bounds x="692" y="102" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="flow-start-run-di" bpmnElement="flow-start-run">
+        <di:waypoint x="188" y="120" />
+        <di:waypoint x="270" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-run-ended-di" bpmnElement="flow-run-ended">
+        <di:waypoint x="370" y="120" />
+        <di:waypoint x="425" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-run-result-di" bpmnElement="flow-run-result">
+        <di:waypoint x="475" y="120" />
+        <di:waypoint x="530" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-rerun-di" bpmnElement="flow-rerun">
+        <di:waypoint x="450" y="145" />
+        <di:waypoint x="450" y="200" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="456" y="163" width="27" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-rerun-again-di" bpmnElement="flow-rerun-again">
+        <di:waypoint x="400" y="240" />
+        <di:waypoint x="345" y="240" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-rerun-now-di" bpmnElement="flow-rerun-now">
+        <di:waypoint x="320" y="215" />
+        <di:waypoint x="320" y="160" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-rerun-later-di" bpmnElement="flow-rerun-later">
+        <di:waypoint x="295" y="240" />
+        <di:waypoint x="248" y="240" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="252" y="220" width="40" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-reset-reached-di" bpmnElement="flow-reset-reached">
+        <di:waypoint x="230" y="222" />
+        <di:waypoint x="230" y="140" />
+        <di:waypoint x="270" y="140" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-result-end-di" bpmnElement="flow-result-end">
+        <di:waypoint x="630" y="120" />
+        <di:waypoint x="692" y="120" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

@@ -1,0 +1,114 @@
+# The engine in the local stack — docs/local-stack.md. It starts
+# Smith runs as sibling containers, so it holds the Docker socket. By default
+# both images are built here, registry-less, as frakworks-engine:main and
+# frakworks-smith:main: scripts/local-up.sh builds them with
+# engine/compose.build.yaml (engine/README.md, "Images"). With
+# FRAKWORKS_REGISTRY set they are <registry>/frakworks-*:main instead, deploy is
+#   docker compose pull engine && docker compose up -d engine
+# and the engine pulls the Smith image itself before a run ("Smith runs").
+# 8080 is taken on many laptops.
+services:
+  engine:
+    # The instance id (InstanceId: the lease holder, the telemetry `host`) is the hostname.
+    hostname: engine
+    # FRAKWORKS_REGISTRY (.env) names the registry: a deployment value, opt-in.
+    # Unset, the local build's registry-less tag (engine/compose.build.yaml).
+    image: ${FRAKWORKS_REGISTRY:+${FRAKWORKS_REGISTRY}/}frakworks-engine:main
+    # Loopback only: every caller (the desktop app, the /intake skill) is on this
+    # host at localhost:8090. Published on all interfaces, a Smith sandbox could
+    # reach it at the host's address, arrive from the network's gateway rather
+    # than its own IP, and pass the engine's Smith check (engine/README.md, "The
+    # frakworks server in a Smith"). Smiths reach the engine at engine:8080.
+    ports: ["127.0.0.1:8090:8080"]
+    # Memory safety for the one-VM stack (engine/README.md, "Smith runs"): the
+    # engine and its db are reserved memory and are the last things the OOM
+    # killer should touch (oom_score_adj -500, below the default 0 a Smith
+    # sandbox gets +500 for in DockerSandbox.kt). Measured engine RSS today is
+    # ~615 MiB; MaxRAMPercentage=60 keeps the JVM heap inside the 2g limit.
+    mem_reservation: 1g
+    mem_limit: 2g
+    oom_score_adj: -500
+    # CPU twin of oom_score_adj: 4096 shares against a sandbox's default 1024,
+    # so engine wins CPU under contention (the 2026-09-26 81 s stall).
+    cpu_shares: 4096
+    environment:
+      JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=60
+      # The Smith image: unset FRAKWORKS_REGISTRY, the locally built
+      # frakworks-smith:main (used as it is, never pulled); set, the registry's,
+      # pulled by the engine before a run.
+      ENGINE_SMITH_IMAGE: ${ENGINE_SMITH_IMAGE:-${FRAKWORKS_REGISTRY:+${FRAKWORKS_REGISTRY}/}frakworks-smith:main}
+      # Re-pull of the Smith image's :main at most this often (PT0S: every run).
+      ENGINE_SMITH_IMAGE_REFRESH_INTERVAL: ${ENGINE_SMITH_IMAGE_REFRESH_INTERVAL:-PT5M}
+      ENGINE_SMITH_NETWORK: ${COMPOSE_PROJECT_NAME:-frakworks}_default
+      # The engine as a Smith reaches it on the network above: the sandbox's
+      # ENGINE_URL, for its frakworks MCP server. A URL, not a credential.
+      ENGINE_SMITH_ENGINE_URL: http://engine:8080
+      ENGINE_SECRETS_KEY: ${ENGINE_SECRETS_KEY:-}
+      # The live transcript and smith_run_active (engine/README.md, "Transcripts and the
+      # live-run gauge"): rows to observability's VictoriaLogs; VictoriaMetrics scrapes
+      # engine:8080/metrics (observability/vmetrics/scrape.local.yml). Empty URL: no rows.
+      ENGINE_TELEMETRY_LOGS_URL: ${ENGINE_TELEMETRY_LOGS_URL-http://victorialogs:9428}
+      # Where read_transcript on POST /mcp/frakworks asks whether a run is live (smith_run_active).
+      ENGINE_TELEMETRY_METRICS_URL: ${ENGINE_TELEMETRY_METRICS_URL-http://victoriametrics:8428}
+      # The HITLP server the engine files its flow waits on (#2447) is no variable: PUT /settings/hitlp sets it (#2500).
+      # Postgres: Operaton's tables and the engine's own `engine` schema
+      # (engine/README.md, "Its own tables"). Run outside Docker (debugging),
+      # the engine keeps application.properties' in-memory H2.
+      # currentSchema=public: the role is named `engine`, so Postgres' default
+      # search_path ("$user", public) would switch to the `engine` schema once
+      # V1 creates it, and Flyway would look there for its history and rerun V1.
+      SPRING_DATASOURCE_URL: jdbc:postgresql://engine-db:5432/engine?currentSchema=public
+      SPRING_DATASOURCE_USERNAME: engine
+      SPRING_DATASOURCE_PASSWORD: ${ENGINE_DB_PASSWORD:?set ENGINE_DB_PASSWORD in .env}
+    depends_on:
+      engine-db: {condition: service_healthy}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      # The kubeconfig for the Kubernetes hosting model (engine/README.md,
+      # "Hosting models"): engine/kube/config, gitignored, read-only. Without
+      # it the engine runs Smiths on Docker only.
+      - ./kube:/etc/frakworks/kube:ro
+      # The operator's plugin jars for bean jobs (engine/README.md, "Custom jobs
+      # and the SDK"): the fixed directory PluginJars reads, no setting for it.
+      - engine-jobs:/var/lib/frakworks/jobs
+  # Survives `down`/`up` on its volume; `down -v` wipes it.
+  engine-db:
+    image: postgres:16
+    restart: unless-stopped
+    mem_reservation: 256m
+    mem_limit: 1g
+    oom_score_adj: -500
+    # Same CPU preference as engine: 4096 shares against a sandbox's 1024.
+    cpu_shares: 4096
+    environment:
+      POSTGRES_DB: engine
+      POSTGRES_USER: engine
+      POSTGRES_PASSWORD: ${ENGINE_DB_PASSWORD:?set ENGINE_DB_PASSWORD in .env}
+    volumes: [engine-pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U engine -d engine"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  smith:
+    profiles: [tools]
+    build:
+      context: ./smith
+      # The framework docs (bots/smith.md, model-choice.md), the
+      # desktop's package files for its baked node_modules, and the engine's
+      # Gradle build files for its baked dependency cache, copied in by smith/Dockerfile.
+      additional_contexts:
+        framework: ../bots
+        desktop: ../observability/desktop
+        engine: .
+    image: frakworks-smith:main
+    environment:
+      # A dry run: it prints what it would do. Another repo: docker compose run -e SMITH_REPO=owner/name smith
+      SMITH_REPO: codefrak-oss/frakworks
+      SMITH_ISSUE: "0"
+      SMITH_ID: manual
+      SMITH_DRY_RUN: "1"
+
+volumes:
+  engine-pgdata:
+  engine-jobs:

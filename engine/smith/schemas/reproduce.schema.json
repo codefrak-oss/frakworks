@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/codefrak-oss/frakworks/engine/smith/schemas/reproduce.schema.json",
+  "title": "ReproduceResult",
+  "description": "What a reproduce Smith writes to /work/out/result.json. The engine checks it (ReadResultDelegate) before its own rules; the Smith checks it with check-result reproduce. Strict types where the engine branches, any non-empty JSON where it only passes content on.",
+  "type": "object",
+  "required": [
+    "outcome"
+  ],
+  "properties": {
+    "outcome": {
+      "enum": [
+        "reproduced",
+        "understood",
+        "not-reproduced",
+        "ask"
+      ],
+      "description": "Branched on by the engine and the BPMN."
+    },
+    "testable": {
+      "type": "boolean",
+      "description": "Branched on: whether the fix needs a regression test."
+    },
+    "rootCause": {
+      "$ref": "#/$defs/content"
+    },
+    "repro": {
+      "$ref": "#/$defs/content"
+    },
+    "evidence": {
+      "$ref": "#/$defs/content"
+    },
+    "untestableWhy": {
+      "$ref": "#/$defs/content"
+    },
+    "summary": {
+      "$ref": "#/$defs/content"
+    },
+    "question": {
+      "$ref": "#/$defs/content"
+    },
+    "filesDropped": {
+      "type": "string",
+      "description": "Set by the engine, not the Smith: why /work/out/repro was not carried to the fix and verify runs (larger than its cap)."
+    }
+  },
+  "$defs": {
+    "content": {
+      "description": "Passed on to a brief or a GitHub comment, never branched on: any non-empty JSON. A string is shown as itself; an object or array as a fenced JSON block.",
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        {
+          "type": "object",
+          "minProperties": 1
+        },
+        {
+          "type": "array",
+          "minItems": 1
+        },
+        {
+          "type": [
+            "number",
+            "boolean"
+          ]
+        }
+      ]
+    }
+  }
+}

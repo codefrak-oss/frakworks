@@ -1,0 +1,142 @@
+# The PR check, on the cluster's `frakworks-build` runner scale set
+# (engine/README.md, "Chore": `wait for the engine check`). The engine waits for
+# it on a flow whose PR touches a path under the repo's check prefixes (its
+# `engine.target_repo` row: `ci_check`, `ci_paths`). One job works out which
+# areas the pull request changed and runs only their suites: the engine's build
+# and tests, the desktop's tests, or both.
+name: engine
+
+# The files outside engine/ and observability/desktop/ are the ones the
+# engine's build reads from the `root` build context (below): the sdk module,
+# the shipped refactoring values, and the files its config tests cross-check.
+# A change to one of them runs the check too. Pull requests only: on main, images.yml
+# builds the same build stage, tests included, for the engine image (a merge
+# whose tree the PR check built reuses its layer), and desktop-release.yml
+# tests the desktop. A second build per merge only slowed the other builds.
+on:
+  pull_request:
+    paths:
+      - 'engine/**'
+      - 'sdk/**'
+      - 'bots/refactor-values.md'
+      - 'observability/desktop/**'
+      - '.env.example'
+      - 'compose.yaml'
+      - 'observability/compose.local.yaml'
+      - 'scripts/local-up.sh'
+
+# Read the code, nothing more: the runner pods hold no secrets, and this job
+# needs none.
+permissions:
+  contents: read
+
+concurrency:
+  group: engine-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # The job id is the check's name: the engine waits for the check run named
+  # `engine` on the head it pushed (the row's `ci_check`), and reads this one
+  # job's log on a failure, so both suites are steps of it.
+  engine:
+    # Never run a fork's code here: the runners share one buildkitd on the
+    # LAN's cluster, so a pull request from a fork could leave anything in its
+    # cache for the next build. PRs from branches of this repo only.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    # Ephemeral runner pods (actions-runner-controller), a scale set the
+    # deployment defines; the cluster side is not in this repo.
+    runs-on: frakworks-build
+    timeout-minutes: 60
+    steps:
+      # Depth 2: a pull request is checked out at the merge commit GitHub
+      # makes, whose first parent is the base, so the diff below is what the
+      # pull request changes.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      # The desktop's tests read the engine's BPMN files and README (the flow
+      # segments, the transcript audit), so an engine change runs them too; a
+      # desktop-only change skips the engine build. So does a change to only
+      # Markdown under engine/: the build stage copies none of it in
+      # (engine/Dockerfile: src, bpmn, smith/schemas, the gradle files), so it
+      # would build what the base did; the desktop's tests still run.
+      - name: changed areas
+        id: areas
+        run: |
+          files=$(git diff --name-only HEAD^1 HEAD)
+          engine=$(echo "$files" | grep -E '^(engine/|sdk/|bots/refactor-values\.md$|\.env\.example$|compose\.yaml$|observability/compose\.local\.yaml$|scripts/local-up\.sh$)' \
+            | grep -qvE '^engine/.*\.md$' && echo true || echo false)
+          desktop=$(echo "$files" | grep -qE '^(observability/desktop/|engine/)' && echo true || echo false)
+          echo "engine=$engine" >> "$GITHUB_OUTPUT"
+          echo "desktop=$desktop" >> "$GITHUB_OUTPUT"
+          echo "engine: $engine, desktop: $desktop"
+      # The runner pod has no Docker daemon: builds go to the cluster's shared
+      # buildkitd ($BUILDKIT_HOST, set on the scale set), whose state outlives
+      # each job, so its cache mount (/gradle-cache) and layer cache are shared
+      # with images.yml's builds. A new pod's network is admitted by the
+      # NetworkPolicy a second or two after it starts, hence the retries.
+      - name: builder
+        if: steps.areas.outputs.engine == 'true'
+        run: |
+          docker buildx create --name frakworks --driver remote "$BUILDKIT_HOST"
+          for i in 1 2 3 4 5; do docker buildx inspect --bootstrap frakworks && exit 0; sleep 2; done
+          exit 1
+      # `npm test` as desktop-release.yml runs it, after the renderer bundle
+      # desktop-release.yml builds (`npm test` does not build it, and a Node
+      # built-in reaching it broke every release from cbc609ef on, unseen
+      # here). Electron's binary is not needed. It runs in the background, alongside the engine build, and
+      # `desktop tests` below waits for it and prints its log.
+      - uses: actions/setup-node@v4
+        if: steps.areas.outputs.desktop == 'true'
+        with:
+          node-version: 24
+      - name: start desktop tests
+        id: desktop
+        if: steps.areas.outputs.desktop == 'true'
+        run: |
+          cd observability/desktop
+          nohup sh -c 'ELECTRON_SKIP_BINARY_DOWNLOAD=1 npm ci --no-audit --no-fund && npm run build:renderer && npm test; echo $? > "$RUNNER_TEMP/desktop.code"' \
+            > "$RUNNER_TEMP/desktop.log" 2>&1 &
+      # The build stage of engine/Dockerfile is what `docker compose build
+      # engine` runs: `gradle build`, the tests included. Nothing is pushed.
+      # The `root` context is the repo root: engine/Dockerfile copies from it
+      # the files outside engine/ that the config tests read (.env.example,
+      # the compose files, scripts/local-up.sh). images.yml gives the engine
+      # image the same one. buildkitd's max-parallelism bounds how many builds
+      # share its CPUs at once. The Gradle remote build cache (the deployment's,
+      # #1609) is shared by every
+      # buildkitd, so a module an earlier build on any node compiled or tested
+      # comes FROM-CACHE; engine/settings.gradle.kts enables it from these two
+      # variables, and a laptop build without them is unchanged.
+      #
+      # One retry, only for a lost buildkitd connection (#2258, friction g91):
+      # buildx's gRPC stream dropping (`rpc error: code = Unavailable`,
+      # `error reading from server: EOF`) with no Gradle task FAILED in the
+      # log. A real compile or test failure prints `> Task ... FAILED` and is
+      # never retried. The retry's log is the one the step ends with.
+      - name: build and test
+        if: steps.areas.outputs.engine == 'true'
+        run: |
+          build() {
+            docker buildx build --builder frakworks --progress=plain --build-context root=. \
+              --build-arg GRADLE_REMOTE_CACHE_URL=http://gradle-cache.frakworks-buildkit.svc.cluster.local:5071/cache/ \
+              --build-arg GRADLE_REMOTE_CACHE_PUSH=true \
+              --target build engine/ 2>&1 | tee "$RUNNER_TEMP/build.log"
+            return "${PIPESTATUS[0]}"
+          }
+          build && exit 0
+          code=$?
+          if grep -qE 'rpc error: code = Unavailable|error reading from server: EOF' "$RUNNER_TEMP/build.log" \
+             && ! grep -qE '> Task [^ ]+ FAILED' "$RUNNER_TEMP/build.log"; then
+            echo "::warning::infrastructure: the BuildKit connection was lost (no task failed); retrying the build once"
+            docker buildx inspect --bootstrap frakworks >/dev/null
+            build
+            exit $?
+          fi
+          exit "$code"
+      - name: desktop tests
+        if: always() && steps.desktop.outcome == 'success'
+        run: |
+          while [ ! -f "$RUNNER_TEMP/desktop.code" ]; do sleep 1; done
+          cat "$RUNNER_TEMP/desktop.log"
+          exit "$(cat "$RUNNER_TEMP/desktop.code")"

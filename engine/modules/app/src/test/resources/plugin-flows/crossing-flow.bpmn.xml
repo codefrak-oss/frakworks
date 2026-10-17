@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- A plugin flow FlowRules refuses for its drawing: flow-crossing-b-to-end runs up past the first task and crosses
+     flow-crossing-a-to-end (the "no crossing flows" rule, applied to a jar's diagrams as to the engine's own). -->
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:operaton="http://operaton.org/schema/1.0/bpmn" id="Definitions_crossing_flow" targetNamespace="http://codefrak.com/engine/test">
+  <bpmn:process id="crossing-flow" name="crossing flow" isExecutable="true" operaton:historyTimeToLive="1">
+    <bpmn:startEvent id="start-crossing-flow">
+      <bpmn:outgoing>flow-crossing-start</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:task id="task-crossing-a" name="a">
+      <bpmn:incoming>flow-crossing-start</bpmn:incoming>
+      <bpmn:outgoing>flow-crossing-a-to-b</bpmn:outgoing>
+      <bpmn:outgoing>flow-crossing-a-to-end</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:task id="task-crossing-b" name="b">
+      <bpmn:incoming>flow-crossing-a-to-b</bpmn:incoming>
+      <bpmn:outgoing>flow-crossing-b-to-end</bpmn:outgoing>
+    </bpmn:task>
+    <bpmn:endEvent id="end-crossing-flow">
+      <bpmn:incoming>flow-crossing-a-to-end</bpmn:incoming>
+      <bpmn:incoming>flow-crossing-b-to-end</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="flow-crossing-start" sourceRef="start-crossing-flow" targetRef="task-crossing-a" />
+    <bpmn:sequenceFlow id="flow-crossing-a-to-b" sourceRef="task-crossing-a" targetRef="task-crossing-b" />
+    <bpmn:sequenceFlow id="flow-crossing-a-to-end" sourceRef="task-crossing-a" targetRef="end-crossing-flow" />
+    <bpmn:sequenceFlow id="flow-crossing-b-to-end" sourceRef="task-crossing-b" targetRef="end-crossing-flow" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_crossing_flow">
+    <bpmndi:BPMNPlane id="BPMNPlane_crossing_flow" bpmnElement="crossing-flow">
+      <bpmndi:BPMNShape id="start-crossing-flow-di" bpmnElement="start-crossing-flow">
+        <dc:Bounds x="152" y="102" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-crossing-a-di" bpmnElement="task-crossing-a">
+        <dc:Bounds x="250" y="80" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-crossing-b-di" bpmnElement="task-crossing-b">
+        <dc:Bounds x="250" y="220" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="end-crossing-flow-di" bpmnElement="end-crossing-flow">
+        <dc:Bounds x="412" y="102" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="flow-crossing-start-di" bpmnElement="flow-crossing-start">
+        <di:waypoint x="188" y="120" />
+        <di:waypoint x="250" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-crossing-a-to-b-di" bpmnElement="flow-crossing-a-to-b">
+        <di:waypoint x="300" y="160" />
+        <di:waypoint x="300" y="220" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-crossing-a-to-end-di" bpmnElement="flow-crossing-a-to-end">
+        <di:waypoint x="350" y="120" />
+        <di:waypoint x="412" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-crossing-b-to-end-di" bpmnElement="flow-crossing-b-to-end">
+        <di:waypoint x="350" y="260" />
+        <di:waypoint x="380" y="260" />
+        <di:waypoint x="380" y="60" />
+        <di:waypoint x="430" y="60" />
+        <di:waypoint x="430" y="102" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

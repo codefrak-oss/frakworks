@@ -1,0 +1,71 @@
+[
+  {
+    "id": "j-prompt",
+    "name": "nightly digest",
+    "kind": "prompt",
+    "repo": "acme/widgets",
+    "config": {
+      "prompt": "Summarize the day"
+    },
+    "signal": {
+      "kind": "every",
+      "every": 3600
+    },
+    "createdBy": "lundmatt1",
+    "createdAt": "2026-10-01T10:00:00Z",
+    "nextRunAt": "2026-10-06T11:00:00Z",
+    "lastRunAt": "2026-10-06T10:00:00Z",
+    "lastInstance": "inst-1",
+    "owner": "user"
+  },
+  {
+    "id": "j-bean",
+    "name": "label sweep",
+    "kind": "bean",
+    "repo": "acme/widgets",
+    "config": "{\"jar\":\"sweep.jar\",\"bean\":\"sweeper\"}",
+    "signal": "{\"kind\":\"execute\"}",
+    "createdBy": "lundmatt1",
+    "createdAt": "2026-10-02T10:00:00Z",
+    "nextRunAt": null,
+    "lastRunAt": "2026-10-05T09:00:00Z",
+    "lastInstance": "inst-2",
+    "owner": "user"
+  },
+  {
+    "id": "j-flow",
+    "name": "release train",
+    "kind": "flow",
+    "repo": "acme/widgets",
+    "config": {
+      "jar": "train.jar",
+      "process": "train"
+    },
+    "signal": {
+      "kind": "execute"
+    },
+    "createdBy": "lundmatt1",
+    "createdAt": "2026-10-03T10:00:00Z",
+    "nextRunAt": null,
+    "lastRunAt": null,
+    "lastInstance": null,
+    "owner": "user"
+  },
+  {
+    "id": "j-refactor",
+    "name": "refactor acme/widgets",
+    "kind": "refactor",
+    "repo": "acme/widgets",
+    "config": {},
+    "signal": {
+      "kind": "every",
+      "every": 604800
+    },
+    "createdBy": "system",
+    "createdAt": "2026-10-04T10:00:00Z",
+    "nextRunAt": "2026-10-11T10:00:00Z",
+    "lastRunAt": null,
+    "lastInstance": null,
+    "owner": "system"
+  }
+]

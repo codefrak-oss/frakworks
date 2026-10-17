@@ -1,0 +1,5 @@
+# Paths that change what the fleet is *allowed* to do, as opposed to what it
+# does. Ruleset "main: changes arrive by pull request" requires a code-owner
+# review for PRs touching these, so a Smith cannot widen its own authority
+# through the ordinary review gate.
+/.github/            @lundmatt1

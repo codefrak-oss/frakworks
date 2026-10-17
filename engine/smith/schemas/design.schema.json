@@ -1,0 +1,207 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/codefrak-oss/frakworks/engine/smith/schemas/design.schema.json",
+  "title": "DesignResult",
+  "description": "What a design Smith writes to /work/out/result.json. The engine checks it (ReadResultDelegate) before its own rules; the Smith checks it with check-result design. Strict types where the engine branches, any non-empty JSON where it only passes content on.",
+  "type": "object",
+  "required": [
+    "outcome"
+  ],
+  "properties": {
+    "outcome": {
+      "enum": [
+        "planned",
+        "split",
+        "ask"
+      ],
+      "description": "Branched on by the engine and the BPMN."
+    },
+    "plan": {
+      "$ref": "#/$defs/plan"
+    },
+    "questions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "question"
+        ],
+        "properties": {
+          "question": {
+            "$ref": "#/$defs/content"
+          },
+          "assumption": {
+            "$ref": "#/$defs/content"
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Branched on: below 0.7 goes to the user in confirm mode."
+          },
+          "impact": {
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ],
+            "description": "Branched on: high goes to the user in confirm mode."
+          },
+          "options": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 5,
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "label"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "pattern": "\\S",
+                  "description": "The answer that comes back when its button is pressed; unique in the list."
+                },
+                "label": {
+                  "type": "string",
+                  "pattern": "\\S",
+                  "description": "The button's text; one over 40 characters is shortened on the button."
+                }
+              }
+            },
+            "description": "Branched on: the candidates, when the answer is one of them. A single question put to the user with options is a kind: choice ask block, its options the buttons."
+          }
+        }
+      }
+    },
+    "question": {
+      "$ref": "#/$defs/content"
+    },
+    "children": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/child"
+      }
+    }
+  },
+  "$defs": {
+    "content": {
+      "description": "Passed on to a brief or a GitHub comment, never branched on: any non-empty JSON. A string is shown as itself; an object or array as a fenced JSON block.",
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        {
+          "type": "object",
+          "minProperties": 1
+        },
+        {
+          "type": "array",
+          "minItems": 1
+        },
+        {
+          "type": [
+            "number",
+            "boolean"
+          ]
+        }
+      ]
+    },
+    "child": {
+      "type": "object",
+      "required": [
+        "title",
+        "body",
+        "kind",
+        "dependsOn",
+        "points"
+      ],
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "The child issue's title, filed as is."
+        },
+        "body": {
+          "type": "string",
+          "description": "The child issue's markdown body; the engine reads its sections."
+        },
+        "kind": {
+          "enum": [
+            "chore",
+            "bug",
+            "feature"
+          ],
+          "description": "Branched on: which flow the child is filed for."
+        },
+        "featureMode": {
+          "enum": [
+            "auto",
+            "confirm",
+            null
+          ],
+          "description": "Ignored: a feature child takes its parent's mode. Omit it."
+        },
+        "dependsOn": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "description": "Indexes of earlier children."
+        },
+        "points": {
+          "enum": [1, 2, 3, 5, 8, 13],
+          "description": "The child's story points (bots/story-points.md), at most 13: recorded on the filed child."
+        }
+      }
+    },
+    "plan": {
+      "type": "object",
+      "required": [
+        "summary"
+      ],
+      "properties": {
+        "summary": {
+          "$ref": "#/$defs/content"
+        },
+        "files": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/content"
+          }
+        },
+        "stages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "title"
+            ],
+            "properties": {
+              "title": {
+                "$ref": "#/$defs/content"
+              },
+              "detail": {
+                "$ref": "#/$defs/content"
+              }
+            }
+          }
+        },
+        "tests": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/content"
+          }
+        },
+        "acceptance": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/content"
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,16 @@
+# Scrape config for the local stack (compose.local.yaml): the stack itself
+# and the engine.
+scrape_configs:
+  - job_name: victoriametrics
+    scrape_interval: 30s
+    static_configs: [{ targets: ["victoriametrics:8428"] }]
+  - job_name: victorialogs
+    scrape_interval: 30s
+    static_configs: [{ targets: ["victorialogs:9428"] }]
+  # smith_run_active while an engine-started Smith runs (engine/README.md,
+  # "Transcripts and the live-run gauge"). 15s: a run's series goes stale at the
+  # first scrape after it leaves /metrics, so this bounds how long a finished
+  # run still reads as live.
+  - job_name: engine
+    scrape_interval: 15s
+    static_configs: [{ targets: ["engine:8080"] }]

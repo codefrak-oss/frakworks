@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="170" font-family="sans-serif"><defs><linearGradient id="g"><stop offset="0" stop-color="#5af" stop-opacity="0"/><stop offset=".5" stop-color="#5af"/><stop offset="1" stop-color="#5af" stop-opacity="0"/></linearGradient></defs><rect width="1000" height="170" fill="#14161b"/>
+<g font-size="11" fill="#ddd">
+<rect x="8" y="8" width="135" height="150" rx="4" fill="#1b1e24"/><rect x="8" y="8" width="135" height="3" fill="#5a9"/><text x="14" y="26" font-weight="bold">Intake (1)</text>
+<rect x="149" y="8" width="135" height="150" rx="4" fill="#1b1e24"/><rect x="149" y="8" width="135" height="3" fill="#a8e"/><text x="155" y="26" font-weight="bold">Designing (0)</text>
+<rect x="290" y="8" width="135" height="150" rx="4" fill="#1b1e24"/><rect x="290" y="8" width="135" height="3" fill="#5af"/><text x="296" y="26" font-weight="bold">Coding (1)</text>
+<rect x="294" y="34" width="127" height="56" rx="5" fill="#14161b" stroke="#25272c"/><rect x="294" y="34" width="4" height="56" fill="#5af"/><text x="304" y="48" font-size="10" fill="#999">#64</text><text x="304" y="63">Chore: coding</text><text x="304" y="80" font-size="10" fill="#999">coding</text><rect x="298" y="88" width="50" height="2" fill="url(#g)"><animateTransform attributeName="transform" type="translate" values="0 0;70 0" dur="1.8s" repeatCount="indefinite"/></rect>
+<rect x="431" y="8" width="135" height="150" rx="4" fill="#1b1e24"/><rect x="431" y="8" width="135" height="3" fill="#e93"/><text x="437" y="26" font-weight="bold">Building (0)</text>
+<rect x="572" y="8" width="135" height="150" rx="4" fill="#1b1e24"/><rect x="572" y="8" width="135" height="3" fill="#e6b"/><text x="578" y="26" font-weight="bold">Reviewing (0)</text>
+<rect x="713" y="8" width="135" height="150" rx="4" fill="#1b1e24"/><rect x="713" y="8" width="135" height="3" fill="#4cc"/><text x="719" y="26" font-weight="bold">Merging (0)</text>
+<rect x="854" y="8" width="135" height="150" rx="4" fill="#1b1e24"/><rect x="854" y="8" width="135" height="3" fill="#888"/><text x="860" y="26" font-weight="bold">Waiting (1)</text>
+<rect x="858" y="34" width="127" height="56" rx="5" fill="#14161b" stroke="#25272c"/><rect x="858" y="34" width="4" height="56" fill="#888"/><text x="868" y="48" font-size="10" fill="#999">#28</text><text x="970" y="48" fill="#e93">⏸</text><text x="868" y="63">Intake: tier 4</text><text x="868" y="80" font-size="10" fill="#999">asking you</text>
+</g></svg>

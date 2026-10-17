@@ -1,0 +1,120 @@
+# Builds the engine and Smith images for amd64 and publishes them to the LAN
+# registry on every push to main that touches engine/** (engine/README.md,
+# "Images"). The images are large and the repo private, so GHCR is
+# deliberately not used: the LAN registry is plain HTTP, no auth, LAN only.
+# Its name is the Actions secret REGISTRY (a secret so the public logs mask
+# it), a deployment value, not written here.
+name: images
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'engine/**'
+      - '.github/workflows/images.yml'
+      # The Smith image's framework docs (smith/Dockerfile).
+      - 'bots/smith.md'
+      - 'bots/model-choice.md'
+      # The Smith image's baked desktop node_modules (smith/Dockerfile).
+      - 'observability/desktop/package.json'
+      - 'observability/desktop/package-lock.json'
+  workflow_dispatch:
+
+# Read the code, nothing more: the runner pods hold no secrets and the registry
+# takes none. Anything credentialed stays off these runners.
+permissions:
+  contents: read
+
+# One build of main at a time, and the running one finishes: a newer push waits,
+# and replaces any push still waiting, so the next build takes every commit since.
+# Cancelling the running build instead starved the deploy (its last step) while
+# main moved faster than a build takes.
+concurrency:
+  group: images-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ${{ secrets.REGISTRY }}
+  # amd64 only: the engine and every Smith run on the cluster's amd64 nodes
+  # (the user, 2026-10-06; arm64 may come back for a local stack on a Mac).
+  PLATFORMS: linux/amd64
+
+jobs:
+  # One job per image, on the cluster's `frakworks-images` runner scale set, so
+  # a push to main never queues behind the PR checks on `frakworks-build`. Both
+  # build on the cluster's one shared buildkitd ($BUILDKIT_HOST, set on the
+  # scale set by the deployment),
+  # whose state outlives each job, so its BuildKit cache mounts
+  # (engine/Dockerfile keeps /gradle-cache in one) are shared with engine.yml's
+  # builds. Its config trusts the HTTP registry.
+  build:
+    runs-on: frakworks-images
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: frakworks-engine
+            context: engine
+            # The commit, as the image's org.opencontainers.image.revision
+            # label and /version's `commit` (engine/Dockerfile, GIT_SHA). The
+            # `root` context is the repo root, for the files outside engine/
+            # that the build stage's config tests read (as in engine.yml), and
+            # the shared Gradle remote build cache the same step there uses.
+            extra: --build-arg GIT_SHA=${{ github.sha }} --build-context root=. --build-arg GRADLE_REMOTE_CACHE_URL=http://gradle-cache.frakworks-buildkit.svc.cluster.local:5071/cache/ --build-arg GRADLE_REMOTE_CACHE_PUSH=true
+          - image: frakworks-smith
+            context: engine/smith
+            # The framework docs, the desktop's package files and the engine's Gradle
+            # build files (for the dependency cache baked into the image, #2665), copied
+            # in by smith/Dockerfile; the same named contexts engine/compose.local.yaml gives it.
+            extra: --build-context framework=bots --build-context desktop=observability/desktop --build-context engine=engine
+    steps:
+      - uses: actions/checkout@v4
+      # The runner pod has no Docker daemon. A new pod's network is admitted by
+      # the NetworkPolicy a second or two after it starts, hence the retries.
+      - name: builder
+        run: |
+          docker buildx create --name frakworks --driver remote "$BUILDKIT_HOST"
+          for i in 1 2 3 4 5; do docker buildx inspect --bootstrap frakworks && exit 0; sleep 2; done
+          exit 1
+      - name: tags
+        id: tags
+        run: echo "sha=sha-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+      # The layer cache also lives in the registry next to the image (mode=max
+      # keeps every stage's layers), so a rebuilt buildkitd volume costs one
+      # slow build, not every one after it.
+      - name: build and push ${{ matrix.image }}
+        run: |
+          docker buildx build --builder frakworks --progress=plain --push \
+            --platform "$PLATFORMS" \
+            --tag "$REGISTRY/${{ matrix.image }}:main" \
+            --tag "$REGISTRY/${{ matrix.image }}:${{ steps.tags.outputs.sha }}" \
+            --cache-from "type=registry,ref=$REGISTRY/${{ matrix.image }}:buildcache" \
+            --cache-to "type=registry,ref=$REGISTRY/${{ matrix.image }}:buildcache,mode=max" \
+            ${{ matrix.extra }} \
+            ${{ matrix.context }}
+      # The registry's own API: the manifest must name each platform the build
+      # was asked for.
+      - name: published
+        run: |
+          curl -sS "http://$REGISTRY/v2/${{ matrix.image }}/tags/list"; echo
+          curl -sSf -H 'Accept: application/vnd.oci.image.index.v1+json' -H 'Accept: application/vnd.oci.image.manifest.v1+json' \
+            "http://$REGISTRY/v2/${{ matrix.image }}/manifests/main" > manifest.json
+          for platform in ${PLATFORMS//,/ }; do
+            arch="${platform#linux/}"
+            grep -q "\"architecture\": *\"$arch\"" manifest.json || { echo "no $arch manifest for ${{ matrix.image }}:main"; exit 1; }
+            echo "$arch published"
+          done
+      # The desktop's `npm test` in the image just pushed, with the network off,
+      # against this checkout: the baked node_modules must be enough
+      # (smith/Dockerfile). A build step on buildkitd stands in for the
+      # `docker run --network none` there is no daemon for; nothing is output.
+      - name: desktop tests in the sandbox
+        if: matrix.image == 'frakworks-smith'
+        run: |
+          docker buildx build --builder frakworks --progress=plain --no-cache -f - . <<EOF
+          FROM $REGISTRY/${{ matrix.image }}:${{ steps.tags.outputs.sha }}
+          USER root
+          COPY . /work/repo
+          RUN --network=none cd /work/repo/observability/desktop && cp -R /opt/desktop-deps/node_modules node_modules && npm test
+          EOF

@@ -1,0 +1,16 @@
+# frakworks: the engine and its Postgres. frakworks-smith: Smith Jobs only,
+# under restricted Pod Security, so the cluster refuses a Smith pod that is
+# not locked down. Two namespaces, so the engine's grant on Secrets where
+# Smiths run never covers its own.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: frakworks
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: frakworks-smith
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest

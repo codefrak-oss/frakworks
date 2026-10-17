@@ -1,0 +1,16 @@
+{
+  "commit": "0123456789abcdef0123456789abcdef01234567",
+  "truncated": false,
+  "entries": [
+    { "path": "README.md", "type": "blob", "sha": "r1" },
+    { "path": "docs", "type": "tree", "sha": "d1" },
+    { "path": "docs/guide.md", "type": "blob", "sha": "g1" },
+    { "path": "docs/img", "type": "tree", "sha": "d2" },
+    { "path": "docs/img/logo.png", "type": "blob", "sha": "l1" },
+    { "path": "engine", "type": "tree", "sha": "d3" },
+    { "path": "engine/build.gradle.kts", "type": "blob", "sha": "b1" },
+    { "path": "vendor", "type": "commit", "sha": "s1" },
+    { "path": "a.txt", "type": "blob", "sha": "a1" },
+    { "path": "Zeta.txt", "type": "blob", "sha": "z1" }
+  ]
+}

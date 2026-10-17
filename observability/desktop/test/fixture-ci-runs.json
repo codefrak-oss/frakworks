@@ -1,0 +1,21 @@
+{
+  "repo": "acme/widgets",
+  "runs": [
+    { "id": 5, "workflow": "Engine", "branch": "smith/issue-9", "event": "pull_request", "status": "in_progress", "conclusion": null,
+      "createdAt": "2026-10-09T11:58:00Z", "startedAt": "2026-10-09T11:58:20Z", "completedAt": null, "durationSeconds": null, "queuedSeconds": 20,
+      "url": "https://github.com/acme/widgets/actions/runs/5", "area": "engine", "trigger": "pr" },
+    { "id": 4, "workflow": "Images", "branch": "main", "event": "push", "status": "queued", "conclusion": null,
+      "createdAt": "2026-10-09T11:50:00Z", "startedAt": null, "completedAt": null, "durationSeconds": null, "queuedSeconds": null,
+      "url": "https://github.com/acme/widgets/actions/runs/4", "area": "images", "trigger": "main" },
+    { "id": 3, "workflow": "Engine", "branch": "main", "event": "push", "status": "completed", "conclusion": "success",
+      "createdAt": "2026-10-09T11:00:00Z", "startedAt": "2026-10-09T11:00:10Z", "completedAt": "2026-10-09T11:10:10Z", "durationSeconds": 600, "queuedSeconds": 10,
+      "url": "https://github.com/acme/widgets/actions/runs/3", "area": "engine", "trigger": "main" },
+    { "id": 2, "workflow": "Engine", "branch": "smith/issue-8", "event": "pull_request", "status": "completed", "conclusion": "failure",
+      "createdAt": "2026-10-09T10:00:00Z", "startedAt": "2026-10-09T10:00:05Z", "completedAt": "2026-10-09T10:05:05Z", "durationSeconds": 300, "queuedSeconds": 5,
+      "url": "https://github.com/acme/widgets/actions/runs/2", "area": "engine", "trigger": "pr" },
+    { "id": 1, "workflow": "Desktop release", "branch": "v1.2.0", "event": "release", "status": "completed", "conclusion": "cancelled",
+      "createdAt": "2026-10-09T09:00:00Z", "startedAt": "2026-10-09T09:00:30Z", "completedAt": "2026-10-09T09:02:30Z", "durationSeconds": 120, "queuedSeconds": 30,
+      "url": "https://github.com/acme/widgets/actions/runs/1", "area": "desktop-release", "trigger": "release" }
+  ],
+  "summary": { "count": 5, "medianDurationSeconds": 300.0, "medianQueuedSeconds": 15.0 }
+}

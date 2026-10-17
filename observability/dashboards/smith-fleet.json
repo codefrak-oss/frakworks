@@ -1,0 +1,955 @@
+{
+  "title": "Smith fleet",
+  "uid": "smith-fleet",
+  "editable": false,
+  "schemaVersion": 39,
+  "time": {
+    "from": "now-7d",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "repo",
+        "type": "constant",
+        "label": "Repo",
+        "hide": 2,
+        "query": "codefrak-oss/frakworks",
+        "current": {
+          "text": "codefrak-oss/frakworks",
+          "value": "codefrak-oss/frakworks"
+        },
+        "description": "The owner/name every GitHub link on this dashboard is built from (issue #1022, multi-repo stage 5). A constant rather than a per-row field on purpose: every panel here aggregates `stats by (child)` or `stats by (ticket)`, so taking the repo from the row would mean adding it to the grouping key — a change to what the panels count, not just to where they link. Point it at another repo, or switch it to a query variable, once a panel here is grouped per repo."
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Runs (7d)",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      },
+      "datasource": {
+        "type": "victoriametrics-logs-datasource",
+        "uid": "victorialogs"
+      },
+      "targets": [
+        {
+          "expr": "type:result | unpack_json | stats count_uniq(session_id) as runs",
+          "queryType": "stats",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Cost (7d, $)",
+      "description": "sum(total_cost_usd), cast through a math pipe before stats sum() — the raw string field trips a VictoriaLogs sum()/avg() parsing bug on some legitimate values (see observability/README.md Known gotchas), which previously made this panel silently drop those runs from the total rather than erroring. Events entirely missing total_cost_usd are filtered out before the sum instead of counting as 0.",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 0
+      },
+      "datasource": {
+        "type": "victoriametrics-logs-datasource",
+        "uid": "victorialogs"
+      },
+      "targets": [
+        {
+          "expr": "type:result | unpack_json | filter total_cost_usd:* | math total_cost_usd * 1 as cost2 | stats by (session_id) max(cost2) as c | stats sum(c) as cost",
+          "queryType": "stats",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 2
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "title": "Errored runs (7d)",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 0
+      },
+      "datasource": {
+        "type": "victoriametrics-logs-datasource",
+        "uid": "victorialogs"
+      },
+      "targets": [
+        {
+          "expr": "type:result AND is_error:true | unpack_json | stats count_uniq(session_id) as errors",
+          "queryType": "stats",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Avg turns/run (7d)",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 0
+      },
+      "datasource": {
+        "type": "victoriametrics-logs-datasource",
+        "uid": "victorialogs"
+      },
+      "targets": [
+        {
+          "expr": "type:result | unpack_json | stats by (session_id) max(num_turns) as t | stats avg(t) as avg_turns",
+          "queryType": "stats",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "title": "Cost by ticket & phase (7d)",
+      "description": "Horizontal stacked bar per issue, segmented by the phase (implementation/review/rework/rebase/secreview) that spent it, plus an 'unphased' segment for runs predating phase labelling (Alloy's phase/model filename parsing landed 2026-09-07/08 — see observability/README.md Known gotchas) so the stack total reconciles with the fleet-wide 'Cost (7d, $)' stat panel above. Each target casts total_cost_usd through a math pipe before stats sum() to avoid a VictoriaLogs sum()/avg() parsing bug on some values, and filters out events missing total_cost_usd entirely so a phase an issue never went through renders as no value rather than a fabricated 0. Sorted descending by row total, capped at 15 issues. Phase colours are fixed by field override so a phase absent from the current time range doesn't shift the colours of the phases that remain.",
+      "type": "barchart",
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 4
+      },
+      "datasource": {
+        "type": "victoriametrics-logs-datasource",
+        "uid": "victorialogs"
+      },
+      "targets": [
+        {
+          "expr": "type:result AND child:* AND phase:implementation | unpack_json | filter total_cost_usd:* | math total_cost_usd * 1 as implementation | stats by (child, session_id) max(implementation) as implementation | stats by (child) sum(implementation) as implementation",
+          "queryType": "stats",
+          "refId": "A"
+        },
+        {
+          "expr": "type:result AND child:* AND phase:review | unpack_json | filter total_cost_usd:* | math total_cost_usd * 1 as review | stats by (child, session_id) max(review) as review | stats by (child) sum(review) as review",
+          "queryType": "stats",
+          "refId": "B"
+        },
+        {
+          "expr": "type:result AND child:* AND phase:rework | unpack_json | filter total_cost_usd:* | math total_cost_usd * 1 as rework | stats by (child, session_id) max(rework) as rework | stats by (child) sum(rework) as rework",
+          "queryType": "stats",
+          "refId": "C"
+        },
+        {
+          "expr": "type:result AND child:* AND phase:rebase | unpack_json | filter total_cost_usd:* | math total_cost_usd * 1 as rebase | stats by (child, session_id) max(rebase) as rebase | stats by (child) sum(rebase) as rebase",
+          "queryType": "stats",
+          "refId": "D"
+        },
+        {
+          "expr": "type:result AND child:* AND NOT phase:* | unpack_json | filter total_cost_usd:* | math total_cost_usd * 1 as unphased | stats by (child, session_id) max(unphased) as unphased | stats by (child) sum(unphased) as unphased",
+          "queryType": "stats",
+          "refId": "E"
+        },
+        {
+          "expr": "type:result AND child:* AND phase:secreview | unpack_json | filter total_cost_usd:* | math total_cost_usd * 1 as secreview | stats by (child, session_id) max(secreview) as secreview | stats by (child) sum(secreview) as secreview",
+          "queryType": "stats",
+          "refId": "F"
+        },
+        {
+          "expr": "type:result AND child:* | stats by (child) max(_time) as last_run | math round(last_run / 1e9) as last_run",
+          "queryType": "stats",
+          "refId": "G"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "labelsToFields",
+          "options": {
+            "mode": "columns",
+            "valueLabel": "__name__"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            }
+          }
+        },
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "calculateField",
+          "options": {
+            "mode": "reduceRow",
+            "reduce": {
+              "reducer": "sum",
+              "include": [
+                "implementation",
+                "review",
+                "rework",
+                "rebase",
+                "unphased",
+                "secreview"
+              ]
+            },
+            "alias": "total",
+            "replaceFields": false
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "sort": [
+              {
+                "field": "last_run",
+                "desc": true
+              }
+            ]
+          }
+        },
+        {
+          "id": "limit",
+          "options": {
+            "limitField": 15
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "total": true,
+              "last_run": true
+            }
+          }
+        }
+      ],
+      "options": {
+        "orientation": "horizontal",
+        "stacking": "normal",
+        "xField": "child",
+        "showValue": "never",
+        "groupWidth": 0.7,
+        "barWidth": 0.9,
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 2,
+          "links": [
+            {
+              "title": "Open issue #${__data.fields.child} on GitHub",
+              "url": "https://github.com/${repo}/issues/${__data.fields.child}",
+              "targetBlank": true
+            }
+          ]
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "child"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "implementation"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#5794F2"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "review"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#FF9830"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "rework"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#B877D9"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "rebase"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#F2495C"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "unphased"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#8E8E8E"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "secreview"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#37872D"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 10,
+      "title": "Content tokens by ticket & phase (7d)",
+      "description": "sum(usage.input_tokens + usage.cache_creation_input_tokens + usage.output_tokens) per issue, stacked by phase (implementation/review/rework/rebase/secreview), plus an 'unphased' segment for runs predating phase labelling (see the cost panel's description and observability/README.md Known gotchas) so the stack total reconciles across panels. Deliberately excludes usage.cache_read_input_tokens, which is a separate panel (context churn), since cache reads can't be recovered from the dollar figures and don't represent new content. Each target requires all three addend fields present (not just the first) before the math cast, so a partial event can't feed NaN into an unguarded sum. Same missing-value, sort, limit and fixed-colour treatment as the cost panel.",
+      "type": "barchart",
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 14
+      },
+      "datasource": {
+        "type": "victoriametrics-logs-datasource",
+        "uid": "victorialogs"
+      },
+      "targets": [
+        {
+          "expr": "type:result AND child:* AND phase:implementation | unpack_json | filter usage.input_tokens:* AND usage.cache_creation_input_tokens:* AND usage.output_tokens:* | math usage.input_tokens + usage.cache_creation_input_tokens + usage.output_tokens as implementation | stats by (child, session_id) max(implementation) as implementation | stats by (child) sum(implementation) as implementation",
+          "queryType": "stats",
+          "refId": "A"
+        },
+        {
+          "expr": "type:result AND child:* AND phase:review | unpack_json | filter usage.input_tokens:* AND usage.cache_creation_input_tokens:* AND usage.output_tokens:* | math usage.input_tokens + usage.cache_creation_input_tokens + usage.output_tokens as review | stats by (child, session_id) max(review) as review | stats by (child) sum(review) as review",
+          "queryType": "stats",
+          "refId": "B"
+        },
+        {
+          "expr": "type:result AND child:* AND phase:rework | unpack_json | filter usage.input_tokens:* AND usage.cache_creation_input_tokens:* AND usage.output_tokens:* | math usage.input_tokens + usage.cache_creation_input_tokens + usage.output_tokens as rework | stats by (child, session_id) max(rework) as rework | stats by (child) sum(rework) as rework",
+          "queryType": "stats",
+          "refId": "C"
+        },
+        {
+          "expr": "type:result AND child:* AND phase:rebase | unpack_json | filter usage.input_tokens:* AND usage.cache_creation_input_tokens:* AND usage.output_tokens:* | math usage.input_tokens + usage.cache_creation_input_tokens + usage.output_tokens as rebase | stats by (child, session_id) max(rebase) as rebase | stats by (child) sum(rebase) as rebase",
+          "queryType": "stats",
+          "refId": "D"
+        },
+        {
+          "expr": "type:result AND child:* AND NOT phase:* | unpack_json | filter usage.input_tokens:* AND usage.cache_creation_input_tokens:* AND usage.output_tokens:* | math usage.input_tokens + usage.cache_creation_input_tokens + usage.output_tokens as unphased | stats by (child, session_id) max(unphased) as unphased | stats by (child) sum(unphased) as unphased",
+          "queryType": "stats",
+          "refId": "E"
+        },
+        {
+          "expr": "type:result AND child:* AND phase:secreview | unpack_json | filter usage.input_tokens:* AND usage.cache_creation_input_tokens:* AND usage.output_tokens:* | math usage.input_tokens + usage.cache_creation_input_tokens + usage.output_tokens as secreview | stats by (child, session_id) max(secreview) as secreview | stats by (child) sum(secreview) as secreview",
+          "queryType": "stats",
+          "refId": "F"
+        },
+        {
+          "expr": "type:result AND child:* | stats by (child) max(_time) as last_run | math round(last_run / 1e9) as last_run",
+          "queryType": "stats",
+          "refId": "G"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "labelsToFields",
+          "options": {
+            "mode": "columns",
+            "valueLabel": "__name__"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            }
+          }
+        },
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "calculateField",
+          "options": {
+            "mode": "reduceRow",
+            "reduce": {
+              "reducer": "sum",
+              "include": [
+                "implementation",
+                "review",
+                "rework",
+                "rebase",
+                "unphased",
+                "secreview"
+              ]
+            },
+            "alias": "total",
+            "replaceFields": false
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "sort": [
+              {
+                "field": "last_run",
+                "desc": true
+              }
+            ]
+          }
+        },
+        {
+          "id": "limit",
+          "options": {
+            "limitField": 15
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "total": true,
+              "last_run": true
+            }
+          }
+        }
+      ],
+      "options": {
+        "orientation": "horizontal",
+        "stacking": "normal",
+        "xField": "child",
+        "showValue": "never",
+        "groupWidth": 0.7,
+        "barWidth": 0.9,
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "links": [
+            {
+              "title": "Open issue #${__data.fields.child} on GitHub",
+              "url": "https://github.com/${repo}/issues/${__data.fields.child}",
+              "targetBlank": true
+            }
+          ]
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "child"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "implementation"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#5794F2"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "review"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#FF9830"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "rework"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#B877D9"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "rebase"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#F2495C"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "unphased"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#8E8E8E"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "secreview"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#37872D"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 11,
+      "title": "Context churn by ticket & phase (7d) — cache reads",
+      "description": "sum(usage.cache_read_input_tokens) per issue, stacked by phase, plus an 'unphased' segment for runs predating phase labelling (see the cost panel's description and observability/README.md Known gotchas) so the stack total reconciles across panels. Titled 'context churn' rather than a token total: a cache read is context being re-sent, not new content generated — see the cost panel's description for why it isn't folded into a dollar segment. Same missing-value, sort, limit and fixed-colour treatment as the other two panels.",
+      "type": "barchart",
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 24
+      },
+      "datasource": {
+        "type": "victoriametrics-logs-datasource",
+        "uid": "victorialogs"
+      },
+      "targets": [
+        {
+          "expr": "type:result AND child:* AND phase:implementation | unpack_json | filter usage.cache_read_input_tokens:* | math usage.cache_read_input_tokens * 1 as implementation | stats by (child, session_id) max(implementation) as implementation | stats by (child) sum(implementation) as implementation",
+          "queryType": "stats",
+          "refId": "A"
+        },
+        {
+          "expr": "type:result AND child:* AND phase:review | unpack_json | filter usage.cache_read_input_tokens:* | math usage.cache_read_input_tokens * 1 as review | stats by (child, session_id) max(review) as review | stats by (child) sum(review) as review",
+          "queryType": "stats",
+          "refId": "B"
+        },
+        {
+          "expr": "type:result AND child:* AND phase:rework | unpack_json | filter usage.cache_read_input_tokens:* | math usage.cache_read_input_tokens * 1 as rework | stats by (child, session_id) max(rework) as rework | stats by (child) sum(rework) as rework",
+          "queryType": "stats",
+          "refId": "C"
+        },
+        {
+          "expr": "type:result AND child:* AND phase:rebase | unpack_json | filter usage.cache_read_input_tokens:* | math usage.cache_read_input_tokens * 1 as rebase | stats by (child, session_id) max(rebase) as rebase | stats by (child) sum(rebase) as rebase",
+          "queryType": "stats",
+          "refId": "D"
+        },
+        {
+          "expr": "type:result AND child:* AND NOT phase:* | unpack_json | filter usage.cache_read_input_tokens:* | math usage.cache_read_input_tokens * 1 as unphased | stats by (child, session_id) max(unphased) as unphased | stats by (child) sum(unphased) as unphased",
+          "queryType": "stats",
+          "refId": "E"
+        },
+        {
+          "expr": "type:result AND child:* AND phase:secreview | unpack_json | filter usage.cache_read_input_tokens:* | math usage.cache_read_input_tokens * 1 as secreview | stats by (child, session_id) max(secreview) as secreview | stats by (child) sum(secreview) as secreview",
+          "queryType": "stats",
+          "refId": "F"
+        },
+        {
+          "expr": "type:result AND child:* | stats by (child) max(_time) as last_run | math round(last_run / 1e9) as last_run",
+          "queryType": "stats",
+          "refId": "G"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "labelsToFields",
+          "options": {
+            "mode": "columns",
+            "valueLabel": "__name__"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            }
+          }
+        },
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "calculateField",
+          "options": {
+            "mode": "reduceRow",
+            "reduce": {
+              "reducer": "sum",
+              "include": [
+                "implementation",
+                "review",
+                "rework",
+                "rebase",
+                "unphased",
+                "secreview"
+              ]
+            },
+            "alias": "total",
+            "replaceFields": false
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "sort": [
+              {
+                "field": "last_run",
+                "desc": true
+              }
+            ]
+          }
+        },
+        {
+          "id": "limit",
+          "options": {
+            "limitField": 15
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "total": true,
+              "last_run": true
+            }
+          }
+        }
+      ],
+      "options": {
+        "orientation": "horizontal",
+        "stacking": "normal",
+        "xField": "child",
+        "showValue": "never",
+        "groupWidth": 0.7,
+        "barWidth": 0.9,
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "links": [
+            {
+              "title": "Open issue #${__data.fields.child} on GitHub",
+              "url": "https://github.com/${repo}/issues/${__data.fields.child}",
+              "targetBlank": true
+            }
+          ]
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "child"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "implementation"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#5794F2"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "review"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#FF9830"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "rework"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#B877D9"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "rebase"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#F2495C"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "unphased"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#8E8E8E"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "secreview"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#37872D"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 6,
+      "title": "Runs per day",
+      "type": "barchart",
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 34
+      },
+      "datasource": {
+        "type": "victoriametrics-logs-datasource",
+        "uid": "victorialogs"
+      },
+      "targets": [
+        {
+          "expr": "type:result | unpack_json | stats by (_time:1d) count() as runs",
+          "queryType": "statsRange",
+          "step": "1d",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "Errored runs — detail",
+      "type": "logs",
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 43
+      },
+      "datasource": {
+        "type": "victoriametrics-logs-datasource",
+        "uid": "victorialogs"
+      },
+      "targets": [
+        {
+          "expr": "type:result AND is_error:true",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "All fleet logs (raw)",
+      "type": "logs",
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 52
+      },
+      "datasource": {
+        "type": "victoriametrics-logs-datasource",
+        "uid": "victorialogs"
+      },
+      "targets": [
+        {
+          "expr": "host:\"smith-runner\"",
+          "refId": "A"
+        }
+      ]
+    }
+  ]
+}

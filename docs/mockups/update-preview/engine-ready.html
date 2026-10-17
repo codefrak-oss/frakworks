@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Update preview: Engine update ready</title>
+<style>
+  :root { --bg: #ffffff; --fg: #1f2328; --muted: #59636e; --faint: #6e7781; --accent: #0969da; --surface: #f6f8fa;
+    --app: #eef1f4; --appbar: #e3e7ec; --card: #ffffff; --line: #d0d4da; --scrim: #f0f2f5; --panel: #ffffff;
+    --btn: #0969da; --amber: #9a6700; --amberbg: #fff8c5; --amberline: #d4a72c; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0d1117; --fg: #e6edf3; --muted: #9198a1; --faint: #6e7681; --accent: #4493f8; --surface: #151b23;
+      --app: #0d1117; --appbar: #151b23; --card: #161b22; --line: #30363d; --scrim: #080a0e; --panel: #161b22;
+      --btn: #1f6feb; --amber: #d29922; --amberbg: #2a2416; --amberline: #9e6a03; }
+  }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 16px; }
+  .muted { color: var(--muted); }
+  a { color: var(--accent); }
+  svg { width: 100%; height: auto; display: block; }
+  svg text { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .app { fill: var(--app); } .appbar { fill: var(--appbar); } .ph { fill: var(--line); }
+  .card { fill: var(--card); stroke: var(--line); } .scrim { fill: var(--scrim); opacity: .45; }
+  .panel { fill: var(--panel); stroke: var(--line); } .rule { fill: var(--line); stroke: var(--line); }
+  .t-fg { fill: var(--fg); } .t-muted { fill: var(--muted); } .t-faint { fill: var(--faint); } .t-link { fill: var(--accent); text-decoration: underline; }
+  .t-amber { fill: var(--amber); } .amber { fill: var(--amberbg); stroke: var(--amberline); }
+  .btn { fill: var(--btn); } .btn2 { fill: none; stroke: var(--faint); } .mono { font-family: ui-monospace, Menlo, monospace !important; }
+  nav ul { padding-left: 20px; }
+</style>
+</head>
+<body>
+<main>
+<h1>Update preview: Engine update ready</h1>
+<p class="muted">Mockup for ticket #100091, confirmed by the user in dark mode · <a href="index.html">all four states</a></p>
+<p>The lit Update engine is clicked. The header names both builds and how far behind the running one is; the live-run and session lines sit above the list.</p>
+<svg viewBox="0 0 640 394" role="img" aria-label="Update the engine? running  sha-76600fb   →   available  sha-a1b2c3d  (3 commits behind)">
+<defs><filter id="blur"><feGaussianBlur stdDeviation="3"/></filter></defs>
+<rect class="app" width="640" height="394"/>
+<g filter="url(#blur)" opacity="0.7">
+<rect class="appbar" x="0" y="0" width="150" height="394"/>
+<rect class="ph" x="12" y="20" width="110" height="10" rx="3"/><rect class="ph" x="12" y="40" width="90" height="10" rx="3"/><rect class="ph" x="12" y="60" width="120" height="10" rx="3"/>
+<rect class="card" x="170" y="20" width="440" height="60" rx="8"/><rect class="card" x="170" y="100" width="440" height="60" rx="8"/><rect class="card" x="170" y="180" width="440" height="60" rx="8"/><rect class="card" x="170" y="260" width="440" height="60" rx="8"/>
+<rect class="appbar" x="0" y="366" width="640" height="28"/>
+</g>
+<rect class="scrim" width="640" height="394"/>
+<rect class="panel" x="110" y="48" width="420" height="322" rx="10"/>
+<text x="128" y="76" class="t-fg" font-size="14" font-weight="600">Update the engine?</text><text x="128" y="100" class="t-muted mono" font-size="12">running  sha-76600fb   →   available  sha-a1b2c3d  (3 commits behind)</text><rect class="rule" x="128" y="112" width="384" height="1"/>
+<text x="128" y="150" class="t-muted" font-size="11">2 Smith runs are live; they survive the engine restart.</text>
+<text x="128" y="166" class="t-muted" font-size="11">1 first-mate session is open; it loses the engine for the gap.</text>
+<rect class="rule" x="128" y="176" width="384" height="1"/>
+<text x="128" y="196" class="t-fg" font-size="12" font-weight="600">What this update brings · 3 changes</text>
+<text x="128" y="218" class="t-link" font-size="12">#2712</text>
+<text x="182" y="218" class="t-fg" font-size="12">Choice questions offer “Something else” with a text box</text>
+<text x="128" y="238" class="t-link" font-size="12">#2711</text>
+<text x="182" y="238" class="t-fg" font-size="12">Ticket detail shows the merged PR’s main build in a strip</text>
+<text x="128" y="258" class="t-link" font-size="12">#2710</text>
+<text x="182" y="258" class="t-fg" font-size="12">First mate strip drops its Copy, History and Continue buttons</text>
+<rect class="rule" x="128" y="278" width="384" height="1"/>
+<text x="128" y="298" class="t-muted" font-size="11">The engine restarts itself onto :main; it is down for about 45 s. Cancel leaves it running.</text>
+<rect class="btn2" x="374" y="326" width="64" height="26" rx="6"/><text x="406" y="343" class="t-fg" font-size="12" text-anchor="middle">Cancel</text>
+<rect class="btn" x="446" y="326" width="66" height="26" rx="6"/><text x="479" y="343" fill="#ffffff" font-size="12" font-weight="600" text-anchor="middle">Update</text>
+<text x="128" y="343" class="t-faint" font-size="10">Enter: Update · Esc: Cancel</text>
+</svg>
+<p class="muted">The app behind the modal is blurred: in the desktop app one snapshot of the window, blurred once (no per-frame re-blur, #1110); in the web version a backdrop blur. Escape cancels; focus starts on Update, so Enter updates. Light and dark follow the system.</p>
+</main>
+</body>
+</html>

@@ -1,0 +1,8 @@
+{
+  "idempotencyKey": "inv-993-currency",
+  "deadline": "2026-10-09T09:00:00Z",
+  "defaultOnTimeout": "escalate",
+  "requires": { "capabilities": ["finance.invoice"] },
+  "question": "Which currency is invoice 993 in?",
+  "responseSchema": { "type": "string", "enum": ["EUR", "USD", "GBP"] }
+}

@@ -1,0 +1,81 @@
+{
+  "_comment": "One ticket's detail document, the shape src/ticket-data.js returns from the ticket:fetch IPC handler. Hand-built rather than captured so it exercises all five recognised comment prefixes; the timestamps are a real ticket's shape, shifted. Stage 3 (#1337) extends it with the comment identity a ticket pin binds to — each comment's `id`, `updatedAt` and content `revision` — and the issue's GitHub `node_id`, so a pin can detect a transfer. The lifecycle/cost/run fields this fixture used to also carry (`intervals`, `costs`, `runs`, `lifecycle_error`, `costs_error`, `runs_error`) moved to the engine's own timeline (#101/#91, fixture-ticket-timeline.json) and are no longer part of this document.",
+  "ticket": 1281,
+  "repo": "codefrak-oss/frakworks",
+  "now": 1789909840,
+  "issue_error": null,
+  "issue": {
+    "node_id": "I_kwDORmY50M6fixture1281",
+    "number": 1281,
+    "title": "Agent Army desktop app stage 2: ticket detail view with the segmented stage bar",
+    "state": "OPEN",
+    "url": "https://github.com/codefrak-oss/frakworks/issues/1281",
+    "labels": [
+      "bot-task",
+      "claimed",
+      "p3"
+    ],
+    "createdAt": "2026-09-21T00:00:00Z",
+    "closedAt": null,
+    "comments": [
+      {
+        "id": "IC_fixture1281_1",
+        "revision": "2026-09-21T00:10:00Z:f846da0686aa",
+        "author": "example-smith",
+        "createdAt": "2026-09-21T00:10:00Z",
+        "updatedAt": "2026-09-21T00:10:00Z",
+        "body": "🤖 Claimed by Smith `smith-runner-1281-1789959477` on smith-runner.\n- Started: `2026-09-21T00:10:00Z`",
+        "url": "https://github.com/codefrak-oss/frakworks/issues/1281#issuecomment-1"
+      },
+      {
+        "id": "IC_fixture1281_2",
+        "revision": "2026-09-21T00:40:00Z:1b7a7734a74d",
+        "author": "example-smith",
+        "createdAt": "2026-09-21T00:40:00Z",
+        "updatedAt": "2026-09-21T00:40:00Z",
+        "body": "ticket-data: second IPC handler wired, 1a2b3c4",
+        "url": "https://github.com/codefrak-oss/frakworks/issues/1281#issuecomment-2"
+      },
+      {
+        "id": "IC_fixture1281_3",
+        "revision": "2026-09-21T00:41:00Z:53eb779febfb",
+        "author": "example-smith",
+        "createdAt": "2026-09-21T00:41:00Z",
+        "updatedAt": "2026-09-21T00:41:00Z",
+        "body": "📊 Run stats: 48 turns · 29m · ~$3.21 (success)",
+        "url": "https://github.com/codefrak-oss/frakworks/issues/1281#issuecomment-3"
+      },
+      {
+        "id": "IC_fixture1281_4",
+        "revision": "2026-09-21T01:05:00Z:8149aa35e2f9",
+        "author": "example-smith",
+        "createdAt": "2026-09-21T01:05:00Z",
+        "updatedAt": "2026-09-21T01:05:00Z",
+        "body": "Returning to the Source: the claim lock no longer names this Smith. Stopping without closing.",
+        "url": "https://github.com/codefrak-oss/frakworks/issues/1281#issuecomment-4"
+      },
+      {
+        "id": "IC_fixture1281_5",
+        "revision": "2026-09-21T01:40:00Z:6ac9c028925b",
+        "author": "example-smith",
+        "createdAt": "2026-09-21T01:40:00Z",
+        "updatedAt": "2026-09-21T01:40:00Z",
+        "body": "Blocked: VictoriaLogs on vm/465 refused the stats_query.\nNeeds: the logs endpoint back.",
+        "url": "https://github.com/codefrak-oss/frakworks/issues/1281#issuecomment-5"
+      },
+      {
+        "id": "IC_fixture1281_6",
+        "revision": "2026-09-21T02:30:00Z:2060083e20f8",
+        "author": "example-smith",
+        "createdAt": "2026-09-21T02:30:00Z",
+        "updatedAt": "2026-09-21T02:30:00Z",
+        "body": "Done. Ticket detail view with the segmented stage bar.\nCommits: 1a2b3c4 5d6e7f8   PR: #1282",
+        "url": "https://github.com/codefrak-oss/frakworks/issues/1281#issuecomment-6"
+      }
+    ]
+  },
+  "prs": [],
+  "prs_error": null,
+  "body_html": null,
+  "comment_html": {}
+}

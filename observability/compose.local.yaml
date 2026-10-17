@@ -1,0 +1,50 @@
+# observability, local profile — docs/local-stack.md.
+# VictoriaMetrics, VictoriaLogs and Grafana with named volumes, localhost
+# binds and the admin password from the root .env. The scrape config is
+# vmetrics/scrape.local.yml: the stack watching itself plus the engine's
+# /metrics.
+services:
+  victoriametrics:
+    image: victoriametrics/victoria-metrics:v1.111.0
+    restart: unless-stopped
+    ports: ["127.0.0.1:8428:8428"]
+    volumes:
+      - vm-data:/storage
+      - ./vmetrics/scrape.local.yml:/etc/vmetrics/scrape.yml:ro
+    command:
+      - "--storageDataPath=/storage"
+      - "--retentionPeriod=13"
+      - "--promscrape.config=/etc/vmetrics/scrape.yml"
+
+  victorialogs:
+    image: victoriametrics/victoria-logs:v1.15.0-victorialogs
+    restart: unless-stopped
+    ports: ["127.0.0.1:9428:9428"]
+    volumes:
+      - vl-data:/storage
+    command:
+      - "--storageDataPath=/storage"
+      - "--retentionPeriod=30d"
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    restart: unless-stopped
+    ports: ["127.0.0.1:3000:3000"]
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD (see .env.example)}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_INSTALL_PLUGINS: victoriametrics-logs-datasource
+    volumes:
+      - grafana-data:/var/lib/grafana
+      # datasources and dashboards; there is no alerting provisioning (the
+      # Operator-era claude-usage alert file was removed 2026-09-27).
+      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./dashboards:/etc/grafana/dashboards:ro
+    depends_on: [victoriametrics, victorialogs]
+
+volumes:
+  vm-data:
+  vl-data:
+  grafana-data:

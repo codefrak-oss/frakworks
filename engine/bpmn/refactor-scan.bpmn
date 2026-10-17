@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- refactor-scan (engine/README.md, "Refactoring jobs"): the flow of a ticket of kind refactor-scan, which a repo's
+     refactoring job files and starts at its config's tier (bpmn/job.bpmn, fileRefactorScan). A no-code Smith inspects
+     the code on the ticket's instructions through callable-smith (changes no file, cuts no bundle), the engine files up
+     to maxTickets of its proposals of at most maxLines each (approval as configured), and the ticket closes. No answer
+     page and no ack. -->
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:operaton="http://operaton.org/schema/1.0/bpmn" id="Definitions_refactor_scan" targetNamespace="http://codefrak.com/engine">
+  <bpmn:message id="message-refactor-scan-filed" name="refactor-scan filed" />
+  <bpmn:process id="refactor-scan" name="refactor-scan" isExecutable="true" operaton:historyTimeToLive="30">
+    <bpmn:documentation>in (ProcessFlowStarter, on "refactor-scan filed"): repo, issue, approvedTicket (whose body is the instructions), askedBy, and model, effort and tier from the ticket's tier; out: outcome and summary, what was filed</bpmn:documentation>
+    <bpmn:startEvent id="start-refactor-scan-filed" name="refactor-scan filed">
+      <bpmn:outgoing>flow-scan-start</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="message-event-refactor-scan-filed" messageRef="message-refactor-scan-filed" />
+    </bpmn:startEvent>
+    <bpmn:serviceTask id="task-prepare-scan" name="prepare the scan" operaton:asyncBefore="true" operaton:delegateExpression="${prepareRefactorScan}">
+      <bpmn:documentation>PrepareRefactorScanDelegate: prompt is the ticket's body less the engine's trailer; with the repo's refactoring off meanwhile, outcome is `failed: refactoring is off for &lt;repo&gt;` and refactorSkipped is true</bpmn:documentation>
+      <bpmn:incoming>flow-scan-start</bpmn:incoming>
+      <bpmn:outgoing>flow-scan-prepared</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="gateway-scan-prepared" name="off?">
+      <bpmn:incoming>flow-scan-prepared</bpmn:incoming>
+      <bpmn:outgoing>flow-scan-inspect</bpmn:outgoing>
+      <bpmn:outgoing>flow-scan-skipped</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:callActivity id="call-callable-smith" name="inspect the code&#10;(callable smith)" calledElement="callable-smith">
+      <bpmn:documentation>callable-smith (bpmn/callable-smith.bpmn): a no-code Smith on the prompt, at the ticket's model and effort; changes no file, cuts no bundle; out result, its proposals, and outcome</bpmn:documentation>
+      <bpmn:extensionElements>
+        <operaton:in source="prompt" target="prompt" />
+        <operaton:in source="repo" target="repo" />
+        <operaton:in source="model" target="model" />
+        <operaton:in source="effort" target="effort" />
+        <operaton:in source="dryRun" target="dryRun" />
+        <operaton:in source="account" target="account" />
+        <operaton:out source="result" target="result" />
+        <operaton:out source="outcome" target="outcome" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>flow-scan-inspect</bpmn:incoming>
+      <bpmn:outgoing>flow-scan-inspected</bpmn:outgoing>
+    </bpmn:callActivity>
+    <bpmn:serviceTask id="task-file-refactor-tickets" name="file the refactoring tickets" operaton:asyncBefore="true" operaton:delegateExpression="${fileRefactorTickets}">
+      <bpmn:documentation>FileRefactorTicketsDelegate: a failed outcome passes through with nothing filed; else the result's summary.proposals, less the keys already open, duplicates and oversize ones, the first maxTickets filed as feature + refactor (feature:confirm for approval human; feature:auto, started at once and labelled authorized for approval none), outcome done and summary saying what was filed and skipped; the filed numbers, skips by reason and found_nothing (no proposals at all, summary `found nothing`) go on the job run that filed the scan (JobRuns.scanResult)</bpmn:documentation>
+      <bpmn:incoming>flow-scan-inspected</bpmn:incoming>
+      <bpmn:outgoing>flow-scan-filed</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="task-close-scan" name="close the scan&#10;(work item)" operaton:asyncBefore="true" operaton:delegateExpression="${closeRefactorScan}">
+      <bpmn:documentation>CloseRefactorScanDelegate: comments the summary (or the outcome) on the ticket and closes it, completed when the scan was done, not planned otherwise; the scan's outcome and summary go on the engine.job_run row of the job run that filed it (JobRuns.scanEnded)</bpmn:documentation>
+      <bpmn:incoming>flow-scan-filed</bpmn:incoming>
+      <bpmn:incoming>flow-scan-skipped</bpmn:incoming>
+      <bpmn:outgoing>flow-scan-end</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="end-refactor-scan-closed" name="refactor-scan closed">
+      <bpmn:incoming>flow-scan-end</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="flow-scan-start" sourceRef="start-refactor-scan-filed" targetRef="task-prepare-scan" />
+    <bpmn:sequenceFlow id="flow-scan-prepared" sourceRef="task-prepare-scan" targetRef="gateway-scan-prepared" />
+    <bpmn:sequenceFlow id="flow-scan-inspect" name="inspect" sourceRef="gateway-scan-prepared" targetRef="call-callable-smith">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${!refactorSkipped}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow-scan-skipped" name="off" sourceRef="gateway-scan-prepared" targetRef="task-close-scan">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${refactorSkipped}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow-scan-inspected" sourceRef="call-callable-smith" targetRef="task-file-refactor-tickets" />
+    <bpmn:sequenceFlow id="flow-scan-filed" sourceRef="task-file-refactor-tickets" targetRef="task-close-scan" />
+    <bpmn:sequenceFlow id="flow-scan-end" sourceRef="task-close-scan" targetRef="end-refactor-scan-closed" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="diagram-refactor-scan">
+    <bpmndi:BPMNPlane id="plane-refactor-scan" bpmnElement="refactor-scan">
+      <bpmndi:BPMNShape id="start-refactor-scan-filed-di" bpmnElement="start-refactor-scan-filed">
+        <dc:Bounds x="152" y="232" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="125" y="275" width="90" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-prepare-scan-di" bpmnElement="task-prepare-scan">
+        <dc:Bounds x="240" y="210" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="gateway-scan-prepared-di" bpmnElement="gateway-scan-prepared" isMarkerVisible="true">
+        <dc:Bounds x="400" y="225" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="411" y="196" width="28" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="call-callable-smith-di" bpmnElement="call-callable-smith">
+        <dc:Bounds x="520" y="210" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-file-refactor-tickets-di" bpmnElement="task-file-refactor-tickets">
+        <dc:Bounds x="680" y="210" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-close-scan-di" bpmnElement="task-close-scan">
+        <dc:Bounds x="840" y="210" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="end-refactor-scan-closed-di" bpmnElement="end-refactor-scan-closed">
+        <dc:Bounds x="1002" y="232" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="972" y="275" width="96" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="flow-scan-start-di" bpmnElement="flow-scan-start">
+        <di:waypoint x="188" y="250" />
+        <di:waypoint x="240" y="250" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-scan-prepared-di" bpmnElement="flow-scan-prepared">
+        <di:waypoint x="340" y="250" />
+        <di:waypoint x="400" y="250" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-scan-inspect-di" bpmnElement="flow-scan-inspect">
+        <di:waypoint x="450" y="250" />
+        <di:waypoint x="520" y="250" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="465" y="226" width="38" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-scan-skipped-di" bpmnElement="flow-scan-skipped">
+        <di:waypoint x="425" y="275" />
+        <di:waypoint x="425" y="370" />
+        <di:waypoint x="890" y="370" />
+        <di:waypoint x="890" y="290" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="435" y="320" width="16" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-scan-inspected-di" bpmnElement="flow-scan-inspected">
+        <di:waypoint x="620" y="250" />
+        <di:waypoint x="680" y="250" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-scan-filed-di" bpmnElement="flow-scan-filed">
+        <di:waypoint x="780" y="250" />
+        <di:waypoint x="840" y="250" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-scan-end-di" bpmnElement="flow-scan-end">
+        <di:waypoint x="940" y="250" />
+        <di:waypoint x="1002" y="250" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

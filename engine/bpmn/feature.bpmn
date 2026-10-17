@@ -1,0 +1,1259 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:camunda="http://camunda.org/schema/1.0/bpmn" xmlns:operaton="http://operaton.org/schema/1.0/bpmn" xmlns:modeler="http://camunda.org/schema/modeler/1.0" id="Definitions_feature" targetNamespace="http://codefrak.com/agent-army/bpmn" exporter="Camunda Modeler" exporterVersion="5.51.1" modeler:executionPlatform="Camunda Platform" modeler:executionPlatformVersion="7.23.0">
+  <bpmn:message id="message-feature-filed" name="feature filed" />
+  <bpmn:message id="message-child-closed" name="child closed" />
+  <bpmn:message id="message-restart-live-parent" name="restart live parent" />
+  <bpmn:error id="error-merge-conflict" name="merge conflict" errorCode="merge-conflict" />
+  <bpmn:process id="feature" name="feature" isExecutable="true" camunda:historyTimeToLive="180">
+    <bpmn:documentation>The flow for a ticket of kind feature, in auto or confirm mode (featureMode): a design Smith plans it, then the chore's work, push and PR, engine check, security review, correctness review, bringing the PR up to date with the default branch (a clean merge is pushed, checked, security-reviewed and reviewed again; a conflict goes back to the work, at most twice) and merge, then acceptance against the plan's criteria: an accept Smith's check, in both modes. The modes differ only before the work: confirm mode stops for the plan questions the design Smith is not confident enough to assume; auto mode lets every assumption stand. Started by a feature label, a feature:auto or feature:confirm label, and authorized; or from an intake. A design that finds the plan too big for one run returns split: the children are filed one at a time, the parent blocked by each on GitHub and parked at child closed until the scan wakes it with the child's merge, then a replan run says continue, revise or done before the next is filed (childMode live: one long-running parent Smith watches and steers the children instead, files the later drafts itself with file_children, and writes done when the split is complete; one that ends early falls back to a replan per close); after the last, the parent's own acceptance (README, "Split features").</bpmn:documentation>
+    <bpmn:startEvent id="start-feature-filed" name="feature filed">
+      <bpmn:outgoing>flow-start-design</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="MessageEventDefinition_feature" messageRef="message-feature-filed" />
+    </bpmn:startEvent>
+    <bpmn:callActivity id="call-design" name="design&#10;(smith run)" camunda:asyncBefore="true" calledElement="reusable-smith-run">
+      <bpmn:documentation>A design Smith on the default branch; commits nothing. Writes the plan (files, stages, tests, acceptance criteria) and the questions the ticket leaves open, each with an assumption and a confidence. In confirm mode, read result turns important questions into ask; in auto mode every assumption stands. The plan rides in every later brief</bpmn:documentation>
+      <bpmn:extensionElements>
+        <camunda:in variables="all" />
+        <camunda:in sourceExpression="${&#39;design&#39;}" target="mode" />
+        <camunda:out variables="all" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>flow-start-design</bpmn:incoming>
+      <bpmn:incoming>flow-answer-design</bpmn:incoming>
+      <bpmn:incoming>flow-overflow-design</bpmn:incoming>
+      <bpmn:outgoing>flow-design-outcome</bpmn:outgoing>
+    </bpmn:callActivity>
+    <bpmn:exclusiveGateway id="gateway-design-outcome" name="planned?">
+      <bpmn:incoming>flow-design-outcome</bpmn:incoming>
+      <bpmn:outgoing>flow-design-planned</bpmn:outgoing>
+      <bpmn:outgoing>flow-design-ask</bpmn:outgoing>
+      <bpmn:outgoing>flow-design-split</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="task-file-child" name="file the next child&#10;(work item)" camunda:asyncBefore="true" camunda:delegateExpression="${fileChild}">
+      <bpmn:documentation>FileChildDelegate, through ChildFiling (shared with the live parent's file_children): files the next unfiled draft (childMode parallel or live: every ready draft, or none when only children are open) at the parent's tier with the part line, records the parent as blocked by it in the work-item store, starts its flow with the parent's authorizer, and parks the parent as a deferred_issue row naming this instance, blocked by every open child</bpmn:documentation>
+      <bpmn:extensionElements>
+        <operaton:failedJobRetryTimeCycle>R3/PT30S</operaton:failedJobRetryTimeCycle>
+      </bpmn:extensionElements>
+      <bpmn:incoming>flow-design-split</bpmn:incoming>
+      <bpmn:incoming>flow-drafts-next</bpmn:incoming>
+      <bpmn:incoming>flow-live-fallback</bpmn:incoming>
+      <bpmn:outgoing>flow-file-live</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="gateway-live-parent" name="live parent?" default="flow-child-wait">
+      <bpmn:documentation>childMode live, and no live parent session has ended early yet (liveFallback): a parent Smith watches the children; otherwise the parent parks at child closed, as serial and parallel do</bpmn:documentation>
+      <bpmn:incoming>flow-file-live</bpmn:incoming>
+      <bpmn:outgoing>flow-child-wait</bpmn:outgoing>
+      <bpmn:outgoing>flow-live-parent</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:callActivity id="call-parent" name="live parent&#10;(smith run)" camunda:asyncBefore="true" calledElement="reusable-smith-run">
+      <bpmn:documentation>One long-running parent Smith (mode parent, turn budget engine.smith.parent-turns) for the whole split: waits on await_children, reads the children with read_ticket_runs, read_transcript and read_ticket, steers them with steer_child, files the next drafts itself with file_children (the same filing as file the next child, the split variable updated here and on the run), and when every draft is filed and the last child closed writes done; or ended, when its session ends first (its turn budget, the 24 h Job deadline, a failed run); a replan's continue or revise written after the last close is still applied</bpmn:documentation>
+      <bpmn:extensionElements>
+        <camunda:in variables="all" />
+        <camunda:in sourceExpression="${&#39;parent&#39;}" target="mode" />
+        <camunda:out variables="all" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>flow-live-parent</bpmn:incoming>
+      <bpmn:incoming>flow-restart-parent</bpmn:incoming>
+      <bpmn:outgoing>flow-parent-reconcile</bpmn:outgoing>
+    </bpmn:callActivity>
+    <bpmn:serviceTask id="task-reconcile-children" name="reconcile the children&#10;(work item)" camunda:asyncBefore="true" camunda:delegateExpression="${reconcileChildren}">
+      <bpmn:documentation>ReconcileChildrenDelegate: records each filed child's close, read from the work-item store (the engine's own close), on the split state; sets liveClosed when every child is closed and the parent's result is not ended</bpmn:documentation>
+      <bpmn:extensionElements>
+        <operaton:failedJobRetryTimeCycle>R3/PT30S</operaton:failedJobRetryTimeCycle>
+      </bpmn:extensionElements>
+      <bpmn:incoming>flow-parent-reconcile</bpmn:incoming>
+      <bpmn:outgoing>flow-reconcile-closed</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="gateway-live-closed" name="all closed?" default="flow-live-ended">
+      <bpmn:incoming>flow-reconcile-closed</bpmn:incoming>
+      <bpmn:outgoing>flow-live-apply</bpmn:outgoing>
+      <bpmn:outgoing>flow-live-ended</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="task-note-live-ended" name="note the live parent ended&#10;(work item)" camunda:asyncBefore="true" camunda:delegateExpression="${noteLiveEnded}">
+      <bpmn:documentation>NoteLiveEndedDelegate: comments that the live parent session ended with children still open and sets liveFallback; file the next child then re-parks the parent on the open children at child closed, and the rest of the split runs one replan per close</bpmn:documentation>
+      <bpmn:extensionElements>
+        <operaton:failedJobRetryTimeCycle>R3/PT30S</operaton:failedJobRetryTimeCycle>
+      </bpmn:extensionElements>
+      <bpmn:incoming>flow-live-ended</bpmn:incoming>
+      <bpmn:outgoing>flow-live-fallback</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:subProcess id="subprocess-child-wait" name="parked">
+      <bpmn:documentation>The parent parked at child closed; a restart live parent message on its boundary leaves it for the live parent instead (childMode live after a fallback)</bpmn:documentation>
+      <bpmn:incoming>flow-child-wait</bpmn:incoming>
+      <bpmn:outgoing>flow-child-replan</bpmn:outgoing>
+      <bpmn:startEvent id="start-child-wait">
+        <bpmn:outgoing>flow-wait-start</bpmn:outgoing>
+      </bpmn:startEvent>
+      <bpmn:intermediateCatchEvent id="event-child-closed" name="child closed">
+        <bpmn:documentation>The scan's resume pass correlates this once the child is closed by the engine's own merge, with closedChild and closedChildPr (a child whose work split it: its close-split task, with closedChildSplit, the drafts); a child closed without a merge leaves the parent here with a comment</bpmn:documentation>
+        <bpmn:incoming>flow-wait-start</bpmn:incoming>
+        <bpmn:outgoing>flow-wait-end</bpmn:outgoing>
+        <bpmn:messageEventDefinition id="MessageEventDefinition_child_closed" messageRef="message-child-closed" />
+      </bpmn:intermediateCatchEvent>
+      <bpmn:endEvent id="end-child-wait">
+        <bpmn:incoming>flow-wait-end</bpmn:incoming>
+      </bpmn:endEvent>
+      <bpmn:sequenceFlow id="flow-wait-start" sourceRef="start-child-wait" targetRef="event-child-closed" />
+      <bpmn:sequenceFlow id="flow-wait-end" sourceRef="event-child-closed" targetRef="end-child-wait" />
+    </bpmn:subProcess>
+    <bpmn:boundaryEvent id="event-restart-live-parent" name="restart live parent" attachedToRef="subprocess-child-wait">
+      <bpmn:documentation>LiveParentRestarter correlates this, with liveRestartBy, only for childMode live with liveFallback set (POST /ticket/{owner}/{repo}/{n}/live-parent); the children keep running</bpmn:documentation>
+      <bpmn:outgoing>flow-restart-task</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="MessageEventDefinition_restart_live_parent" messageRef="message-restart-live-parent" />
+    </bpmn:boundaryEvent>
+    <bpmn:serviceTask id="task-restart-live-parent" name="restart the live parent&#10;(work item)" camunda:asyncBefore="true" camunda:delegateExpression="${restartLiveParent}">
+      <bpmn:documentation>RestartLiveParentDelegate: clears liveFallback, deletes the parent's deferred_issue row and comments; the new parent run watches the children still open</bpmn:documentation>
+      <bpmn:extensionElements>
+        <operaton:failedJobRetryTimeCycle>R3/PT30S</operaton:failedJobRetryTimeCycle>
+      </bpmn:extensionElements>
+      <bpmn:incoming>flow-restart-task</bpmn:incoming>
+      <bpmn:outgoing>flow-restart-parent</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:callActivity id="call-replan" name="replan&#10;(smith run)" camunda:asyncBefore="true" calledElement="reusable-smith-run">
+      <bpmn:documentation>A replan Smith on main as it now is, told the plan, the merged child and its PR, and the remaining drafts: continue, revise (rewritten drafts) or done (drop the rest). After the last child it is the coherence check</bpmn:documentation>
+      <bpmn:extensionElements>
+        <camunda:in variables="all" />
+        <camunda:in sourceExpression="${&#39;replan&#39;}" target="mode" />
+        <camunda:out variables="all" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>flow-child-replan</bpmn:incoming>
+      <bpmn:outgoing>flow-replan-apply</bpmn:outgoing>
+    </bpmn:callActivity>
+    <bpmn:serviceTask id="task-apply-replan" name="apply the replan" camunda:asyncBefore="true" camunda:delegateExpression="${applyReplan}">
+      <bpmn:documentation>ApplyReplanDelegate: records the merge on the split state (live: applies the parent run's result, the closes already recorded), replaces or drops the remaining drafts, sets draftsLeft and (parallel and live) childrenOpen</bpmn:documentation>
+      <bpmn:extensionElements>
+        <operaton:failedJobRetryTimeCycle>R3/PT30S</operaton:failedJobRetryTimeCycle>
+      </bpmn:extensionElements>
+      <bpmn:incoming>flow-replan-apply</bpmn:incoming>
+      <bpmn:incoming>flow-live-apply</bpmn:incoming>
+      <bpmn:outgoing>flow-apply-drafts</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="gateway-drafts-left" name="more to do?" default="flow-drafts-none">
+      <bpmn:incoming>flow-apply-drafts</bpmn:incoming>
+      <bpmn:outgoing>flow-drafts-next</bpmn:outgoing>
+      <bpmn:outgoing>flow-drafts-none</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="task-post-question" name="post the smith&#39;s question&#10;(work item)" camunda:asyncBefore="true" camunda:delegateExpression="${postFeatureQuestion}">
+      <bpmn:documentation>PostFeatureQuestionDelegate: records the design Smith's question, or the plan questions the user must answer, in engine.intake_question and comments it on the ticket</bpmn:documentation>
+      <bpmn:extensionElements>
+        <operaton:failedJobRetryTimeCycle>R3/PT30S</operaton:failedJobRetryTimeCycle>
+      </bpmn:extensionElements>
+      <bpmn:incoming>flow-design-ask</bpmn:incoming>
+      <bpmn:outgoing>flow-question-answer</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:userTask id="user-task-answer-question" name="answer the smith&#39;s question">
+      <bpmn:documentation>Waits for POST /intake/{id}/answer from someone who may authorize features; the answers join the brief of the next design run</bpmn:documentation>
+      <bpmn:incoming>flow-question-answer</bpmn:incoming>
+      <bpmn:outgoing>flow-answer-design</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:callActivity id="call-do-work" name="do the work&#10;(smith run)" camunda:asyncBefore="true" calledElement="reusable-smith-run">
+      <bpmn:documentation>A work Smith on the ticket and the plan: follows the plan's stages; the brief's answers bind, and an unanswered plan question's assumption stands; commits only, never pushes</bpmn:documentation>
+      <bpmn:extensionElements>
+        <camunda:in variables="all" />
+        <camunda:in sourceExpression="${&#39;work&#39;}" target="mode" />
+        <camunda:out variables="all" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>flow-merge-rejected</bpmn:incoming>
+      <bpmn:incoming>flow-design-planned</bpmn:incoming>
+      <bpmn:incoming>flow-answer-work</bpmn:incoming>
+      <bpmn:incoming>flow-security-findings</bpmn:incoming>
+      <bpmn:incoming>flow-review-changes</bpmn:incoming>
+      <bpmn:incoming>flow-rebase-conflict</bpmn:incoming>
+      <bpmn:incoming>flow-ci-failed</bpmn:incoming>
+      <bpmn:incoming>flow-outcome-rejected</bpmn:incoming>
+      <bpmn:outgoing>flow-work-outcome</bpmn:outgoing>
+    </bpmn:callActivity>
+    <bpmn:exclusiveGateway id="gateway-work-outcome" name="outcome?">
+      <bpmn:incoming>flow-work-outcome</bpmn:incoming>
+      <bpmn:outgoing>flow-outcome-done</bpmn:outgoing>
+      <bpmn:outgoing>flow-outcome-ask</bpmn:outgoing>
+      <bpmn:outgoing>flow-outcome-overflowed</bpmn:outgoing>
+      <bpmn:outgoing>flow-outcome-nothing-to-do</bpmn:outgoing>
+      <bpmn:outgoing>flow-outcome-split</bpmn:outgoing>
+      <bpmn:outgoing>flow-outcome-rejected</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="task-close-nothing-to-do" name="close ticket, nothing to do&#10;(work item)" camunda:asyncBefore="true" camunda:delegateExpression="${closeNothingToDo}">
+      <bpmn:documentation>CloseNothingToDoDelegate, shared with the chore: the work found the ticket needs no change; comments its reason and closes the ticket as completed, with no pr, review, merge or acceptance. A split child's close wakes its parent like a merge (engine/README.md, "Split features")</bpmn:documentation>
+      <bpmn:extensionElements>
+        <operaton:failedJobRetryTimeCycle>R3/PT30S</operaton:failedJobRetryTimeCycle>
+      </bpmn:extensionElements>
+      <bpmn:incoming>flow-outcome-nothing-to-do</bpmn:incoming>
+      <bpmn:outgoing>flow-nothing-to-do-end</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="end-nothing-to-do" name="nothing to do">
+      <bpmn:incoming>flow-nothing-to-do-end</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:serviceTask id="task-note-overflow" name="note the overflow&#10;(work item)" camunda:asyncBefore="true" camunda:delegateExpression="${noteOverflow}">
+      <bpmn:documentation>NoteOverflowDelegate: the work run overflowed its context window; comments that and sends the flow back to design with overflowed in the brief, so it splits instead of retrying the same brief</bpmn:documentation>
+      <bpmn:extensionElements>
+        <operaton:failedJobRetryTimeCycle>R3/PT30S</operaton:failedJobRetryTimeCycle>
+      </bpmn:extensionElements>
+      <bpmn:incoming>flow-outcome-overflowed</bpmn:incoming>
+      <bpmn:outgoing>flow-overflow-design</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="task-post-work-question" name="post the smith&#39;s question&#10;(work item)" camunda:asyncBefore="true" camunda:delegateExpression="${postFeatureQuestion}">
+      <bpmn:documentation>PostFeatureQuestionDelegate, for the work Smith's question</bpmn:documentation>
+      <bpmn:extensionElements>
+        <operaton:failedJobRetryTimeCycle>R3/PT30S</operaton:failedJobRetryTimeCycle>
+      </bpmn:extensionElements>
+      <bpmn:incoming>flow-outcome-ask</bpmn:incoming>
+      <bpmn:outgoing>flow-work-question-answer</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:userTask id="user-task-answer-work" name="answer the smith&#39;s question">
+      <bpmn:documentation>Waits for POST /intake/{id}/answer; the answers join the brief of the next work run</bpmn:documentation>
+      <bpmn:incoming>flow-work-question-answer</bpmn:incoming>
+      <bpmn:outgoing>flow-answer-work</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:exclusiveGateway id="gateway-security-review-on" name="security reviews on?" default="flow-security-review-on">
+      <bpmn:documentation>The repo's security_review setting, read at the push (`securityReview`, set by open/update pr): off, or a docs-only change (`docsOnly`, set by open/update pr: engine/README.md, "Docs path"), goes straight to review pr, with no security run</bpmn:documentation>
+      <bpmn:incoming>flow-ci-passed</bpmn:incoming>
+      <bpmn:outgoing>flow-security-review-on</bpmn:outgoing>
+      <bpmn:outgoing>flow-security-review-off</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:callActivity id="call-security-review" name="security review&#10;(smith run)" camunda:asyncBefore="true" calledElement="reusable-smith-run">
+      <bpmn:documentation>A security Smith on the pushed round (the round's bundle in /work/in/commits.bundle, now on the PR branch; a catch-up merge with its merge entry), after the engine check passed or was skipped; outcome passed or findings, which go back to the work and stay off GitHub. Why here: engine/README.md, "Why the engine check runs before the reviews"</bpmn:documentation>
+      <bpmn:extensionElements>
+        <camunda:in variables="all" />
+        <camunda:in sourceExpression="${&#39;security&#39;}" target="mode" />
+        <camunda:out variables="all" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>flow-security-review-on</bpmn:incoming>
+      <bpmn:outgoing>flow-security-outcome</bpmn:outgoing>
+    </bpmn:callActivity>
+    <bpmn:exclusiveGateway id="gateway-security-passed" name="passed?">
+      <bpmn:incoming>flow-security-outcome</bpmn:incoming>
+      <bpmn:outgoing>flow-security-passed</bpmn:outgoing>
+      <bpmn:outgoing>flow-security-findings</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="task-open-pr" name="open/update pr&#10;(github)" camunda:asyncBefore="true" camunda:delegateExpression="${openPr}">
+      <bpmn:documentation>OpenPrDelegate, shared with the chore: pushes the Smith's bundle, or the rebase step's merge, to smith/issue-n (fast-forward)</bpmn:documentation>
+      <bpmn:extensionElements>
+        <!-- Spaced retries: a transient GitHub or git error (a ResourceAccessException
+             on the default-branch GET, a 502 on the push) gets three tries 30 s apart
+             before it is an incident; Operaton's default of three immediate retries
+             burned all three in 30 ms (engine/README.md, "open/update pr"). A rejected
+             push is still the incident after one try (OpenPrDelegate.failWithoutRetries). -->
+        <operaton:failedJobRetryTimeCycle>R3/PT30S</operaton:failedJobRetryTimeCycle>
+      </bpmn:extensionElements>
+      <bpmn:incoming>flow-outcome-done</bpmn:incoming>
+      <bpmn:incoming>flow-rebase-clean</bpmn:incoming>
+      <bpmn:outgoing>flow-open-pr-ci</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:callActivity id="call-ci-check" name="wait for the engine check&#10;(ci check)" camunda:asyncBefore="true" calledElement="reusable-ci-check">
+      <bpmn:documentation>bpmn/reusable-ci-check.bpmn: when the pushed branch touches a configured check's paths, first makes sure the default branch merges into it (a PR GitHub cannot merge gets no check run: conflict, with a rebase-n-1 finding, goes back to the work like a failed check), then parks with no Smith running until the check on its head completes; ciOutcome skipped, conflict, passed, or failed with a ci-n-1 finding. engine/README.md, "Chore"</bpmn:documentation>
+      <bpmn:extensionElements>
+        <camunda:in variables="all" />
+        <camunda:out variables="all" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>flow-open-pr-ci</bpmn:incoming>
+      <bpmn:outgoing>flow-ci-outcome</bpmn:outgoing>
+    </bpmn:callActivity>
+    <bpmn:exclusiveGateway id="gateway-ci-passed" name="check passed?" default="flow-ci-passed">
+      <bpmn:incoming>flow-ci-outcome</bpmn:incoming>
+      <bpmn:outgoing>flow-ci-passed</bpmn:outgoing>
+      <bpmn:outgoing>flow-ci-failed</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:callActivity id="call-review-pr" name="review pr&#10;(smith run)" camunda:asyncBefore="true" calledElement="reusable-smith-run">
+      <bpmn:documentation>A correctness review Smith on the PR, against the ticket and the plan; outcome approved or changes, with findings</bpmn:documentation>
+      <bpmn:extensionElements>
+        <camunda:in variables="all" />
+        <camunda:in sourceExpression="${&#39;review&#39;}" target="mode" />
+        <camunda:out variables="all" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>flow-security-review-off</bpmn:incoming>
+      <bpmn:incoming>flow-security-passed</bpmn:incoming>
+      <bpmn:outgoing>flow-review-outcome</bpmn:outgoing>
+    </bpmn:callActivity>
+    <bpmn:exclusiveGateway id="gateway-review-outcome" name="approve or changes?" default="flow-review-changes">
+      <bpmn:incoming>flow-review-outcome</bpmn:incoming>
+      <bpmn:outgoing>flow-review-approve</bpmn:outgoing>
+      <bpmn:outgoing>flow-review-changes</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="task-rebase-pr" name="bring pr up to date&#10;(git)" camunda:asyncBefore="true" camunda:delegateExpression="${rebasePr}">
+      <bpmn:documentation>RebasePrDelegate: merges the default branch into smith/issue-n in a bare clone, never pushing; rebase is current, clean (the merge's bundle and brief entry, for open/update pr to push and security to review) or conflict (a rebase-n-1 finding for the work; the third conflict is an incident)</bpmn:documentation>
+      <bpmn:extensionElements>
+        <!-- Spaced retries: the rebase reads the default branch from GitHub, and a
+             rate-limit 403 (API rate limit exceeded) clears only when the hour's window
+             resets; five tries 15 min apart span that hour. Operaton's default of three
+             immediate retries left an incident within a minute (engine/README.md, "open/update pr"). -->
+        <operaton:failedJobRetryTimeCycle>R5/PT15M</operaton:failedJobRetryTimeCycle>
+      </bpmn:extensionElements>
+      <bpmn:incoming>flow-review-approve</bpmn:incoming>
+      <bpmn:incoming>flow-merge-conflict</bpmn:incoming>
+      <bpmn:outgoing>flow-rebase-outcome</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="gateway-rebase-current" name="up to date?" default="flow-rebase-behind">
+      <bpmn:incoming>flow-rebase-outcome</bpmn:incoming>
+      <bpmn:outgoing>flow-rebase-current</bpmn:outgoing>
+      <bpmn:outgoing>flow-rebase-behind</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:exclusiveGateway id="gateway-rebase-clean" name="merged cleanly?">
+      <bpmn:incoming>flow-rebase-behind</bpmn:incoming>
+      <bpmn:outgoing>flow-rebase-clean</bpmn:outgoing>
+      <bpmn:outgoing>flow-rebase-conflict</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="task-merge-pr" name="merge pr&#10;(github)" camunda:asyncBefore="true" camunda:delegateExpression="${mergePr}">
+      <bpmn:documentation>MergePrDelegate, shared with the chore: squash-merges the PR; GitHub's 405 for merge conflicts is the error merge-conflict</bpmn:documentation>
+      <bpmn:extensionElements>
+        <operaton:failedJobRetryTimeCycle>R3/PT30S</operaton:failedJobRetryTimeCycle>
+      </bpmn:extensionElements>
+      <bpmn:incoming>flow-hitlp-no</bpmn:incoming>
+      <bpmn:outgoing>flow-merge-accept</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:boundaryEvent id="event-merge-conflict" name="merge conflict" attachedToRef="task-merge-pr">
+      <bpmn:outgoing>flow-merge-conflict</bpmn:outgoing>
+      <bpmn:errorEventDefinition id="ErrorEventDefinition_merge_conflict" errorRef="error-merge-conflict" camunda:errorCodeVariable="mergeError" />
+    </bpmn:boundaryEvent>
+    <bpmn:callActivity id="call-accept" name="check acceptance&#10;(smith run)" camunda:asyncBefore="true" calledElement="reusable-smith-run">
+      <bpmn:documentation>Both modes: an accept Smith on the default branch after the merge checks each of the plan's acceptance criteria; accepted, unmet, or unverified (something it could not check here), which closes saying so</bpmn:documentation>
+      <bpmn:extensionElements>
+        <camunda:in variables="all" />
+        <camunda:in sourceExpression="${&#39;accept&#39;}" target="mode" />
+        <camunda:out variables="all" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>flow-merge-accept</bpmn:incoming>
+      <bpmn:incoming>flow-drafts-none</bpmn:incoming>
+      <bpmn:incoming>flow-accept-rejected</bpmn:incoming>
+      <bpmn:outgoing>flow-accept-outcome</bpmn:outgoing>
+    </bpmn:callActivity>
+    <bpmn:exclusiveGateway id="gateway-accept-outcome" name="accepted?">
+      <bpmn:incoming>flow-accept-outcome</bpmn:incoming>
+      <bpmn:outgoing>flow-accept-accepted</bpmn:outgoing>
+      <bpmn:outgoing>flow-accept-unmet</bpmn:outgoing>
+      <bpmn:outgoing>flow-accept-rejected</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="task-report-unmet" name="report not accepted&#10;(work item)" camunda:asyncBefore="true" camunda:delegateExpression="${reportUnmet}">
+      <bpmn:documentation>ReportUnmetDelegate: comments the unmet criteria on the ticket and leaves it open for a human</bpmn:documentation>
+      <bpmn:extensionElements>
+        <operaton:failedJobRetryTimeCycle>R3/PT30S</operaton:failedJobRetryTimeCycle>
+      </bpmn:extensionElements>
+      <bpmn:incoming>flow-accept-unmet</bpmn:incoming>
+      <bpmn:outgoing>flow-unmet-end</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="end-not-accepted" name="not accepted">
+      <bpmn:incoming>flow-unmet-end</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:serviceTask id="task-close-ticket" name="close ticket&#10;(work item)" camunda:asyncBefore="true" camunda:delegateExpression="${closeTicket}">
+      <bpmn:documentation>CloseTicketDelegate, shared with the chore; says how it was accepted</bpmn:documentation>
+      <bpmn:extensionElements>
+        <operaton:failedJobRetryTimeCycle>R3/PT30S</operaton:failedJobRetryTimeCycle>
+      </bpmn:extensionElements>
+      <bpmn:incoming>flow-no-post-deploy-check</bpmn:incoming>
+      <bpmn:outgoing>flow-close-end</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="end-feature-done" name="feature done">
+      <bpmn:incoming>flow-close-end</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="flow-start-design" sourceRef="start-feature-filed" targetRef="call-design" />
+    <bpmn:sequenceFlow id="flow-design-outcome" sourceRef="call-design" targetRef="gateway-design-outcome" />
+    <bpmn:sequenceFlow id="flow-design-planned" name="planned" sourceRef="gateway-design-outcome" targetRef="call-do-work">
+      <bpmn:conditionExpression xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="bpmn:tFormalExpression">${outcome == 'planned'}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow-design-ask" name="questions for the user" sourceRef="gateway-design-outcome" targetRef="task-post-question">
+      <bpmn:conditionExpression xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="bpmn:tFormalExpression">${outcome == 'ask'}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow-design-split" name="split" sourceRef="gateway-design-outcome" targetRef="task-file-child">
+      <bpmn:conditionExpression xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="bpmn:tFormalExpression">${outcome == 'split'}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow-file-live" sourceRef="task-file-child" targetRef="gateway-live-parent" />
+    <bpmn:sequenceFlow id="flow-child-wait" sourceRef="gateway-live-parent" targetRef="subprocess-child-wait" />
+    <bpmn:sequenceFlow id="flow-restart-task" sourceRef="event-restart-live-parent" targetRef="task-restart-live-parent" />
+    <bpmn:sequenceFlow id="flow-restart-parent" sourceRef="task-restart-live-parent" targetRef="call-parent" />
+    <bpmn:sequenceFlow id="flow-live-parent" name="live" sourceRef="gateway-live-parent" targetRef="call-parent">
+      <bpmn:conditionExpression xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="bpmn:tFormalExpression">${execution.getVariable('childMode') == 'live' &amp;&amp; execution.getVariable('liveFallback') != true}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow-parent-reconcile" sourceRef="call-parent" targetRef="task-reconcile-children" />
+    <bpmn:sequenceFlow id="flow-reconcile-closed" sourceRef="task-reconcile-children" targetRef="gateway-live-closed" />
+    <bpmn:sequenceFlow id="flow-live-apply" name="every child closed" sourceRef="gateway-live-closed" targetRef="task-apply-replan">
+      <bpmn:conditionExpression xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="bpmn:tFormalExpression">${liveClosed == true}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow-live-ended" name="ended early" sourceRef="gateway-live-closed" targetRef="task-note-live-ended" />
+    <bpmn:sequenceFlow id="flow-live-fallback" sourceRef="task-note-live-ended" targetRef="task-file-child" />
+    <bpmn:sequenceFlow id="flow-child-replan" sourceRef="subprocess-child-wait" targetRef="call-replan" />
+    <bpmn:sequenceFlow id="flow-replan-apply" sourceRef="call-replan" targetRef="task-apply-replan" />
+    <bpmn:sequenceFlow id="flow-apply-drafts" sourceRef="task-apply-replan" targetRef="gateway-drafts-left" />
+    <bpmn:sequenceFlow id="flow-drafts-next" name="another draft or a child open" sourceRef="gateway-drafts-left" targetRef="task-file-child">
+      <bpmn:conditionExpression xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="bpmn:tFormalExpression">${draftsLeft || childrenOpen}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow-drafts-none" name="all done" sourceRef="gateway-drafts-left" targetRef="call-accept" />
+    <bpmn:sequenceFlow id="flow-outcome-overflowed" name="overflowed" sourceRef="gateway-work-outcome" targetRef="task-note-overflow">
+      <bpmn:conditionExpression xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="bpmn:tFormalExpression">${outcome == 'overflowed'}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow-overflow-design" sourceRef="task-note-overflow" targetRef="call-design" />
+    <bpmn:sequenceFlow id="flow-question-answer" sourceRef="task-post-question" targetRef="user-task-answer-question" />
+    <bpmn:sequenceFlow id="flow-answer-design" sourceRef="user-task-answer-question" targetRef="call-design" />
+    <bpmn:sequenceFlow id="flow-outcome-rejected" name="rejected" sourceRef="gateway-work-outcome" targetRef="call-do-work">
+      <bpmn:documentation>ReadResultDelegate turned the result down (WorkResult.problems) for the first time in a row: the round runs again with a rules-n-1 finding; a second rejection parks on an incident (engine/README.md, "Incidents")</bpmn:documentation>
+      <bpmn:conditionExpression xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="bpmn:tFormalExpression">${outcome == 'rejected'}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow-work-outcome" sourceRef="call-do-work" targetRef="gateway-work-outcome" />
+    <bpmn:sequenceFlow id="flow-outcome-done" name="done" sourceRef="gateway-work-outcome" targetRef="task-open-pr">
+      <bpmn:conditionExpression xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="bpmn:tFormalExpression">${outcome == 'done'}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow-outcome-ask" name="smith has a question" sourceRef="gateway-work-outcome" targetRef="task-post-work-question">
+      <bpmn:conditionExpression xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="bpmn:tFormalExpression">${outcome == 'ask'}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow-work-question-answer" sourceRef="task-post-work-question" targetRef="user-task-answer-work" />
+    <bpmn:sequenceFlow id="flow-outcome-nothing-to-do" name="nothing to do" sourceRef="gateway-work-outcome" targetRef="task-close-nothing-to-do">
+      <bpmn:conditionExpression xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="bpmn:tFormalExpression">${outcome == 'nothing-to-do'}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:serviceTask id="task-close-split" name="close ticket, split&#10;(work item)" camunda:asyncBefore="true" camunda:delegateExpression="${closeSplit}">
+      <bpmn:documentation>CloseSplitDelegate: the work split this child of a split feature; lists the drafts on it, closes it as not planned, deletes the parent's deferred row and correlates the parent's child closed with the drafts, which its replan files in this ticket's place (README, "A child that splits")</bpmn:documentation>
+      <bpmn:extensionElements>
+        <operaton:failedJobRetryTimeCycle>R3/PT30S</operaton:failedJobRetryTimeCycle>
+      </bpmn:extensionElements>
+      <bpmn:incoming>flow-outcome-split</bpmn:incoming>
+      <bpmn:outgoing>flow-split-end</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="end-split" name="split">
+      <bpmn:incoming>flow-split-end</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="flow-outcome-split" name="split" sourceRef="gateway-work-outcome" targetRef="task-close-split">
+      <bpmn:conditionExpression xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="bpmn:tFormalExpression">${outcome == 'split'}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow-split-end" sourceRef="task-close-split" targetRef="end-split" />
+    <bpmn:sequenceFlow id="flow-nothing-to-do-end" sourceRef="task-close-nothing-to-do" targetRef="end-nothing-to-do" />
+    <bpmn:sequenceFlow id="flow-answer-work" sourceRef="user-task-answer-work" targetRef="call-do-work" />
+    <bpmn:sequenceFlow id="flow-security-outcome" sourceRef="call-security-review" targetRef="gateway-security-passed" />
+    <bpmn:sequenceFlow id="flow-security-passed" name="passed" sourceRef="gateway-security-passed" targetRef="call-review-pr">
+      <bpmn:conditionExpression xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="bpmn:tFormalExpression">${outcome == 'passed'}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow-security-findings" name="findings" sourceRef="gateway-security-passed" targetRef="call-do-work">
+      <bpmn:conditionExpression xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="bpmn:tFormalExpression">${outcome == 'findings'}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow-open-pr-ci" sourceRef="task-open-pr" targetRef="call-ci-check" />
+    <bpmn:sequenceFlow id="flow-ci-outcome" sourceRef="call-ci-check" targetRef="gateway-ci-passed" />
+    <bpmn:sequenceFlow id="flow-ci-passed" name="passed" sourceRef="gateway-ci-passed" targetRef="gateway-security-review-on" />
+    <bpmn:sequenceFlow id="flow-security-review-on" name="on" sourceRef="gateway-security-review-on" targetRef="call-security-review" />
+    <bpmn:sequenceFlow id="flow-security-review-off" name="off, or docs only" sourceRef="gateway-security-review-on" targetRef="call-review-pr">
+      <bpmn:conditionExpression xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="bpmn:tFormalExpression">${execution.getVariable('securityReview') == false || execution.getVariable('docsOnly') == true}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow-ci-failed" name="check failed, or conflict" sourceRef="gateway-ci-passed" targetRef="call-do-work">
+      <bpmn:conditionExpression xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="bpmn:tFormalExpression">${ciOutcome == 'failed' || ciOutcome == 'conflict'}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow-review-outcome" sourceRef="call-review-pr" targetRef="gateway-review-outcome" />
+    <bpmn:sequenceFlow id="flow-review-approve" name="approve" sourceRef="gateway-review-outcome" targetRef="task-rebase-pr">
+      <bpmn:conditionExpression xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="bpmn:tFormalExpression">${outcome == 'approved'}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow-review-changes" name="changes requested" sourceRef="gateway-review-outcome" targetRef="call-do-work" />
+    <bpmn:sequenceFlow id="flow-rebase-outcome" sourceRef="task-rebase-pr" targetRef="gateway-rebase-current" />
+    <bpmn:sequenceFlow id="flow-rebase-current" name="yes" sourceRef="gateway-rebase-current" targetRef="task-check-post-deploy">
+      <bpmn:conditionExpression xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="bpmn:tFormalExpression">${rebase == 'current'}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow-rebase-behind" name="behind" sourceRef="gateway-rebase-current" targetRef="gateway-rebase-clean" />
+    <bpmn:sequenceFlow id="flow-rebase-clean" name="merged cleanly" sourceRef="gateway-rebase-clean" targetRef="task-open-pr">
+      <bpmn:conditionExpression xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="bpmn:tFormalExpression">${rebase == 'clean'}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow-rebase-conflict" name="conflict" sourceRef="gateway-rebase-clean" targetRef="call-do-work">
+      <bpmn:conditionExpression xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="bpmn:tFormalExpression">${rebase == 'conflict'}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow-merge-conflict" sourceRef="event-merge-conflict" targetRef="task-rebase-pr" />
+    <bpmn:sequenceFlow id="flow-merge-accept" sourceRef="task-merge-pr" targetRef="call-accept" />
+    <bpmn:sequenceFlow id="flow-accept-outcome" sourceRef="call-accept" targetRef="gateway-accept-outcome" />
+    <bpmn:sequenceFlow id="flow-accept-accepted" name="accepted or unverified" sourceRef="gateway-accept-outcome" targetRef="gateway-has-post-deploy-check">
+      <bpmn:conditionExpression xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="bpmn:tFormalExpression">${outcome == 'accepted' || outcome == 'unverified'}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow-accept-unmet" name="unmet" sourceRef="gateway-accept-outcome" targetRef="task-report-unmet">
+      <bpmn:conditionExpression xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="bpmn:tFormalExpression">${outcome == 'unmet'}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <!-- An accept result the rules refuse for the first time in a row: the acceptance check runs again with a new Smith,
+         told why in a rules finding (engine/README.md, "Incidents", "A rejected work result"); a second parks on the incident. -->
+    <bpmn:sequenceFlow id="flow-accept-rejected" name="rejected" sourceRef="gateway-accept-outcome" targetRef="call-accept">
+      <bpmn:conditionExpression xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="bpmn:tFormalExpression">${outcome == 'rejected'}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow-unmet-end" sourceRef="task-report-unmet" targetRef="end-not-accepted" />
+    <bpmn:sequenceFlow id="flow-close-end" sourceRef="task-close-ticket" targetRef="end-feature-done" />
+    <bpmn:exclusiveGateway id="gateway-hitlp-change" name="hitlp change?" default="flow-hitlp-no">
+      <bpmn:documentation>`hitlpChange`, set by open/update pr at each push: a branch changing engine/modules/hitlp/** or a hitlp migration waits for the user's acceptance before the merge, whatever the review said (engine/README.md, "Hitlp changes wait for the user"). `mergeAccepted`, cleared at every push, lets the accepted head through after a merge conflict round</bpmn:documentation>
+      <bpmn:incoming>flow-post-deploy-ready</bpmn:incoming>
+      <bpmn:outgoing>flow-hitlp-no</bpmn:outgoing>
+      <bpmn:outgoing>flow-hitlp-yes</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="task-post-merge-acceptance" name="ask the user to accept the merge&#10;(work item)" camunda:asyncBefore="true" camunda:delegateExpression="${postMergeAcceptance}">
+      <bpmn:documentation>PostMergeAcceptanceDelegate: records the question under the flow's instance id and posts it on the ticket: the PR, the hitlp paths it changes or what blocks its post-deployment check (postDeployBlocked), and how to answer (accept, or anything else to send it back)</bpmn:documentation>
+      <bpmn:extensionElements>
+        <operaton:failedJobRetryTimeCycle>R3/PT30S</operaton:failedJobRetryTimeCycle>
+      </bpmn:extensionElements>
+      <bpmn:incoming>flow-hitlp-yes</bpmn:incoming>
+      <bpmn:incoming>flow-post-deploy-blocked</bpmn:incoming>
+      <bpmn:outgoing>flow-post-merge-acceptance</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:userTask id="user-task-answer-merge" name="accept merging the hitlp change">
+      <bpmn:documentation>Waits for the HITLP approve record (HitlpAnswers) or POST /intake/{id}/answer; GET /needs shows it as an acceptance row</bpmn:documentation>
+      <bpmn:incoming>flow-post-merge-acceptance</bpmn:incoming>
+      <bpmn:outgoing>flow-answer-merge</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:serviceTask id="task-read-merge-acceptance" name="read the user&#39;s answer" camunda:asyncBefore="true" camunda:delegateExpression="${readMergeAcceptance}">
+      <bpmn:documentation>ReadMergeAcceptanceDelegate: `mergeAccepted` true for an answer starting with accept; anything else is a finding with the user's words for the next work round</bpmn:documentation>
+      <bpmn:extensionElements>
+        <operaton:failedJobRetryTimeCycle>R3/PT30S</operaton:failedJobRetryTimeCycle>
+      </bpmn:extensionElements>
+      <bpmn:incoming>flow-answer-merge</bpmn:incoming>
+      <bpmn:outgoing>flow-read-merge-acceptance</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="gateway-merge-accepted" name="merge accepted?" default="flow-merge-rejected">
+      <bpmn:incoming>flow-read-merge-acceptance</bpmn:incoming>
+      <bpmn:outgoing>flow-merge-accepted</bpmn:outgoing>
+      <bpmn:outgoing>flow-merge-rejected</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:sequenceFlow id="flow-hitlp-no" sourceRef="gateway-hitlp-change" targetRef="task-merge-pr" />
+    <bpmn:sequenceFlow id="flow-hitlp-yes" name="hitlp change" sourceRef="gateway-hitlp-change" targetRef="task-post-merge-acceptance">
+      <bpmn:conditionExpression xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="bpmn:tFormalExpression">${execution.getVariable('hitlpChange') == true &amp;&amp; execution.getVariable('mergeAccepted') != true}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow-post-merge-acceptance" sourceRef="task-post-merge-acceptance" targetRef="user-task-answer-merge" />
+    <bpmn:sequenceFlow id="flow-answer-merge" sourceRef="user-task-answer-merge" targetRef="task-read-merge-acceptance" />
+    <bpmn:sequenceFlow id="flow-read-merge-acceptance" sourceRef="task-read-merge-acceptance" targetRef="gateway-merge-accepted" />
+    <bpmn:sequenceFlow id="flow-merge-accepted" name="accepted" sourceRef="gateway-merge-accepted" targetRef="task-check-post-deploy">
+      <bpmn:conditionExpression xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="bpmn:tFormalExpression">${mergeAccepted == true}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow-merge-rejected" name="not accepted" sourceRef="gateway-merge-accepted" targetRef="call-do-work" />
+    <bpmn:serviceTask id="task-check-post-deploy" name="read the post-deployment check&#10;(engine)" camunda:asyncBefore="true" camunda:delegateExpression="${checkPostDeploy}">
+      <bpmn:documentation>CheckPostDeployDelegate: parses the PR body's POST-DEPLOYMENT-CHECK section into postDeployCheck (null without one). A section the engine cannot read, or one on a repo with no ops-role MCP server (the engine's own repo needs none), sets postDeployBlocked and comments on the ticket what to fix; the merge then waits for the user's answer, and accept reads the section again (engine/docs/feature.md, "The ops role")</bpmn:documentation>
+      <bpmn:extensionElements>
+        <operaton:failedJobRetryTimeCycle>R3/PT30S</operaton:failedJobRetryTimeCycle>
+      </bpmn:extensionElements>
+      <bpmn:incoming>flow-rebase-current</bpmn:incoming>
+      <bpmn:incoming>flow-merge-accepted</bpmn:incoming>
+      <bpmn:outgoing>flow-check-post-deploy</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="gateway-post-deploy-ready" name="ready to merge?" default="flow-post-deploy-ready">
+      <bpmn:incoming>flow-check-post-deploy</bpmn:incoming>
+      <bpmn:outgoing>flow-post-deploy-ready</bpmn:outgoing>
+      <bpmn:outgoing>flow-post-deploy-blocked</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:sequenceFlow id="flow-check-post-deploy" sourceRef="task-check-post-deploy" targetRef="gateway-post-deploy-ready" />
+    <bpmn:sequenceFlow id="flow-post-deploy-ready" sourceRef="gateway-post-deploy-ready" targetRef="gateway-hitlp-change" />
+    <bpmn:sequenceFlow id="flow-post-deploy-blocked" name="blocked" sourceRef="gateway-post-deploy-ready" targetRef="task-post-merge-acceptance">
+      <bpmn:conditionExpression xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="bpmn:tFormalExpression">${execution.getVariable('postDeployBlocked') != null}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:exclusiveGateway id="gateway-has-post-deploy-check" name="post-deployment check?" default="flow-no-post-deploy-check">
+      <bpmn:incoming>flow-accept-accepted</bpmn:incoming>
+      <bpmn:outgoing>flow-no-post-deploy-check</bpmn:outgoing>
+      <bpmn:outgoing>flow-has-post-deploy-check</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:callActivity id="call-post-deploy-check" name="check after the deploy&#10;(post deploy check)" camunda:asyncBefore="true" calledElement="post-deploy-check">
+      <bpmn:documentation>bpmn/post-deploy-check.bpmn: the PR's POST-DEPLOYMENT-CHECK section (postDeployCheck) is checked once the merge is in production; the ticket stays open until the check closes it</bpmn:documentation>
+      <bpmn:extensionElements>
+        <camunda:in variables="all" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>flow-has-post-deploy-check</bpmn:incoming>
+      <bpmn:outgoing>flow-post-deploy-checked</bpmn:outgoing>
+    </bpmn:callActivity>
+    <bpmn:endEvent id="end-post-deploy-checked" name="checked">
+      <bpmn:incoming>flow-post-deploy-checked</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="flow-no-post-deploy-check" sourceRef="gateway-has-post-deploy-check" targetRef="task-close-ticket" />
+    <bpmn:sequenceFlow id="flow-has-post-deploy-check" name="has a check" sourceRef="gateway-has-post-deploy-check" targetRef="call-post-deploy-check">
+      <bpmn:conditionExpression xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="bpmn:tFormalExpression">${execution.getVariable('postDeployCheck') != null}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow-post-deploy-checked" sourceRef="call-post-deploy-check" targetRef="end-post-deploy-checked" />
+    <bpmn:textAnnotation id="annotation-merge-reviewed">
+      <bpmn:text>a clean merge is pushed, checked and security-reviewed like any round; then review pr again. two conflict rounds at most: the third conflict is an incident</bpmn:text>
+    </bpmn:textAnnotation>
+    <bpmn:association id="association-merge-reviewed" sourceRef="gateway-rebase-clean" targetRef="annotation-merge-reviewed" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_feature">
+    <bpmndi:BPMNPlane id="BPMNPlane_feature" bpmnElement="feature">
+      <bpmndi:BPMNShape id="start-feature-filed-di" bpmnElement="start-feature-filed">
+        <dc:Bounds x="162" y="262" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="150" y="305" width="60" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="call-design-di" bpmnElement="call-design">
+        <dc:Bounds x="250" y="240" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="gateway-design-outcome-di" bpmnElement="gateway-design-outcome" isMarkerVisible="true">
+        <dc:Bounds x="410" y="255" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="348" y="210" width="60" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-post-question-di" bpmnElement="task-post-question">
+        <dc:Bounds x="385" y="410" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="user-task-answer-question-di" bpmnElement="user-task-answer-question">
+        <dc:Bounds x="385" y="540" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="call-do-work-di" bpmnElement="call-do-work">
+        <dc:Bounds x="530" y="240" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="gateway-work-outcome-di" bpmnElement="gateway-work-outcome" isMarkerVisible="true">
+        <dc:Bounds x="690" y="255" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="745" y="225" width="60" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-post-work-question-di" bpmnElement="task-post-work-question">
+        <dc:Bounds x="665" y="410" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="user-task-answer-work-di" bpmnElement="user-task-answer-work">
+        <dc:Bounds x="665" y="540" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-close-split-di" bpmnElement="task-close-split">
+        <dc:Bounds x="840" y="520" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="end-split-di" bpmnElement="end-split">
+        <dc:Bounds x="1002" y="542" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1009" y="585" width="22" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="flow-outcome-split-di" bpmnElement="flow-outcome-split">
+        <di:waypoint x="740" y="290" />
+        <di:waypoint x="790" y="290" />
+        <di:waypoint x="790" y="560" />
+        <di:waypoint x="840" y="560" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="798" y="500" width="24" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-split-end-di" bpmnElement="flow-split-end">
+        <di:waypoint x="940" y="560" />
+        <di:waypoint x="1002" y="560" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="task-close-nothing-to-do-di" bpmnElement="task-close-nothing-to-do">
+        <dc:Bounds x="840" y="410" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="end-nothing-to-do-di" bpmnElement="end-nothing-to-do">
+        <dc:Bounds x="1002" y="432" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="987" y="475" width="66" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="call-security-review-di" bpmnElement="call-security-review">
+        <dc:Bounds x="1350" y="240" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="gateway-security-passed-di" bpmnElement="gateway-security-passed" isMarkerVisible="true">
+        <dc:Bounds x="1510" y="255" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1514" y="312" width="42" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-open-pr-di" bpmnElement="task-open-pr">
+        <dc:Bounds x="810" y="240" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="call-review-pr-di" bpmnElement="call-review-pr">
+        <dc:Bounds x="1630" y="240" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="gateway-review-outcome-di" bpmnElement="gateway-review-outcome" isMarkerVisible="true">
+        <dc:Bounds x="1790" y="255" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1728" y="210" width="60" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-merge-pr-di" bpmnElement="task-merge-pr">
+        <dc:Bounds x="2190" y="240" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="call-accept-di" bpmnElement="call-accept">
+        <dc:Bounds x="2460" y="240" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="gateway-accept-outcome-di" bpmnElement="gateway-accept-outcome" isMarkerVisible="true">
+        <dc:Bounds x="2620" y="255" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2558" y="210" width="60" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-report-unmet-di" bpmnElement="task-report-unmet">
+        <dc:Bounds x="2595" y="410" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="end-not-accepted-di" bpmnElement="end-not-accepted">
+        <dc:Bounds x="2627" y="572" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2615" y="615" width="60" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-close-ticket-di" bpmnElement="task-close-ticket">
+        <dc:Bounds x="2830" y="240" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="end-feature-done-di" bpmnElement="end-feature-done">
+        <dc:Bounds x="2992" y="262" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2980" y="305" width="60" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-file-child-di" bpmnElement="task-file-child">
+        <dc:Bounds x="530" y="30" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="subprocess-child-wait-di" bpmnElement="subprocess-child-wait" isExpanded="true">
+        <dc:Bounds x="698" y="-10" width="104" height="145" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="start-child-wait-di" bpmnElement="start-child-wait">
+        <dc:Bounds x="732" y="0" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="end-child-wait-di" bpmnElement="end-child-wait">
+        <dc:Bounds x="732" y="94" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="flow-wait-start-di" bpmnElement="flow-wait-start">
+        <di:waypoint x="750" y="36" />
+        <di:waypoint x="750" y="52" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-wait-end-di" bpmnElement="flow-wait-end">
+        <di:waypoint x="750" y="88" />
+        <di:waypoint x="750" y="94" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="event-restart-live-parent-di" bpmnElement="event-restart-live-parent">
+        <dc:Bounds x="766" y="-28" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="806" y="0" width="60" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-restart-live-parent-di" bpmnElement="task-restart-live-parent">
+        <dc:Bounds x="820" y="-85" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="flow-restart-task-di" bpmnElement="flow-restart-task">
+        <di:waypoint x="784" y="-28" />
+        <di:waypoint x="784" y="-45" />
+        <di:waypoint x="820" y="-45" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-restart-parent-di" bpmnElement="flow-restart-parent">
+        <di:waypoint x="870" y="-85" />
+        <di:waypoint x="870" y="-88" />
+        <di:waypoint x="700" y="-88" />
+        <di:waypoint x="700" y="-90" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="event-child-closed-di" bpmnElement="event-child-closed">
+        <dc:Bounds x="732" y="52" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="770" y="62" width="30" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="gateway-live-parent-di" bpmnElement="gateway-live-parent" isMarkerVisible="true">
+        <dc:Bounds x="640" y="45" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="600" y="100" width="60" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="call-parent-di" bpmnElement="call-parent">
+        <dc:Bounds x="615" y="-170" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-reconcile-children-di" bpmnElement="task-reconcile-children">
+        <dc:Bounds x="760" y="-170" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="gateway-live-closed-di" bpmnElement="gateway-live-closed" isMarkerVisible="true">
+        <dc:Bounds x="905" y="-155" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="940" y="-95" width="60" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-note-live-ended-di" bpmnElement="task-note-live-ended">
+        <dc:Bounds x="880" y="-290" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="flow-file-live-di" bpmnElement="flow-file-live">
+        <di:waypoint x="630" y="70" />
+        <di:waypoint x="640" y="70" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-live-parent-di" bpmnElement="flow-live-parent">
+        <di:waypoint x="665" y="45" />
+        <di:waypoint x="665" y="-90" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="670" y="-30" width="30" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-parent-reconcile-di" bpmnElement="flow-parent-reconcile">
+        <di:waypoint x="715" y="-130" />
+        <di:waypoint x="760" y="-130" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-reconcile-closed-di" bpmnElement="flow-reconcile-closed">
+        <di:waypoint x="860" y="-130" />
+        <di:waypoint x="905" y="-130" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-live-apply-di" bpmnElement="flow-live-apply">
+        <di:waypoint x="955" y="-130" />
+        <di:waypoint x="1020" y="-130" />
+        <di:waypoint x="1020" y="30" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1025" y="-60" width="90" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-live-ended-di" bpmnElement="flow-live-ended">
+        <di:waypoint x="930" y="-155" />
+        <di:waypoint x="930" y="-210" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="940" y="-195" width="60" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-live-fallback-di" bpmnElement="flow-live-fallback">
+        <di:waypoint x="880" y="-250" />
+        <di:waypoint x="560" y="-250" />
+        <di:waypoint x="560" y="30" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="call-replan-di" bpmnElement="call-replan">
+        <dc:Bounds x="810" y="30" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-apply-replan-di" bpmnElement="task-apply-replan">
+        <dc:Bounds x="970" y="30" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="gateway-drafts-left-di" bpmnElement="gateway-drafts-left" isMarkerVisible="true">
+        <dc:Bounds x="1130" y="45" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1125" y="100" width="60" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-note-overflow-di" bpmnElement="task-note-overflow">
+        <dc:Bounds x="825" y="650" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="flow-design-split-di" bpmnElement="flow-design-split">
+        <di:waypoint x="435" y="255" />
+        <di:waypoint x="435" y="70" />
+        <di:waypoint x="530" y="70" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="443" y="150" width="30" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-child-wait-di" bpmnElement="flow-child-wait">
+        <di:waypoint x="690" y="70" />
+        <di:waypoint x="698" y="70" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-child-replan-di" bpmnElement="flow-child-replan">
+        <di:waypoint x="802" y="70" />
+        <di:waypoint x="810" y="70" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-replan-apply-di" bpmnElement="flow-replan-apply">
+        <di:waypoint x="910" y="70" />
+        <di:waypoint x="970" y="70" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-apply-drafts-di" bpmnElement="flow-apply-drafts">
+        <di:waypoint x="1070" y="70" />
+        <di:waypoint x="1130" y="70" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-drafts-next-di" bpmnElement="flow-drafts-next">
+        <di:waypoint x="1155" y="45" />
+        <di:waypoint x="1155" y="-320" />
+        <di:waypoint x="500" y="-320" />
+        <di:waypoint x="500" y="50" />
+        <di:waypoint x="530" y="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="790" y="-345" width="80" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-drafts-none-di" bpmnElement="flow-drafts-none">
+        <di:waypoint x="1180" y="70" />
+        <di:waypoint x="2510" y="70" />
+        <di:waypoint x="2510" y="240" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1690" y="50" width="60" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-outcome-overflowed-di" bpmnElement="flow-outcome-overflowed">
+        <di:waypoint x="740" y="300" />
+        <di:waypoint x="780" y="300" />
+        <di:waypoint x="780" y="690" />
+        <di:waypoint x="825" y="690" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="788" y="600" width="70" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-overflow-design-di" bpmnElement="flow-overflow-design">
+        <di:waypoint x="875" y="730" />
+        <di:waypoint x="875" y="760" />
+        <di:waypoint x="270" y="760" />
+        <di:waypoint x="270" y="320" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-start-design-di" bpmnElement="flow-start-design">
+        <di:waypoint x="198" y="280" />
+        <di:waypoint x="250" y="280" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-design-outcome-di" bpmnElement="flow-design-outcome">
+        <di:waypoint x="350" y="280" />
+        <di:waypoint x="410" y="280" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-design-planned-di" bpmnElement="flow-design-planned">
+        <di:waypoint x="460" y="280" />
+        <di:waypoint x="530" y="280" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="470" y="262" width="45" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-design-ask-di" bpmnElement="flow-design-ask">
+        <di:waypoint x="435" y="305" />
+        <di:waypoint x="435" y="410" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="443" y="344" width="80" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-question-answer-di" bpmnElement="flow-question-answer">
+        <di:waypoint x="435" y="490" />
+        <di:waypoint x="435" y="540" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-answer-design-di" bpmnElement="flow-answer-design">
+        <di:waypoint x="385" y="580" />
+        <di:waypoint x="300" y="580" />
+        <di:waypoint x="300" y="320" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-work-outcome-di" bpmnElement="flow-work-outcome">
+        <di:waypoint x="630" y="280" />
+        <di:waypoint x="690" y="280" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-outcome-done-di" bpmnElement="flow-outcome-done">
+        <di:waypoint x="740" y="280" />
+        <di:waypoint x="810" y="280" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="760" y="262" width="30" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-outcome-ask-di" bpmnElement="flow-outcome-ask">
+        <di:waypoint x="715" y="305" />
+        <di:waypoint x="715" y="410" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="630" y="344" width="80" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-work-question-answer-di" bpmnElement="flow-work-question-answer">
+        <di:waypoint x="715" y="490" />
+        <di:waypoint x="715" y="540" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-outcome-rejected-di" bpmnElement="flow-outcome-rejected">
+        <di:waypoint x="715" y="255" />
+        <di:waypoint x="715" y="220" />
+        <di:waypoint x="615" y="220" />
+        <di:waypoint x="615" y="240" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="640" y="223" width="41" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-outcome-nothing-to-do-di" bpmnElement="flow-outcome-nothing-to-do">
+        <di:waypoint x="740" y="290" />
+        <di:waypoint x="790" y="290" />
+        <di:waypoint x="790" y="450" />
+        <di:waypoint x="840" y="450" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="798" y="330" width="66" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-nothing-to-do-end-di" bpmnElement="flow-nothing-to-do-end">
+        <di:waypoint x="940" y="450" />
+        <di:waypoint x="1002" y="450" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-answer-work-di" bpmnElement="flow-answer-work">
+        <di:waypoint x="665" y="580" />
+        <di:waypoint x="580" y="580" />
+        <di:waypoint x="580" y="320" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-security-outcome-di" bpmnElement="flow-security-outcome">
+        <di:waypoint x="1450" y="280" />
+        <di:waypoint x="1510" y="280" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-security-passed-di" bpmnElement="flow-security-passed">
+        <di:waypoint x="1560" y="280" />
+        <di:waypoint x="1630" y="280" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1577" y="262" width="36" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-security-findings-di" bpmnElement="flow-security-findings">
+        <di:waypoint x="1535" y="255" />
+        <di:waypoint x="1535" y="172" />
+        <di:waypoint x="580" y="172" />
+        <di:waypoint x="580" y="240" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1360" y="180" width="45" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-review-outcome-di" bpmnElement="flow-review-outcome">
+        <di:waypoint x="1730" y="280" />
+        <di:waypoint x="1790" y="280" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-review-approve-di" bpmnElement="flow-review-approve">
+        <di:waypoint x="1840" y="280" />
+        <di:waypoint x="1910" y="280" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1855" y="262" width="40" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-review-changes-di" bpmnElement="flow-review-changes">
+        <di:waypoint x="1815" y="255" />
+        <di:waypoint x="1815" y="160" />
+        <di:waypoint x="560" y="160" />
+        <di:waypoint x="560" y="240" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="930" y="140" width="100" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-merge-accept-di" bpmnElement="flow-merge-accept">
+        <di:waypoint x="2290" y="280" />
+        <di:waypoint x="2460" y="280" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-accept-outcome-di" bpmnElement="flow-accept-outcome">
+        <di:waypoint x="2560" y="280" />
+        <di:waypoint x="2620" y="280" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-accept-accepted-di" bpmnElement="flow-accept-accepted">
+        <di:waypoint x="2670" y="280" />
+        <di:waypoint x="2705" y="280" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2673" y="250" width="54" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-accept-unmet-di" bpmnElement="flow-accept-unmet">
+        <di:waypoint x="2645" y="305" />
+        <di:waypoint x="2645" y="410" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2653" y="344" width="40" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-accept-rejected-di" bpmnElement="flow-accept-rejected">
+        <di:waypoint x="2645" y="255" />
+        <di:waypoint x="2645" y="190" />
+        <di:waypoint x="2510" y="190" />
+        <di:waypoint x="2510" y="240" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2556" y="172" width="43" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-unmet-end-di" bpmnElement="flow-unmet-end">
+        <di:waypoint x="2645" y="490" />
+        <di:waypoint x="2645" y="572" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-close-end-di" bpmnElement="flow-close-end">
+        <di:waypoint x="2930" y="280" />
+        <di:waypoint x="2992" y="280" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="task-rebase-pr-di" bpmnElement="task-rebase-pr">
+        <dc:Bounds x="1910" y="240" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="gateway-rebase-current-di" bpmnElement="gateway-rebase-current" isMarkerVisible="true">
+        <dc:Bounds x="2070" y="255" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2065" y="233" width="60" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="gateway-rebase-clean-di" bpmnElement="gateway-rebase-clean" isMarkerVisible="true">
+        <dc:Bounds x="2070" y="380" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2156" y="436" width="80" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="event-merge-conflict-di" bpmnElement="event-merge-conflict">
+        <dc:Bounds x="2222" y="222" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2150" y="196" width="72" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="flow-rebase-outcome-di" bpmnElement="flow-rebase-outcome">
+        <di:waypoint x="2010" y="280" />
+        <di:waypoint x="2070" y="280" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-rebase-current-di" bpmnElement="flow-rebase-current">
+        <di:waypoint x="2120" y="280" />
+        <di:waypoint x="2150" y="280" />
+        <di:waypoint x="2150" y="400" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2146" y="262" width="18" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-rebase-behind-di" bpmnElement="flow-rebase-behind">
+        <di:waypoint x="2095" y="305" />
+        <di:waypoint x="2095" y="380" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2103" y="335" width="34" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-rebase-clean-di" bpmnElement="flow-rebase-clean">
+        <di:waypoint x="2070" y="405" />
+        <di:waypoint x="880" y="405" />
+        <di:waypoint x="880" y="320" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1410" y="387" width="80" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-rebase-conflict-di" bpmnElement="flow-rebase-conflict">
+        <di:waypoint x="2095" y="430" />
+        <di:waypoint x="2095" y="1140" />
+        <di:waypoint x="550" y="1140" />
+        <di:waypoint x="550" y="320" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1100" y="1122" width="40" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-merge-conflict-di" bpmnElement="flow-merge-conflict">
+        <di:waypoint x="2240" y="222" />
+        <di:waypoint x="2240" y="180" />
+        <di:waypoint x="1960" y="180" />
+        <di:waypoint x="1960" y="240" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="annotation-merge-reviewed-di" bpmnElement="annotation-merge-reviewed">
+        <dc:Bounds x="1780" y="800" width="300" height="70" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="association-merge-reviewed-di" bpmnElement="association-merge-reviewed">
+        <di:waypoint x="2083" y="418" />
+        <di:waypoint x="1980" y="800" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="call-ci-check-di" bpmnElement="call-ci-check">
+        <dc:Bounds x="970" y="240" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="gateway-ci-passed-di" bpmnElement="gateway-ci-passed" isMarkerVisible="true">
+        <dc:Bounds x="1130" y="255" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1118" y="312" width="74" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="flow-open-pr-ci-di" bpmnElement="flow-open-pr-ci">
+        <di:waypoint x="910" y="280" />
+        <di:waypoint x="970" y="280" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-ci-outcome-di" bpmnElement="flow-ci-outcome">
+        <di:waypoint x="1070" y="280" />
+        <di:waypoint x="1130" y="280" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-ci-passed-di" bpmnElement="flow-ci-passed">
+        <di:waypoint x="1180" y="280" />
+        <di:waypoint x="1240" y="280" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1192" y="262" width="36" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-ci-failed-di" bpmnElement="flow-ci-failed">
+        <di:waypoint x="1155" y="255" />
+        <di:waypoint x="1155" y="200" />
+        <di:waypoint x="600" y="200" />
+        <di:waypoint x="600" y="240" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="800" y="180" width="130" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="gateway-security-review-on-di" bpmnElement="gateway-security-review-on" isMarkerVisible="true">
+        <dc:Bounds x="1240" y="255" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1234" y="219" width="62" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="flow-security-review-on-di" bpmnElement="flow-security-review-on">
+        <di:waypoint x="1290" y="280" />
+        <di:waypoint x="1350" y="280" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1295" y="262" width="15" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-security-review-off-di" bpmnElement="flow-security-review-off">
+        <di:waypoint x="1265" y="305" />
+        <di:waypoint x="1265" y="360" />
+        <di:waypoint x="1680" y="360" />
+        <di:waypoint x="1680" y="320" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1300" y="342" width="17" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="gateway-hitlp-change-di" bpmnElement="gateway-hitlp-change" isMarkerVisible="true">
+        <dc:Bounds x="2250" y="520" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2305" y="510" width="66" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-post-merge-acceptance-di" bpmnElement="task-post-merge-acceptance">
+        <dc:Bounds x="2190" y="660" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="user-task-answer-merge-di" bpmnElement="user-task-answer-merge">
+        <dc:Bounds x="2330" y="660" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-read-merge-acceptance-di" bpmnElement="task-read-merge-acceptance">
+        <dc:Bounds x="2470" y="660" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="gateway-merge-accepted-di" bpmnElement="gateway-merge-accepted" isMarkerVisible="true">
+        <dc:Bounds x="2610" y="675" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2550" y="732" width="80" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="flow-hitlp-no-di" bpmnElement="flow-hitlp-no">
+        <di:waypoint x="2275" y="520" />
+        <di:waypoint x="2275" y="320" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-hitlp-yes-di" bpmnElement="flow-hitlp-yes">
+        <di:waypoint x="2275" y="570" />
+        <di:waypoint x="2275" y="660" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2281" y="600" width="60" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-post-merge-acceptance-di" bpmnElement="flow-post-merge-acceptance">
+        <di:waypoint x="2290" y="700" />
+        <di:waypoint x="2330" y="700" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-answer-merge-di" bpmnElement="flow-answer-merge">
+        <di:waypoint x="2430" y="700" />
+        <di:waypoint x="2470" y="700" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-read-merge-acceptance-di" bpmnElement="flow-read-merge-acceptance">
+        <di:waypoint x="2570" y="700" />
+        <di:waypoint x="2610" y="700" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-merge-accepted-di" bpmnElement="flow-merge-accepted">
+        <di:waypoint x="2635" y="725" />
+        <di:waypoint x="2635" y="780" />
+        <di:waypoint x="2115" y="780" />
+        <di:waypoint x="2115" y="440" />
+        <di:waypoint x="2130" y="440" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2480" y="762" width="46" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-merge-rejected-di" bpmnElement="flow-merge-rejected">
+        <di:waypoint x="2660" y="700" />
+        <di:waypoint x="2680" y="700" />
+        <di:waypoint x="2680" y="1140" />
+        <di:waypoint x="550" y="1140" />
+        <di:waypoint x="550" y="320" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2688" y="760" width="64" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="task-check-post-deploy-di" bpmnElement="task-check-post-deploy">
+        <dc:Bounds x="2130" y="400" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="gateway-post-deploy-ready-di" bpmnElement="gateway-post-deploy-ready" isMarkerVisible="true">
+        <dc:Bounds x="2155" y="520" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2215" y="575" width="55" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="flow-check-post-deploy-di" bpmnElement="flow-check-post-deploy">
+        <di:waypoint x="2180" y="480" />
+        <di:waypoint x="2180" y="520" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-post-deploy-ready-di" bpmnElement="flow-post-deploy-ready">
+        <di:waypoint x="2205" y="545" />
+        <di:waypoint x="2250" y="545" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-post-deploy-blocked-di" bpmnElement="flow-post-deploy-blocked">
+        <di:waypoint x="2180" y="570" />
+        <di:waypoint x="2180" y="610" />
+        <di:waypoint x="2210" y="610" />
+        <di:waypoint x="2210" y="660" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2130" y="585" width="38" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="gateway-has-post-deploy-check-di" bpmnElement="gateway-has-post-deploy-check" isMarkerVisible="true">
+        <dc:Bounds x="2705" y="255" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2745" y="226" width="76" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="call-post-deploy-check-di" bpmnElement="call-post-deploy-check">
+        <dc:Bounds x="2780" y="380" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="end-post-deploy-checked-di" bpmnElement="end-post-deploy-checked">
+        <dc:Bounds x="2932" y="402" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2927" y="445" width="46" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="flow-no-post-deploy-check-di" bpmnElement="flow-no-post-deploy-check">
+        <di:waypoint x="2755" y="280" />
+        <di:waypoint x="2830" y="280" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-has-post-deploy-check-di" bpmnElement="flow-has-post-deploy-check">
+        <di:waypoint x="2730" y="305" />
+        <di:waypoint x="2730" y="420" />
+        <di:waypoint x="2780" y="420" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2736" y="340" width="58" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-post-deploy-checked-di" bpmnElement="flow-post-deploy-checked">
+        <di:waypoint x="2880" y="420" />
+        <di:waypoint x="2932" y="420" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

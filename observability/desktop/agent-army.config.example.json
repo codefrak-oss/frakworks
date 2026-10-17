@@ -1,0 +1,14 @@
+{
+  "_comment": "Template. Copy to <userData>/agent-army.config.json — on macOS that is ~/Library/Application Support/Agent Army/agent-army.config.json — and fill in your deployment's values; a deployment's filled copy is the deployment's own. Every value here is public configuration; no credential belongs in this file and the app refuses one that carries a secret-shaped key. `first_mate.tier` is First mate's standing tier (1-10, default 8 = fable low; Config > First mate model sets it); the app writes `first_mate.override` itself when a timed override is set from the First mate strip.",
+  "first_mate": {
+    "tier": 8
+  },
+  "registry": "registry.example:5000",
+  "release_feed": "http://releases.example/",
+  "logs_url": "http://localhost:9428/",
+  "metrics_url": "http://localhost:8428/",
+  "grafana_url": "http://grafana.example:3000",
+  "grafana_dashboards": [
+    { "label": "Build gate", "path": "/public-dashboards/13f5cabf8653434ebebb72eac1e6b1c5", "builds": true }
+  ]
+}

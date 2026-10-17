@@ -1,0 +1,164 @@
+#!/usr/bin/env python3
+"""check-acceptance-criteria [FILE]: is this ticket body fileable?
+
+Reads FILE, or stdin if omitted. Every filer runs it before filing a ticket
+(bots/smith.md, "Discovered work and sub-tickets"): a ticket's acceptance
+criteria are the only thing a context-free reviewer has to judge its PR
+against, so a body without checkable ones is not fileable.
+
+Run it as bots/check-acceptance-criteria FILE (it is executable) or as
+python3 bots/check-acceptance-criteria FILE; never with bash or sh, which
+would read this Python as shell.
+
+The criteria are the "- [ ]" checkbox lines under the "## Acceptance
+criteria" heading, including any under its own sub-headings (### and
+deeper); a numbered or plain bulleted list does not count.
+
+  exit 0  the Acceptance criteria section holds at least one concrete,
+          checkable item. Prints nothing.
+  exit 1  it does not. Prints why, on stdout, in words fit for a review
+          comment or a Smith's handback.
+  exit 2  the check itself could not run (bad usage / unreadable input).
+
+Standard library only, so a Smith's clone can run it with nothing installed.
+"""
+from __future__ import annotations
+
+import re
+import sys
+
+_PLACEHOLDER = re.compile(
+    r"^(tbd|tba|todo|fixme|xxx+|n/?a|\.\.\.|-+|_+|"
+    r"criteria|acceptance criteria|<[^>]*>|\[[^\]]*\])$",
+    re.I,
+)
+
+_CHECKABLE = re.compile(
+    r"`[^`]+`"
+    r"|\b[\w./-]+\.(md|sh|py|ya?ml|json|txt|toml|cfg|ini)\b"
+    r"|(?<!\w)/[\w./-]+"
+    r"|\b\d+\b"
+    r"|\b(exits?|returns?|contains?|includes?|prints?|outputs?|emits?|"
+    r"passe?s?|fails?|rejects?|accepts?|matches?|renders?|raises?|logs?|"
+    r"documented|stated|described|named|listed|added|removed|deleted|"
+    r"created|updated|wired|no longer|does not|do not|must not|is not|"
+    r"non-?zero|error|section|heading|test|label|comment|field)\b",
+    re.I,
+)
+
+
+def _die(reason, out):
+    out.write(reason + "\n")
+    return 1
+
+
+def _load(args, stdin):
+    positional = [a for a in args if not a.startswith("-")]
+    if len(positional) > 1:
+        sys.stderr.write("usage: check-acceptance-criteria [FILE]\n")
+        return None, 2
+    try:
+        if positional:
+            with open(positional[0], encoding="utf-8") as fh:
+                return fh.read(), None
+        return stdin.read(), None
+    except OSError as exc:
+        sys.stderr.write(f"cannot read input: {exc}\n")
+        return None, 2
+
+
+def _strip_comments(text):
+    return re.sub(r"<!--.*?-->", "", text, flags=re.S)
+
+
+def _section(text, name):
+    head = re.search(rf"^[ \t]{{0,3}}#{{1,6}}[ \t]+{re.escape(name)}[ \t]*$",
+                     text, re.I | re.M)
+    if not head:
+        return None
+    rest = text[head.end():]
+    # The section runs to the next heading of its own level or higher; its
+    # sub-headings (a "### Engine" under "## Acceptance criteria") stay in it.
+    level = len(re.match(r"[ \t]*(#+)", head.group(0)).group(1))
+    nxt = re.search(rf"^[ \t]{{0,3}}#{{1,{level}}}[ \t]+\S", rest, re.M)
+    return rest[:nxt.start()] if nxt else rest
+
+
+def _norm(s):
+    return re.sub(r"[^a-z0-9 ]", "", s.lower()).strip()
+
+
+def _checklist_items(body):
+    items = []
+    for line in body.splitlines():
+        m = re.match(r"[ \t]*[-*][ \t]+\[[ xX]\](.*)$", line)
+        if m:
+            items.append(m.group(1).strip())
+    return items
+
+
+def main(argv, stdin=None, stdout=None) -> int:
+    stdin = stdin if stdin is not None else sys.stdin
+    stdout = stdout if stdout is not None else sys.stdout
+
+    text, rc = _load(argv, stdin)
+    if rc is not None:
+        return rc
+    text = _strip_comments(text)
+
+    body = _section(text, "Acceptance criteria")
+    if body is None:
+        return _die(
+            "No `## Acceptance criteria` section. A sub-ticket without "
+            "acceptance criteria is not fileable — they are the only thing a "
+            "context-free reviewer has to judge the PR against.", stdout)
+
+    items = _checklist_items(body)
+    if not items:
+        return _die(
+            "The `## Acceptance criteria` section has no checklist items. "
+            "Write each criterion as `- [ ] …`: a checkbox a reviewer or the "
+            "Smith can tick off (a numbered or plain bulleted list does not "
+            "count).", stdout)
+
+    blank = sum(1 for it in items if not it)
+    if blank:
+        return _die(
+            f"{blank} acceptance-criteria checkbox(es) are empty (`- [ ]` "
+            "with nothing after them). Fill each one in or delete it.", stdout)
+
+    placeholder = [it for it in items if _PLACEHOLDER.match(it.strip())]
+    if placeholder:
+        return _die(
+            "Placeholder acceptance criteria: "
+            + "; ".join(f"{it!r}" for it in placeholder)
+            + ". Replace them with something a reviewer can verify.", stdout)
+
+    goal = _section(text, "Goal") or ""
+    goal_n = _norm(goal)
+    real = []
+    for it in items:
+        it_n = _norm(it)
+        if len(it_n) < 12:
+            continue
+        if goal_n and (it_n in goal_n or goal_n in it_n):
+            continue
+        real.append(it)
+
+    if not real:
+        return _die(
+            "Every acceptance criterion is empty, too short, or a "
+            "restatement of the Goal. Each must add something specific the "
+            "Goal does not already say.", stdout)
+
+    if not any(_CHECKABLE.search(it) for it in real):
+        return _die(
+            "No acceptance criterion is concretely checkable — each reads "
+            "as an opinion only a human could settle. Name a file, a "
+            "command, an output, an exit code, or an observable change.", stdout)
+
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

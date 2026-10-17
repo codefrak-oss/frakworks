@@ -1,0 +1,10 @@
+{
+  "requestId": "task-12bc",
+  "idempotencyKey": "inv-993-currency",
+  "primitive": "ask",
+  "outcome": "answered",
+  "answer": "EUR",
+  "decidedBy": { "type": "human", "id": "h-007" },
+  "decidedAt": "2026-10-08T15:20:00Z",
+  "channel": "chat"
+}

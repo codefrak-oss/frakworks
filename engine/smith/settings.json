@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "defaultMode": "acceptEdits",
+    "allow": [
+      "Bash",
+      "Edit", "Write", "Read", "Glob", "Grep", "LS",
+      "WebFetch", "WebSearch", "TodoWrite", "NotebookEdit", "Task",
+      "mcp__frakworks", "mcp__frakworks-engine-diagnostics"
+    ],
+    "deny": [
+      "Bash(git push:*)",
+      "Bash(gh pr create:*)",
+      "Bash(gh pr merge:*)"
+    ]
+  }
+}

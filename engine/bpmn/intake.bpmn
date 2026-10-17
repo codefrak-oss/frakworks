@@ -1,0 +1,403 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:camunda="http://camunda.org/schema/1.0/bpmn" xmlns:modeler="http://camunda.org/schema/modeler/1.0" id="Definitions_intake" targetNamespace="http://codefrak.com/agent-army/bpmn" exporter="Camunda Modeler" exporterVersion="5.51.1" modeler:executionPlatform="Camunda Platform" modeler:executionPlatformVersion="7.23.0">
+  <bpmn:message id="message-ask-submitted" name="ask submitted" />
+  <bpmn:message id="message-file-ticket" name="file ticket" />
+  <bpmn:message id="message-intake-authorized" name="intake authorized" />
+  <bpmn:error id="error-no-terminal-comment" name="smith exited without terminal comment" errorCode="no-terminal-comment" />
+  <bpmn:error id="error-limit-stop" name="usage limit stop" errorCode="limit-stop" />
+  <bpmn:process id="intake" name="intake" isExecutable="true" camunda:historyTimeToLive="180">
+    <bpmn:startEvent id="start-ask-submitted" name="ask submitted">
+      <bpmn:outgoing>flow-start-create</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="MessageEventDefinition_ask" messageRef="message-ask-submitted" />
+    </bpmn:startEvent>
+    <bpmn:serviceTask id="task-open-ask" name="open the ask item" camunda:delegateExpression="${openAskItem}">
+      <bpmn:documentation>OpenAskItemDelegate: opens the ask as its ask work item (no GitHub write); sets repo, issue (the item's ticket number), issueUrl, askItem, and authorizedBy when the submitter is a trusted login</bpmn:documentation>
+      <bpmn:incoming>flow-start-create</bpmn:incoming>
+      <bpmn:outgoing>flow-create-authorized</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="gateway-authorized" name="authorized?" default="flow-authorized-wait">
+      <bpmn:incoming>flow-create-authorized</bpmn:incoming>
+      <bpmn:outgoing>flow-authorized-refine</bpmn:outgoing>
+      <bpmn:outgoing>flow-authorized-wait</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:intermediateCatchEvent id="event-intake-authorized" name="ask item started">
+      <bpmn:documentation>IssueApprovals.approveIntake correlates this when a trusted login starts the ask item (POST /work-items/{id}/start or First mate's approve); it sets authorizedBy and the snapshot</bpmn:documentation>
+      <bpmn:incoming>flow-authorized-wait</bpmn:incoming>
+      <bpmn:outgoing>flow-wait-refine</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="MessageEventDefinition_authorized" messageRef="message-intake-authorized" />
+    </bpmn:intermediateCatchEvent>
+    <bpmn:serviceTask id="task-check-duplicate" name="is it already a ticket?&#10;(jev)" camunda:delegateExpression="${checkDuplicate}">
+      <bpmn:documentation>CheckDuplicateDelegate: reads the repo's open work items and asks Jev (use case intake-duplicate) which one the ask duplicates, or none; sets duplicateOf on a match at engine.jev.duplicate-floor, else null. Any failure is no match</bpmn:documentation>
+      <bpmn:incoming>flow-authorized-refine</bpmn:incoming>
+      <bpmn:incoming>flow-wait-refine</bpmn:incoming>
+      <bpmn:outgoing>flow-check-duplicate</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="gateway-duplicate" name="looks like an open ticket?" default="flow-duplicate-refine">
+      <bpmn:incoming>flow-check-duplicate</bpmn:incoming>
+      <bpmn:outgoing>flow-duplicate-refine</bpmn:outgoing>
+      <bpmn:outgoing>flow-duplicate-post</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="task-post-duplicate" name="ask the user: the same work?&#10;(work item)" camunda:asyncBefore="true" camunda:delegateExpression="${postDuplicate}">
+      <bpmn:documentation>PostDuplicateDelegate: records "this looks like #n: is it the same work?" in engine.intake_question, files it as a HITLP human.ask (hitlpTaskId) and records it in the ask item's conversation; HitlpAnswers completes the wait from the decision record. Async: with no HITLP server configured the job is an incident naming ENGINE_HITLP_URL. Never drops the ask: the user cancels the intake, or answers</bpmn:documentation>
+      <bpmn:incoming>flow-duplicate-post</bpmn:incoming>
+      <bpmn:outgoing>flow-post-answer-duplicate</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:userTask id="user-task-answer-duplicate" name="answer: is it a duplicate?">
+      <bpmn:documentation>Waits for POST /intake/{id}/answer from someone who may authorize intakes, or for DELETE /intake/{id}; the answer and the brief's "this looks like #n" line go to the refine run</bpmn:documentation>
+      <bpmn:incoming>flow-post-answer-duplicate</bpmn:incoming>
+      <bpmn:outgoing>flow-answer-duplicate-record</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:serviceTask id="task-record-duplicate-answer" name="record the answer&#10;(jev outcome)" camunda:delegateExpression="${recordDuplicateAnswer}">
+      <bpmn:documentation>RecordDuplicateAnswerDelegate: the user's answer is the duplicate call's outcome in engine.jev_call</bpmn:documentation>
+      <bpmn:incoming>flow-answer-duplicate-record</bpmn:incoming>
+      <bpmn:outgoing>flow-record-refine</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:callActivity id="call-refine-ask" name="refine ask&#10;(smith run)" calledElement="reusable-smith-run">
+      <bpmn:extensionElements>
+        <camunda:in variables="all" />
+        <camunda:in sourceExpression="${&#39;refine&#39;}" target="mode" />
+        <camunda:out variables="all" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>flow-duplicate-refine</bpmn:incoming>
+      <bpmn:incoming>flow-record-refine</bpmn:incoming>
+      <bpmn:incoming>flow-answer-refine</bpmn:incoming>
+      <bpmn:outgoing>flow-refine-outcome</bpmn:outgoing>
+    </bpmn:callActivity>
+    <bpmn:exclusiveGateway id="gateway-outcome" name="outcome?">
+      <bpmn:incoming>flow-refine-outcome</bpmn:incoming>
+      <bpmn:outgoing>flow-outcome-file</bpmn:outgoing>
+      <bpmn:outgoing>flow-outcome-insufficient-permissions</bpmn:outgoing>
+      <bpmn:outgoing>flow-outcome-ask</bpmn:outgoing>
+      <bpmn:outgoing>flow-outcome-withdrawn</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="task-close-withdrawn" name="close the ask as not planned&#10;(work item)" camunda:asyncBefore="true" camunda:delegateExpression="${closeWithdrawn}">
+      <bpmn:documentation>CloseWithdrawnDelegate: the user's answer withdrew the ask; quotes the refiner's reason in the ask item's conversation and closes it as not planned. Nothing is filed, nothing starts, no session is told</bpmn:documentation>
+      <bpmn:incoming>flow-outcome-withdrawn</bpmn:incoming>
+      <bpmn:outgoing>flow-withdrawn-end</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="task-file-unlabeled" name="file unlabeled ticket for human triage" camunda:asyncBefore="true" camunda:delegateExpression="${fileUnlabeledTicket}">
+      <bpmn:documentation>Files the refiner's drafted ticket with no labels (no kind, no authorized), with its blocker and reason under "## Needs human triage" and "· triage" ending the engine trailer; sets ticket and ticketUrl. Nothing starts from it: it shows under "Needs you" as insufficient-permissions until the user labels it with a kind or closes it</bpmn:documentation>
+      <bpmn:incoming>flow-outcome-insufficient-permissions</bpmn:incoming>
+      <bpmn:outgoing>flow-unlabeled-close</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:sendTask id="task-file-ticket" name="file ticket" camunda:delegateExpression="${fileTicket}">
+      <bpmn:documentation>FileTicketDelegate: files the smith's drafted ticket from its result.json at refinePick (Jev's kind, mode and tier where sure, else the refiner's), with its kind label. Idempotent (FileOnce, #1802): a run after a rolled-back one reuses the ticket it filed, found by engine.intake_ticket (written in its own transaction) or by the intake id in an open ticket's trailer</bpmn:documentation>
+      <bpmn:incoming>flow-outcome-file</bpmn:incoming>
+      <bpmn:outgoing>flow-file-kind</bpmn:outgoing>
+    </bpmn:sendTask>
+    <bpmn:serviceTask id="task-post-question" name="post the smith&#39;s question&#10;(work item)" camunda:asyncBefore="true" camunda:delegateExpression="${postQuestion}">
+      <bpmn:documentation>PostQuestionDelegate: records the question in engine.intake_question, files it as a HITLP human.ask (hitlpTaskId) and records it in the ask item's conversation; HitlpAnswers completes the wait from the decision record. Async: with no HITLP server configured the job is an incident naming ENGINE_HITLP_URL.</bpmn:documentation>
+      <bpmn:incoming>flow-outcome-ask</bpmn:incoming>
+      <bpmn:outgoing>flow-question-answer</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:userTask id="user-task-answer-question" name="answer the smith&#39;s question">
+      <bpmn:documentation>Waits for POST /intake/{id}/answer from someone who may authorize intakes; the answer joins the brief of the next refine run</bpmn:documentation>
+      <bpmn:incoming>flow-question-answer</bpmn:incoming>
+      <bpmn:outgoing>flow-answer-refine</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:exclusiveGateway id="gateway-kind" name="a chore, bug or feature?" default="flow-kind-close">
+      <bpmn:incoming>flow-file-kind</bpmn:incoming>
+      <bpmn:outgoing>flow-kind-work</bpmn:outgoing>
+      <bpmn:outgoing>flow-kind-close</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="task-start-work" name="start chore/bug/feature if authorized" camunda:asyncBefore="true" camunda:delegateExpression="${startFlowFromIntake}">
+      <bpmn:documentation>StartFlowFromIntakeDelegate: the intake's authorization carries to the chore, bug or feature when its authorizer may also authorize that kind there (a feature takes the refiner's mode); else the ticket waits for an authorized label. asyncBefore (#1802): the file step's transaction commits before this one starts, so a failure here retries from here, never re-running the file step</bpmn:documentation>
+      <bpmn:incoming>flow-kind-work</bpmn:incoming>
+      <bpmn:outgoing>flow-work-close</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="task-close-intake" name="say what was filed&#10;(work item)" camunda:asyncBefore="true" camunda:delegateExpression="${closeIntake}">
+      <bpmn:documentation>CloseIntakeDelegate: says what was filed in the ask item's conversation, and closes the ask item when the ticket was filed elsewhere. asyncBefore (#1802): a failure here retries this step alone, not the start or the file step before it</bpmn:documentation>
+      <bpmn:incoming>flow-work-close</bpmn:incoming>
+      <bpmn:incoming>flow-kind-close</bpmn:incoming>
+      <bpmn:incoming>flow-unlabeled-close</bpmn:incoming>
+      <bpmn:outgoing>flow-close-notify</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="task-notify-session" name="notify the session that filed it" camunda:delegateExpression="${notifyFilingSession}">
+      <bpmn:documentation>NotifyFilingSessionDelegate: when the ask named a notifySession and a ticket was filed (not a dry run), queues engine.intake_notification for the host-side watcher to push "filed as #n" into that Claude Code session with claude -p; never fails the intake</bpmn:documentation>
+      <bpmn:incoming>flow-close-notify</bpmn:incoming>
+      <bpmn:outgoing>flow-notify-end</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="end-intake-closed" name="intake closed">
+      <bpmn:incoming>flow-notify-end</bpmn:incoming>
+      <bpmn:incoming>flow-withdrawn-end</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="flow-start-create" sourceRef="start-ask-submitted" targetRef="task-open-ask" />
+    <bpmn:sequenceFlow id="flow-create-authorized" sourceRef="task-open-ask" targetRef="gateway-authorized" />
+    <bpmn:sequenceFlow id="flow-authorized-refine" name="yes" sourceRef="gateway-authorized" targetRef="task-check-duplicate">
+      <bpmn:conditionExpression xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="bpmn:tFormalExpression">${authorizedBy != null}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow-authorized-wait" name="not yet" sourceRef="gateway-authorized" targetRef="event-intake-authorized" />
+    <bpmn:sequenceFlow id="flow-wait-refine" sourceRef="event-intake-authorized" targetRef="task-check-duplicate" />
+    <bpmn:sequenceFlow id="flow-check-duplicate" sourceRef="task-check-duplicate" targetRef="gateway-duplicate" />
+    <bpmn:sequenceFlow id="flow-duplicate-refine" name="no" sourceRef="gateway-duplicate" targetRef="call-refine-ask" />
+    <bpmn:sequenceFlow id="flow-duplicate-post" name="yes" sourceRef="gateway-duplicate" targetRef="task-post-duplicate">
+      <bpmn:conditionExpression xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="bpmn:tFormalExpression">${duplicateOf != null}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow-post-answer-duplicate" sourceRef="task-post-duplicate" targetRef="user-task-answer-duplicate" />
+    <bpmn:sequenceFlow id="flow-answer-duplicate-record" sourceRef="user-task-answer-duplicate" targetRef="task-record-duplicate-answer" />
+    <bpmn:sequenceFlow id="flow-record-refine" sourceRef="task-record-duplicate-answer" targetRef="call-refine-ask" />
+    <bpmn:sequenceFlow id="flow-question-answer" sourceRef="task-post-question" targetRef="user-task-answer-question" />
+    <bpmn:sequenceFlow id="flow-answer-refine" sourceRef="user-task-answer-question" targetRef="call-refine-ask" />
+    <bpmn:sequenceFlow id="flow-refine-outcome" sourceRef="call-refine-ask" targetRef="gateway-outcome" />
+    <bpmn:sequenceFlow id="flow-outcome-file" name="file" sourceRef="gateway-outcome" targetRef="task-file-ticket">
+      <bpmn:conditionExpression xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="bpmn:tFormalExpression">${outcome == 'file'}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow-outcome-insufficient-permissions" name="insufficient permissions" sourceRef="gateway-outcome" targetRef="task-file-unlabeled">
+      <bpmn:conditionExpression xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="bpmn:tFormalExpression">${outcome == 'insufficient-permissions'}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow-outcome-ask" name="smith doesn&#39;t understand the ask" sourceRef="gateway-outcome" targetRef="task-post-question">
+      <bpmn:conditionExpression xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="bpmn:tFormalExpression">${outcome == 'ask'}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow-file-kind" sourceRef="task-file-ticket" targetRef="gateway-kind" />
+    <bpmn:sequenceFlow id="flow-kind-work" name="chore, bug, feature or proposal" sourceRef="gateway-kind" targetRef="task-start-work">
+      <bpmn:conditionExpression xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="bpmn:tFormalExpression">${kind == 'chore' || kind == 'bug' || kind == 'feature' || kind == 'proposal' || kind == 'research'}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow-kind-close" name="another kind" sourceRef="gateway-kind" targetRef="task-close-intake" />
+    <bpmn:sequenceFlow id="flow-work-close" sourceRef="task-start-work" targetRef="task-close-intake" />
+    <bpmn:sequenceFlow id="flow-unlabeled-close" sourceRef="task-file-unlabeled" targetRef="task-close-intake" />
+    <bpmn:sequenceFlow id="flow-close-notify" sourceRef="task-close-intake" targetRef="task-notify-session" />
+    <bpmn:sequenceFlow id="flow-notify-end" sourceRef="task-notify-session" targetRef="end-intake-closed" />
+    <bpmn:sequenceFlow id="flow-outcome-withdrawn" name="withdrawn" sourceRef="gateway-outcome" targetRef="task-close-withdrawn">
+      <bpmn:conditionExpression xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="bpmn:tFormalExpression">${outcome == 'withdrawn'}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow-withdrawn-end" sourceRef="task-close-withdrawn" targetRef="end-intake-closed" />
+    <bpmn:textAnnotation id="TextAnnotation_labels">
+      <bpmn:text>labels are projections written by listeners: claimed = external task locked; needs-review = a user task exists for the user; blocked = incident open.</bpmn:text>
+    </bpmn:textAnnotation>
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_intake">
+    <bpmndi:BPMNPlane id="BPMNPlane_intake" bpmnElement="intake">
+      <bpmndi:BPMNShape id="start-ask-submitted-di" bpmnElement="start-ask-submitted">
+        <dc:Bounds x="262" y="212" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="246" y="188" width="68" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-open-ask-di" bpmnElement="task-open-ask">
+        <dc:Bounds x="360" y="190" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="gateway-authorized-di" bpmnElement="gateway-authorized" isMarkerVisible="true">
+        <dc:Bounds x="510" y="205" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="505" y="181" width="60" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="event-intake-authorized-di" bpmnElement="event-intake-authorized">
+        <dc:Bounds x="517" y="312" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="490" y="355" width="90" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-check-duplicate-di" bpmnElement="task-check-duplicate">
+        <dc:Bounds x="620" y="190" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="gateway-duplicate-di" bpmnElement="gateway-duplicate" isMarkerVisible="true">
+        <dc:Bounds x="770" y="205" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="752" y="168" width="86" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-post-duplicate-di" bpmnElement="task-post-duplicate">
+        <dc:Bounds x="745" y="320" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="user-task-answer-duplicate-di" bpmnElement="user-task-answer-duplicate">
+        <dc:Bounds x="745" y="460" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-record-duplicate-answer-di" bpmnElement="task-record-duplicate-answer">
+        <dc:Bounds x="880" y="460" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="call-refine-ask-di" bpmnElement="call-refine-ask">
+        <dc:Bounds x="880" y="190" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="gateway-outcome-di" bpmnElement="gateway-outcome" isMarkerVisible="true">
+        <dc:Bounds x="1045" y="205" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1005" y="203" width="49" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-file-unlabeled-di" bpmnElement="task-file-unlabeled">
+        <dc:Bounds x="1240" y="80" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-file-ticket-di" bpmnElement="task-file-ticket">
+        <dc:Bounds x="1240" y="190" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-post-question-di" bpmnElement="task-post-question">
+        <dc:Bounds x="1240" y="300" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="user-task-answer-question-di" bpmnElement="user-task-answer-question">
+        <dc:Bounds x="1400" y="300" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="gateway-kind-di" bpmnElement="gateway-kind" isMarkerVisible="true">
+        <dc:Bounds x="1400" y="205" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1365" y="262" width="120" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-start-work-di" bpmnElement="task-start-work">
+        <dc:Bounds x="1510" y="190" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-close-withdrawn-di" bpmnElement="task-close-withdrawn">
+        <dc:Bounds x="1830" y="420" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-close-intake-di" bpmnElement="task-close-intake">
+        <dc:Bounds x="1670" y="190" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-notify-session-di" bpmnElement="task-notify-session">
+        <dc:Bounds x="1830" y="190" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="end-intake-closed-di" bpmnElement="end-intake-closed">
+        <dc:Bounds x="1992" y="212" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1977" y="188" width="65" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="TextAnnotation_labels_di" bpmnElement="TextAnnotation_labels">
+        <dc:Bounds x="160" y="1040" width="300" height="70" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="flow-start-create-di" bpmnElement="flow-start-create">
+        <di:waypoint x="298" y="230" />
+        <di:waypoint x="360" y="230" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-create-authorized-di" bpmnElement="flow-create-authorized">
+        <di:waypoint x="460" y="230" />
+        <di:waypoint x="510" y="230" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-authorized-refine-di" bpmnElement="flow-authorized-refine">
+        <di:waypoint x="560" y="230" />
+        <di:waypoint x="620" y="230" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="580" y="212" width="18" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-authorized-wait-di" bpmnElement="flow-authorized-wait">
+        <di:waypoint x="535" y="255" />
+        <di:waypoint x="535" y="312" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="541" y="273" width="36" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-wait-refine-di" bpmnElement="flow-wait-refine">
+        <di:waypoint x="553" y="330" />
+        <di:waypoint x="670" y="330" />
+        <di:waypoint x="670" y="270" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-question-answer-di" bpmnElement="flow-question-answer">
+        <di:waypoint x="1340" y="340" />
+        <di:waypoint x="1400" y="340" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-answer-refine-di" bpmnElement="flow-answer-refine">
+        <di:waypoint x="1450" y="380" />
+        <di:waypoint x="1450" y="430" />
+        <di:waypoint x="950" y="430" />
+        <di:waypoint x="950" y="270" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-refine-outcome-di" bpmnElement="flow-refine-outcome">
+        <di:waypoint x="980" y="230" />
+        <di:waypoint x="1045" y="230" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-outcome-file-di" bpmnElement="flow-outcome-file">
+        <di:waypoint x="1095" y="230" />
+        <di:waypoint x="1240" y="230" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1109" y="203" width="15" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-outcome-insufficient-permissions-di" bpmnElement="flow-outcome-insufficient-permissions">
+        <di:waypoint x="1070" y="205" />
+        <di:waypoint x="1070" y="120" />
+        <di:waypoint x="1240" y="120" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1110" y="86" width="59" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-outcome-withdrawn-di" bpmnElement="flow-outcome-withdrawn">
+        <di:waypoint x="1060" y="245" />
+        <di:waypoint x="1060" y="460" />
+        <di:waypoint x="1830" y="460" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1110" y="440" width="50" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-withdrawn-end-di" bpmnElement="flow-withdrawn-end">
+        <di:waypoint x="1930" y="460" />
+        <di:waypoint x="2010" y="460" />
+        <di:waypoint x="2010" y="248" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-outcome-ask-di" bpmnElement="flow-outcome-ask">
+        <di:waypoint x="1070" y="255" />
+        <di:waypoint x="1070" y="340" />
+        <di:waypoint x="1240" y="340" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1103" y="290" width="74" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-file-kind-di" bpmnElement="flow-file-kind">
+        <di:waypoint x="1340" y="230" />
+        <di:waypoint x="1400" y="230" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-kind-work-di" bpmnElement="flow-kind-work">
+        <di:waypoint x="1450" y="230" />
+        <di:waypoint x="1510" y="230" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1440" y="210" width="100" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-kind-close-di" bpmnElement="flow-kind-close">
+        <di:waypoint x="1425" y="205" />
+        <di:waypoint x="1425" y="160" />
+        <di:waypoint x="1700" y="160" />
+        <di:waypoint x="1700" y="190" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1530" y="142" width="62" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-work-close-di" bpmnElement="flow-work-close">
+        <di:waypoint x="1610" y="230" />
+        <di:waypoint x="1670" y="230" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-unlabeled-close-di" bpmnElement="flow-unlabeled-close">
+        <di:waypoint x="1340" y="120" />
+        <di:waypoint x="1740" y="120" />
+        <di:waypoint x="1740" y="190" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-close-notify-di" bpmnElement="flow-close-notify">
+        <di:waypoint x="1770" y="230" />
+        <di:waypoint x="1830" y="230" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-notify-end-di" bpmnElement="flow-notify-end">
+        <di:waypoint x="1930" y="230" />
+        <di:waypoint x="1992" y="230" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-check-duplicate-di" bpmnElement="flow-check-duplicate">
+        <di:waypoint x="720" y="230" />
+        <di:waypoint x="770" y="230" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-duplicate-refine-di" bpmnElement="flow-duplicate-refine">
+        <di:waypoint x="820" y="230" />
+        <di:waypoint x="880" y="230" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="836" y="212" width="22" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-duplicate-post-di" bpmnElement="flow-duplicate-post">
+        <di:waypoint x="795" y="255" />
+        <di:waypoint x="795" y="320" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="801" y="280" width="18" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-post-answer-duplicate-di" bpmnElement="flow-post-answer-duplicate">
+        <di:waypoint x="795" y="400" />
+        <di:waypoint x="795" y="460" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-answer-duplicate-record-di" bpmnElement="flow-answer-duplicate-record">
+        <di:waypoint x="845" y="500" />
+        <di:waypoint x="880" y="500" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-record-refine-di" bpmnElement="flow-record-refine">
+        <di:waypoint x="910" y="460" />
+        <di:waypoint x="910" y="270" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

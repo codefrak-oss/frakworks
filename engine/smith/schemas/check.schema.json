@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/codefrak-oss/frakworks/engine/smith/schemas/check.schema.json",
+  "title": "CheckResult",
+  "description": "What a post-deployment check Smith (mode check) writes to /work/out/result.json. The engine checks it (ReadResultDelegate, then CheckResultHandler's rules: a bug on failed, a wake hint with exactly one key, a parsable at); the Smith checks it with check-result check. Strict types where the engine branches, any non-empty JSON where it only passes content on.",
+  "type": "object",
+  "required": [
+    "outcome",
+    "summary"
+  ],
+  "properties": {
+    "outcome": {
+      "enum": [
+        "passed",
+        "failed",
+        "not_yet"
+      ],
+      "description": "Branched on by the engine and the BPMN: passed ends the check, failed files a bug, not_yet runs it again later."
+    },
+    "summary": {
+      "$ref": "#/$defs/content",
+      "description": "What was checked and what it showed; for not_yet, why the check's conditions are not met yet."
+    },
+    "bug": {
+      "type": "object",
+      "description": "For failed only: the bug the engine files in the ticket's repo.",
+      "required": [
+        "title",
+        "body"
+      ],
+      "properties": {
+        "title": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "body": {
+          "$ref": "#/$defs/content"
+        }
+      }
+    },
+    "wake": {
+      "type": "object",
+      "description": "For not_yet only, optional: when to look again. Exactly one of at and event.",
+      "properties": {
+        "at": {
+          "type": "string",
+          "description": "An ISO-8601 instant, e.g. 2026-10-14T09:00:00Z."
+        },
+        "event": {
+          "type": "string",
+          "description": "A bus frame to wake on: <type> or <type>:<field>=<value>, over engine/docs/events.md's frame types, e.g. push:default=true or intake:name=question."
+        }
+      },
+      "minProperties": 1,
+      "maxProperties": 1,
+      "additionalProperties": false
+    }
+  },
+  "$defs": {
+    "content": {
+      "description": "Passed on to a brief, a bug or a conversation entry, never branched on: any non-empty JSON. A string is shown as itself; an object or array as a fenced JSON block.",
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        {
+          "type": "object",
+          "minProperties": 1
+        },
+        {
+          "type": "array",
+          "minItems": 1
+        },
+        {
+          "type": [
+            "number",
+            "boolean"
+          ]
+        }
+      ]
+    }
+  }
+}

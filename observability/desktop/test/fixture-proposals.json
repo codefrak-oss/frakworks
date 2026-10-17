@@ -1,0 +1,31 @@
+{
+  "docs": [
+    { "repo": "o/r", "slug": "pitch-me", "path": "docs/proposals/pitch-me.md", "title": "Pitch me",
+      "status": "proposed", "decisionLog": ["2026-09-26 proposed (#12)"], "ticket": 12, "buildTicket": null,
+      "pitch": "docs/proposals/pitch-me.html" },
+    { "repo": "o/r", "slug": "built-thing", "path": "docs/proposals/built-thing.md", "title": "Built thing",
+      "status": "accepted", "decisionLog": ["2026-09-20 proposed (#8)", "2026-09-21 accepted (#8); build filed as #9"],
+      "ticket": 8, "buildTicket": 9, "pitch": "docs/proposals/built-thing.html" },
+    { "repo": "o/r", "slug": "later", "path": "docs/proposals/later.md", "title": "Later",
+      "status": "shelved", "decisionLog": ["2026-09-01 shelved — not now"], "ticket": null, "buildTicket": null, "pitch": null },
+    { "repo": "o/other", "slug": "old-doc", "path": "docs/proposals/old-doc.md", "title": "Old doc",
+      "status": null, "decisionLog": [], "ticket": null, "buildTicket": null, "pitch": null }
+  ],
+  "board": [
+    { "repo": "o/r", "number": 12, "title": "Pitch me (ticket)", "url": "https://github.com/o/r/issues/12", "kind": "proposal",
+      "flow": { "flow": "proposal", "stage": "user-task-answer-decision", "ended": false,
+                "prUrl": "https://github.com/o/r/pull/13", "pitch": "docs/proposals/pitch-me.html" } },
+    { "repo": "o/r", "number": 14, "title": "Drafting one", "url": "https://github.com/o/r/issues/14", "kind": "proposal",
+      "flow": { "flow": "proposal", "stage": "call-draft", "ended": false } },
+    { "repo": "o/r", "number": 15, "title": "Some work", "url": "https://github.com/o/r/issues/15", "kind": "work",
+      "flow": { "flow": "work", "stage": "call-smith", "ended": false } }
+  ],
+  "needs": [
+    { "repo": "o/r", "ticket": 12, "kind": "decision", "actionId": "p-12", "ask": "The proposal is ready for your decision" },
+    { "repo": "o/r", "ticket": 15, "kind": "question", "actionId": "w-15", "ask": "which one?" }
+  ],
+  "pages": {
+    "o/r:later": { "pitch": { "kind": "html", "path": "docs/proposals/later.html", "prUrl": "", "content": "<h1>Later</h1>" } },
+    "o/other:old-doc": { "pitch": { "kind": "markdown", "path": "docs/proposals/old-doc.md", "prUrl": "", "content": "<h1>Old doc</h1><p>from before pitches</p>" } }
+  }
+}

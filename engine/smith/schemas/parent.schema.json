@@ -1,0 +1,160 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/codefrak-oss/frakworks/engine/smith/schemas/parent.schema.json",
+  "title": "ParentResult",
+  "description": "What a live parent Smith writes to /work/out/result.json when its split is done (outcome done: every draft filed through file_children or dropped, every child closed), or when its session ends first (outcome ended). continue and revise stay accepted for a parent that did not file through file_children: the engine files the ready drafts and starts a new parent session. The engine checks it (ReadResultDelegate) before its own rules; the Smith checks it with check-result parent. Strict types where the engine branches, any non-empty JSON where it only passes content on.",
+  "type": "object",
+  "required": [
+    "outcome"
+  ],
+  "properties": {
+    "outcome": {
+      "enum": [
+        "continue",
+        "revise",
+        "done",
+        "ended"
+      ],
+      "description": "Branched on by the engine and the BPMN. done: the split is complete; ended: the session ends first; continue and revise: a replan's, for drafts the parent did not file itself."
+    },
+    "children": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/child"
+      }
+    },
+    "summary": {
+      "$ref": "#/$defs/content"
+    },
+    "steer": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/steer"
+      },
+      "description": "Course changes for filed children still open: each is commented on the child and rides in its later briefs, binding."
+    }
+  },
+  "$defs": {
+    "content": {
+      "description": "Passed on to a brief or a GitHub comment, never branched on: any non-empty JSON. A string is shown as itself; an object or array as a fenced JSON block.",
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        {
+          "type": "object",
+          "minProperties": 1
+        },
+        {
+          "type": "array",
+          "minItems": 1
+        },
+        {
+          "type": [
+            "number",
+            "boolean"
+          ]
+        }
+      ]
+    },
+    "steer": {
+      "type": "object",
+      "required": [
+        "child",
+        "message"
+      ],
+      "properties": {
+        "child": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "The issue number of a filed child in state open (the brief's split.filed)."
+        },
+        "message": {
+          "type": "string",
+          "pattern": "\\S",
+          "description": "What the child must do differently; binding on its later runs."
+        }
+      }
+    },
+    "child": {
+      "type": "object",
+      "required": [
+        "title",
+        "body",
+        "kind",
+        "dependsOn",
+        "points"
+      ],
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "The child issue's title, filed as is."
+        },
+        "body": {
+          "type": "string",
+          "description": "The child issue's markdown body; the engine reads its sections."
+        },
+        "kind": {
+          "enum": [
+            "chore",
+            "bug",
+            "feature"
+          ],
+          "description": "Branched on: which flow the child is filed for."
+        },
+        "featureMode": {
+          "enum": [
+            "auto",
+            "confirm",
+            null
+          ],
+          "description": "Ignored: a feature child takes its parent's mode. Omit it."
+        },
+        "dependsOn": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "description": "Indexes of earlier children."
+        },
+        "points": {
+          "enum": [
+            1,
+            2,
+            3,
+            5,
+            8,
+            13
+          ],
+          "description": "The child's story points (bots/story-points.md), at most 13: recorded on the filed child."
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "outcome": {
+            "const": "ended"
+          }
+        },
+        "required": [
+          "outcome"
+        ]
+      },
+      "then": {
+        "required": [
+          "summary"
+        ],
+        "properties": {
+          "children": {
+            "maxItems": 0
+          }
+        }
+      }
+    }
+  ]
+}

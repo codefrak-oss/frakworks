@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Update preview mockups</title>
+<style>
+  :root { --bg: #ffffff; --fg: #1f2328; --muted: #59636e; --faint: #6e7781; --accent: #0969da; --surface: #f6f8fa;
+    --app: #eef1f4; --appbar: #e3e7ec; --card: #ffffff; --line: #d0d4da; --scrim: #f0f2f5; --panel: #ffffff;
+    --btn: #0969da; --amber: #9a6700; --amberbg: #fff8c5; --amberline: #d4a72c; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0d1117; --fg: #e6edf3; --muted: #9198a1; --faint: #6e7681; --accent: #4493f8; --surface: #151b23;
+      --app: #0d1117; --appbar: #151b23; --card: #161b22; --line: #30363d; --scrim: #080a0e; --panel: #161b22;
+      --btn: #1f6feb; --amber: #d29922; --amberbg: #2a2416; --amberline: #9e6a03; }
+  }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 16px; }
+  .muted { color: var(--muted); }
+  a { color: var(--accent); }
+  svg { width: 100%; height: auto; display: block; }
+  svg text { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .app { fill: var(--app); } .appbar { fill: var(--appbar); } .ph { fill: var(--line); }
+  .card { fill: var(--card); stroke: var(--line); } .scrim { fill: var(--scrim); opacity: .45; }
+  .panel { fill: var(--panel); stroke: var(--line); } .rule { fill: var(--line); stroke: var(--line); }
+  .t-fg { fill: var(--fg); } .t-muted { fill: var(--muted); } .t-faint { fill: var(--faint); } .t-link { fill: var(--accent); text-decoration: underline; }
+  .t-amber { fill: var(--amber); } .amber { fill: var(--amberbg); stroke: var(--amberline); }
+  .btn { fill: var(--btn); } .btn2 { fill: none; stroke: var(--faint); } .mono { font-family: ui-monospace, Menlo, monospace !important; }
+  nav ul { padding-left: 20px; }
+</style>
+</head>
+<body>
+<main>
+<h1>Update preview mockups</h1>
+<p class="muted">Ticket #100091 · confirmed by the user ("build it as drawn")</p>
+<p>One modal, shown before a downloaded desktop update installs and before the engine updates, lists each ticket the incoming version brings (the ticket number as a link, then its title from the engine's work-item store) under the running → incoming version pair, with Cancel and Update.</p>
+<nav><ul>
+<li><a href="desktop-ready.html">Desktop update ready</a>: Restart is clicked with a downloaded desktop update. One row per ticket the incoming build brings, its title from the engine's work-item store; a ticket the store does not know reads <em>title unavailable</em>; a PR whose subject names no ticket is a <code>PR #n</code> row.</li>
+<li><a href="engine-ready.html">Engine update ready</a>: The lit Update engine is clicked. The header names both builds and how far behind the running one is; the live-run and session lines sit above the list.</li>
+<li><a href="list-missing.html">List missing</a>: The list could not be read in 4 s (the engine did not answer, the build is unstamped, or <code>git log</code> failed). One amber line says why; Update is still offered, because the update never waits on the list.</li>
+<li><a href="nothing-merged.html">Nothing merged</a>: The two builds are the same commit (a rebuilt image): the list is empty and says so.</li>
+</ul></nav>
+</main>
+</body>
+</html>

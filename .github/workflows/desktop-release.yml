@@ -1,0 +1,179 @@
+# Builds, signs and publishes the desktop app (observability/desktop/) as a
+# macOS release on every push to main that touches it, so the running app's
+# yellow Restart lights within a minute of a merge (observability/desktop/
+# README.md, "The status bar").
+#
+# Where it runs: the one runner labelled `desktop-build`, the self-hosted
+# macOS runner (an Intel Mac). codesign needs macOS, and GitHub-hosted
+# macOS minutes cost money on a private repo (the user, 2026-09-26). An Intel
+# Mac builds and signs the arm64 app fine: Electron ships prebuilt per arch
+# and codesign is arch-agnostic.
+#
+# What the runner holds, unlike the Linux build runners (engine.yml: "the
+# runner VM holds no secrets"): the Apple Development signing identity in its
+# login keychain (CSC_NAME names it; electron-builder finds it there) and an
+# SSH key for the `publish` user on the release host. Both are that runner's own,
+# reachable only on the LAN, and nothing here reads a GitHub secret.
+name: desktop-release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'observability/desktop/**'
+      - '.github/workflows/desktop-release.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A newer push supersedes a release still building for an older one.
+concurrency:
+  group: desktop-release-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # The release host, the signing identity and its keychain are this
+  # deployment's values, held as Actions secrets (Settings > Secrets and
+  # variables > Actions > Secrets) so the public logs mask them, not in the tree.
+  FEED_HOST: ${{ secrets.RELEASE_HOST }}
+  FEED_DIR: /srv/releases
+  # How many versions stay on the feed; older DMG/zip/blockmap triples are
+  # removed after each publish (a build is ~230 MB and nothing else prunes;
+  # the user, 2026-09-26). latest-mac.yml always names the newest.
+  FEED_KEEP: 5
+  # The signing identity's common name, as `security find-identity -v -p
+  # codesigning` prints it on the runner. Never a Developer ID: the app is
+  # for the user's own Macs on the LAN, and the first launch on each is a
+  # right-click Open past Gatekeeper; updates after that need only that the
+  # new build's signature matches the running one, which this gives.
+  CSC_NAME: ${{ secrets.CSC_NAME }}
+  CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+  # The identity lives in a keychain of its own on the runner, made with
+  # `security create-keychain` and imported with `-T /usr/bin/codesign`;
+  # codesign over a launchd/SSH session finds it only when the keychain is
+  # named (errSecInternalComponent otherwise, seen 2026-09-26), and it is
+  # locked after a reboot, so the `keychain` step unlocks it with the
+  # password the runner keeps in ~/.build-keychain-password.
+  CSC_KEYCHAIN: ${{ secrets.CSC_KEYCHAIN }}
+
+jobs:
+  release:
+    if: github.event_name != 'pull_request'
+    runs-on: [self-hosted, macOS, desktop-build]
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: observability/desktop
+    steps:
+      - uses: actions/checkout@v4
+      # The version electron-updater compares: package.json's 0.1.0 stays the
+      # checkout's, and every build stamps 0.1.<run number>, monotonic across
+      # runs, so latest-mac.yml always names a newer one than any earlier
+      # build. The stamp is not committed.
+      - name: version
+        id: version
+        run: |
+          v="0.1.${GITHUB_RUN_NUMBER}"
+          npm version --no-git-tag-version "$v" >/dev/null
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "building v$v from ${GITHUB_SHA::7}"
+      - name: keychain
+        run: |
+          security unlock-keychain -p "$(cat ~/.build-keychain-password)" "$CSC_KEYCHAIN"
+          security find-identity -v -p codesigning "$CSC_KEYCHAIN" | grep -F "$CSC_NAME"
+      - name: install
+        run: npm ci
+      - name: test
+        run: npm test
+      # `npm test` builds the test bundles, not the renderer; the
+      # window is blank without dist/renderer.js (build 0.1.5, 2026-09-26).
+      # --publish never: electron-builder writes latest-mac.yml next to the
+      # artifacts and publishes nothing itself; the rsync below is the publish.
+      - name: build, sign
+        run: |
+          npm run build:renderer
+          npx electron-builder --mac --arm64 --publish never
+      - name: signed
+        run: |
+          app=$(ls -d release/mac-arm64/*.app | head -1)
+          codesign --verify --deep --strict --verbose=2 "$app"
+          codesign -dv "$app" 2>&1 | grep -E '^Authority=' | head -1
+          for f in dist/renderer.js dist/renderer.css src/renderer/index.html src/preload.js; do
+            npx @electron/asar list "$app/Contents/Resources/app.asar" | grep -qx "/$f" || { echo "missing from app.asar: $f"; exit 1; }
+          done
+          ls -la release/*.dmg release/*.zip release/*.blockmap release/latest-mac.yml
+      # macOS ships rsync 2.6.9, whose --chmod takes only the symbolic form
+      # (F644 is a 3.x addition; seen 2026-09-26).
+      # The artifacts first, latest-mac.yml last: a client that reads the
+      # manifest never finds it naming a zip that is not there yet. Older
+      # builds stay on the feed until the user prunes them.
+      - name: publish
+        run: |
+          v=${{ steps.version.outputs.version }}
+          rsync -av --chmod=u=rw,g=r,o=r release/*-"$v"-arm64.dmg release/*-"$v"-arm64.zip release/*-"$v"-arm64.zip.blockmap \
+            "publish@${FEED_HOST}:${FEED_DIR}/"
+          rsync -av --chmod=u=rw,g=r,o=r release/latest-mac.yml "publish@${FEED_HOST}:${FEED_DIR}/"
+          curl -sSf "http://${FEED_HOST}/latest-mac.yml" | head -5
+      # Oldest versions beyond FEED_KEEP go, by version order (sort -V), each
+      # as its dmg + zip + blockmap; the version just published is newest so
+      # it always stays. Nothing else in the directory is touched.
+      - name: prune
+        run: |
+          ssh "publish@${FEED_HOST}" "cd ${FEED_DIR} && ls frakworks-*-arm64.dmg 2>/dev/null | sed 's/\.dmg\$//' | sort -V | head -n -${FEED_KEEP} | while read -r b; do echo \"removing \$b\"; rm -f \"\$b.dmg\" \"\$b.zip\" \"\$b.zip.blockmap\"; done; ls"
+
+  # The web version's image (observability/desktop/README.md, "Web version"):
+  # frakworks-web, nginx serving dist-web/ at /web/, built from
+  # observability/desktop with web-image/Dockerfile (its node stage runs
+  # `npm run build:web`). On the cluster's image runners and shared buildkitd,
+  # like images.yml, pushed to the same LAN registry, not on the macOS
+  # signing runner (no route to the registry). From #2400 / PR #2401.
+  web-image:
+    if: github.event_name != 'pull_request'
+    runs-on: frakworks-images
+    timeout-minutes: 30
+    env:
+      REGISTRY: ${{ secrets.REGISTRY }}
+      PLATFORMS: linux/amd64
+    steps:
+      - uses: actions/checkout@v4
+      - name: builder
+        run: |
+          docker buildx create --name frakworks --driver remote "$BUILDKIT_HOST"
+          for i in 1 2 3 4 5; do docker buildx inspect --bootstrap frakworks && exit 0; sleep 2; done
+          exit 1
+      - name: build and push frakworks-web
+        run: |
+          docker buildx build --builder frakworks --progress=plain --push \
+            --platform "$PLATFORMS" \
+            --file observability/desktop/web-image/Dockerfile \
+            --tag "$REGISTRY/frakworks-web:main" \
+            --tag "$REGISTRY/frakworks-web:sha-${GITHUB_SHA::7}" \
+            --cache-from "type=registry,ref=$REGISTRY/frakworks-web:buildcache" \
+            --cache-to "type=registry,ref=$REGISTRY/frakworks-web:buildcache,mode=max" \
+            observability/desktop
+      - name: published
+        run: |
+          curl -sSf -H 'Accept: application/vnd.oci.image.index.v1+json' -H 'Accept: application/vnd.oci.image.manifest.v1+json' \
+            "http://$REGISTRY/v2/frakworks-web/manifests/main" > /dev/null && echo "frakworks-web:main published"
+      # Deployment `web` pulls :main (imagePullPolicy Always), so a restart
+      # deploys it. WEB_KUBECONFIG is a kubeconfig for a ServiceAccount that
+      # may only restart deployments/web in namespace frakworks (the deployment's
+      # ServiceAccount). Unset: skipped, and the new image
+      # goes live on the pod's next restart. The runner image has no kubectl, so
+      # a pinned one (checksum-verified) is fetched.
+      - name: deploy the web version
+        env:
+          WEB_KUBECONFIG: ${{ secrets.WEB_KUBECONFIG }}
+          KUBECTL_VERSION: v1.36.0
+          KUBECTL_SHA256: 123d8c8844f46b1244c547fffb3c17180c0c26dac9890589fe7e67763298748e
+        if: env.WEB_KUBECONFIG != ''
+        run: |
+          curl -sSfL -o "$RUNNER_TEMP/kubectl" "https://dl.k8s.io/release/$KUBECTL_VERSION/bin/linux/amd64/kubectl"
+          echo "$KUBECTL_SHA256  $RUNNER_TEMP/kubectl" | sha256sum -c -
+          chmod +x "$RUNNER_TEMP/kubectl"
+          export PATH="$RUNNER_TEMP:$PATH"
+          (umask 077; printf '%s\n' "$WEB_KUBECONFIG" > "$RUNNER_TEMP/kubeconfig")
+          export KUBECONFIG="$RUNNER_TEMP/kubeconfig"
+          kubectl -n frakworks rollout restart deployment/web
+          kubectl -n frakworks rollout status deployment/web --timeout=180s

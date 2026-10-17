@@ -1,0 +1,96 @@
+# A Smith pod's network, like the Docker sandbox's: nothing reaches in; out it
+# reaches the cluster's DNS, the engine's port in frakworks (selected by
+# namespace, never by address) and the internet, not the LAN or the rest of
+# the cluster. k3s enforces NetworkPolicy out of the box. The `except` list is
+# every private range (RFC 1918, link-local, CGNAT), not a site's LAN: a site
+# value (an address the pods may reach) belongs in the overlay.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: smith-sandbox
+  namespace: frakworks-smith
+spec:
+  podSelector: {}
+  policyTypes: ["Ingress", "Egress"]
+  ingress: []
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: kube-system}
+          podSelector:
+            matchLabels: {k8s-app: kube-dns}
+      ports:
+        - {protocol: UDP, port: 53}
+        - {protocol: TCP, port: 53}
+    - to:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: frakworks}
+          podSelector:
+            matchLabels: {app.kubernetes.io/name: engine}
+      ports:
+        - {protocol: TCP, port: 8080}
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except: ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "169.254.0.0/16", "100.64.0.0/10"]
+---
+# frakworks takes ingress from frakworks-smith and frakworks-firstmate on the
+# engine's port only, so Postgres is unreachable from either. The engine and Postgres talk inside
+# the namespace. The overlay adds its ingress controller's namespace (the
+# engine's API for the desktop app).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: engine-ingress
+  namespace: frakworks
+spec:
+  podSelector: {}
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - podSelector: {}
+    - from:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: frakworks-smith}
+      ports:
+        - {protocol: TCP, port: 8080}
+    - from:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: frakworks-firstmate}
+      ports:
+        - {protocol: TCP, port: 8080}
+---
+# A first mate pod's network, like a Smith's: nothing reaches in; out it
+# reaches DNS, the engine's port and the public internet, not the private
+# ranges, so never a Smith pod. With smith-sandbox (no ingress, egress only
+# DNS, the engine and the public internet) no traffic passes between Smith
+# and first mate pods either way.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: firstmate-sandbox
+  namespace: frakworks-firstmate
+spec:
+  podSelector: {}
+  policyTypes: ["Ingress", "Egress"]
+  ingress: []
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: kube-system}
+          podSelector:
+            matchLabels: {k8s-app: kube-dns}
+      ports:
+        - {protocol: UDP, port: 53}
+        - {protocol: TCP, port: 53}
+    - to:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: frakworks}
+          podSelector:
+            matchLabels: {app.kubernetes.io/name: engine}
+      ports:
+        - {protocol: TCP, port: 8080}
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except: ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "169.254.0.0/16", "100.64.0.0/10"]

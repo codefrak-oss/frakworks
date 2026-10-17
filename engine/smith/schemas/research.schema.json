@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/codefrak-oss/frakworks/engine/smith/schemas/research.schema.json",
+  "title": "ResearchResult",
+  "description": "What a research Smith writes to /work/out/result.json. The engine checks it (ReadResultDelegate) before its own rules (a non-empty answer.md, an answer.html passing PitchRules, no bundle); the Smith checks it with check-result research. Strict types where the engine branches, any non-empty JSON where it only passes content on.",
+  "type": "object",
+  "required": [
+    "outcome"
+  ],
+  "properties": {
+    "outcome": {
+      "enum": [
+        "answered",
+        "ask"
+      ],
+      "description": "Branched on by the engine and the BPMN."
+    },
+    "summary": {
+      "$ref": "#/$defs/content"
+    },
+    "answer": {
+      "type": "object",
+      "description": "The answer, kept by the engine and never committed unless the asker says save.",
+      "required": [
+        "md",
+        "html"
+      ],
+      "properties": {
+        "md": {
+          "type": "string",
+          "pattern": "\\S",
+          "description": "answer.md: the question, the answer, the citations and the date."
+        },
+        "html": {
+          "type": "string",
+          "pattern": "\\S",
+          "description": "answer.html: one self-contained page by /etc/smith/pitch-guide.md; the engine lints it (PitchRules)."
+        }
+      }
+    },
+    "questions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "question"
+        ],
+        "properties": {
+          "question": {
+            "$ref": "#/$defs/content"
+          },
+          "assumption": {
+            "$ref": "#/$defs/content"
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "impact": {
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ]
+          }
+        }
+      }
+    },
+    "question": {
+      "$ref": "#/$defs/content"
+    }
+  },
+  "$defs": {
+    "content": {
+      "description": "Passed on to a brief or a GitHub comment, never branched on: any non-empty JSON. A string is shown as itself; an object or array as a fenced JSON block.",
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        {
+          "type": "object",
+          "minProperties": 1
+        },
+        {
+          "type": "array",
+          "minItems": 1
+        },
+        {
+          "type": [
+            "number",
+            "boolean"
+          ]
+        }
+      ]
+    }
+  }
+}

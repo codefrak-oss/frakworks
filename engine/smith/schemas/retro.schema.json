@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/codefrak-oss/frakworks/engine/smith/schemas/retro.schema.json",
+  "title": "RetroAnswer",
+  "description": "The retro turn's answer (engine/README.md, \"The retro\"): run-smith.sh passes it to claude --json-schema and writes its notes to /work/out/retro.json, which collect result stores as friction notes with source retro. Not a result: no mode is checked against it.",
+  "type": "object",
+  "required": [
+    "notes"
+  ],
+  "properties": {
+    "notes": {
+      "type": "array",
+      "maxItems": 20,
+      "items": {
+        "type": "object",
+        "required": [
+          "kind",
+          "summary"
+        ],
+        "properties": {
+          "kind": {
+            "enum": [
+              "bug",
+              "design",
+              "docs",
+              "tooling",
+              "other"
+            ]
+          },
+          "summary": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000,
+            "description": "One line: what got in the way."
+          },
+          "evidence": {
+            "type": "string",
+            "maxLength": 8000,
+            "description": "The exact error, path, command or workaround."
+          },
+          "severity": {
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ]
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

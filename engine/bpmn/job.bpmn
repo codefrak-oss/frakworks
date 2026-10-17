@@ -1,0 +1,210 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- job (engine/README.md, "Custom jobs and the SDK"): one run of a registered job (engine.job), started by JobStarter
+     on its signal (the ticker's every, or POST /jobs/{id}/execute) with jobId, repo, kind, name, config, owner and, for a
+     prompt job, prompt. It notes `started`, branches on the kind, and notes `ended` with the outcome. A prompt job calls
+     callable-smith; a bean job runs its loaded jar's FrakJob (runBeanJob, PluginJars) and sets outcome to `failed: <message>`
+     when it threw; a flow job calls the process its config names from its jar's diagrams, deployed as job:<id> at
+     registration (PluginFlows), with every variable of this instance. A refactor job (system-owned, "Refactoring jobs")
+     only files a refactor-scan ticket for its repo at its config's tier and starts it (fileRefactorScan); the scan itself
+     is that ticket's own flow, bpmn/refactor-scan.bpmn. -->
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:operaton="http://operaton.org/schema/1.0/bpmn" id="Definitions_job" targetNamespace="http://codefrak.com/engine">
+  <bpmn:process id="job" name="job" isExecutable="true" operaton:historyTimeToLive="30">
+    <bpmn:documentation>in: jobId, repo, kind (prompt|bean|flow|refactor), name, config (the row's JSON), owner (user|system), prompt (a prompt job's); out: result and outcome (a prompt job's, from callable-smith; a bean job's outcome is `failed: &lt;message&gt;` when its FrakJob threw, else unset for done; a refactor job's is `failed: ...` when its config was off or had no tier, and summary says what it filed)</bpmn:documentation>
+    <bpmn:startEvent id="start-job">
+      <bpmn:outgoing>flow-job-start</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:serviceTask id="task-note-job-started" name="note job started&#10;(event)" operaton:asyncBefore="true" operaton:delegateExpression="${noteJobStarted}">
+      <bpmn:documentation>NoteJobStartedDelegate: the run's engine.job_run row (JobRuns, keyed by this instance) and the job frame `started` with jobId, name, kind, owner, repo and this instance; async, so the start returns at once and the instance is what the registrar's 409s see</bpmn:documentation>
+      <bpmn:incoming>flow-job-start</bpmn:incoming>
+      <bpmn:outgoing>flow-job-noted</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="gateway-kind" name="kind?">
+      <bpmn:incoming>flow-job-noted</bpmn:incoming>
+      <bpmn:outgoing>flow-kind-prompt</bpmn:outgoing>
+      <bpmn:outgoing>flow-kind-bean</bpmn:outgoing>
+      <bpmn:outgoing>flow-kind-flow</bpmn:outgoing>
+      <bpmn:outgoing>flow-kind-refactor</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="task-file-refactor-scan" name="file the refactor-scan ticket" operaton:asyncBefore="true" operaton:delegateExpression="${fileRefactorScan}">
+      <bpmn:documentation>FileRefactorScanDelegate: with the repo's engine.refactor_config row on and this its job, a tier set and no refactor-scan issue open, files a refactor-scan ticket at the config's tier whose body is the instructions (RefactorPrompt) and starts it (bpmn/refactor-scan.bpmn, label event 0, labelled authorized), summary naming it and the run's engine.job_run row its scan_issue; open, it files nothing and summary says which is open; off or with no tier, outcome is `failed: ...` and nothing is filed</bpmn:documentation>
+      <bpmn:incoming>flow-kind-refactor</bpmn:incoming>
+      <bpmn:outgoing>flow-refactor-filed</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:callActivity id="call-callable-smith" name="run the prompt&#10;(callable smith)" calledElement="callable-smith">
+      <bpmn:documentation>callable-smith (bpmn/callable-smith.bpmn): in prompt (from the job's config), repo and jobId, with model, effort, dryRun and account when the caller set them; out result, the run's result JSON, and outcome</bpmn:documentation>
+      <bpmn:extensionElements>
+        <operaton:in source="prompt" target="prompt" />
+        <operaton:in source="repo" target="repo" />
+        <operaton:in source="jobId" target="jobId" />
+        <operaton:in source="model" target="model" />
+        <operaton:in source="effort" target="effort" />
+        <operaton:in source="dryRun" target="dryRun" />
+        <operaton:in source="account" target="account" />
+        <operaton:out source="result" target="result" />
+        <operaton:out source="outcome" target="outcome" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>flow-kind-prompt</bpmn:incoming>
+      <bpmn:outgoing>flow-prompt-ended</bpmn:outgoing>
+    </bpmn:callActivity>
+    <bpmn:serviceTask id="task-run-bean-job" name="run the bean job" operaton:asyncBefore="true" operaton:delegateExpression="${runBeanJob}">
+      <bpmn:documentation>RunBeanJobDelegate: the job's FrakJob from its loaded jar (PluginJars, by the row's jar and bean) run with a JobContext over this execution; an exception sets outcome to `failed: &lt;message&gt;` and the flow goes on, no incident</bpmn:documentation>
+      <bpmn:incoming>flow-kind-bean</bpmn:incoming>
+      <bpmn:outgoing>flow-bean-ended</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="task-prepare-flow-job" name="prepare the flow job" operaton:asyncBefore="true" operaton:delegateExpression="${prepareFlowJob}">
+      <bpmn:documentation>PrepareFlowJobDelegate: the job's row by jobId, its jar held for the job (PluginJars.acquireContext, the reload after a restart) so the plugin flow's ${name}s resolve (PluginBeanResolver), and jobProcessKey set to the config's process; a job or jar gone is an incident on this task</bpmn:documentation>
+      <bpmn:incoming>flow-kind-flow</bpmn:incoming>
+      <bpmn:outgoing>flow-flow-prepared</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:callActivity id="call-plugin-flow" name="run the plugin flow" calledElement="${jobProcessKey}">
+      <bpmn:documentation>the plugin's own process from its job:&lt;id&gt; deployment, by the key task-prepare-flow-job set (the config's process); in every variable of this instance (jobId, repo, kind, name, config, jobProcessKey); out result and outcome when the plugin flow set them</bpmn:documentation>
+      <bpmn:extensionElements>
+        <operaton:in variables="all" />
+        <operaton:out source="result" target="result" />
+        <operaton:out source="outcome" target="outcome" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>flow-flow-prepared</bpmn:incoming>
+      <bpmn:outgoing>flow-flow-ended</bpmn:outgoing>
+    </bpmn:callActivity>
+    <bpmn:serviceTask id="task-note-job-ended" name="note job ended&#10;(event)" operaton:delegateExpression="${noteJobEnded}">
+      <bpmn:documentation>NoteJobEndedDelegate: the job frame `ended` with outcome (callable-smith's for a prompt job, `failed: ...` for a bean job that threw, the filing's for a refactor job; done when the branch set none); closes the run's engine.job_run row with outcome, summary and status done|nothing (summary `filed nothing...`)|failed (outcome `failed...`)</bpmn:documentation>
+      <bpmn:incoming>flow-prompt-ended</bpmn:incoming>
+      <bpmn:incoming>flow-refactor-filed</bpmn:incoming>
+      <bpmn:incoming>flow-bean-ended</bpmn:incoming>
+      <bpmn:incoming>flow-flow-ended</bpmn:incoming>
+      <bpmn:outgoing>flow-job-end</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="end-job">
+      <bpmn:incoming>flow-job-end</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="flow-job-start" sourceRef="start-job" targetRef="task-note-job-started" />
+    <bpmn:sequenceFlow id="flow-job-noted" sourceRef="task-note-job-started" targetRef="gateway-kind" />
+    <bpmn:sequenceFlow id="flow-kind-refactor" name="refactor" sourceRef="gateway-kind" targetRef="task-file-refactor-scan">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${kind == 'refactor'}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow-kind-prompt" name="prompt" sourceRef="gateway-kind" targetRef="call-callable-smith">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${kind == 'prompt'}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow-kind-bean" name="bean" sourceRef="gateway-kind" targetRef="task-run-bean-job">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${kind == 'bean'}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow-kind-flow" name="flow" sourceRef="gateway-kind" targetRef="task-prepare-flow-job">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${kind == 'flow'}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow-prompt-ended" sourceRef="call-callable-smith" targetRef="task-note-job-ended" />
+    <bpmn:sequenceFlow id="flow-refactor-filed" sourceRef="task-file-refactor-scan" targetRef="task-note-job-ended" />
+    <bpmn:sequenceFlow id="flow-bean-ended" sourceRef="task-run-bean-job" targetRef="task-note-job-ended" />
+    <bpmn:sequenceFlow id="flow-flow-prepared" sourceRef="task-prepare-flow-job" targetRef="call-plugin-flow" />
+    <bpmn:sequenceFlow id="flow-flow-ended" sourceRef="call-plugin-flow" targetRef="task-note-job-ended" />
+    <bpmn:sequenceFlow id="flow-job-end" sourceRef="task-note-job-ended" targetRef="end-job" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_job">
+    <bpmndi:BPMNPlane id="BPMNPlane_job" bpmnElement="job">
+      <bpmndi:BPMNShape id="start-job-di" bpmnElement="start-job">
+        <dc:Bounds x="152" y="232" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-note-job-started-di" bpmnElement="task-note-job-started">
+        <dc:Bounds x="250" y="210" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="gateway-kind-di" bpmnElement="gateway-kind" isMarkerVisible="true">
+        <dc:Bounds x="410" y="225" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="372" y="226" width="28" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-file-refactor-scan-di" bpmnElement="task-file-refactor-scan">
+        <dc:Bounds x="520" y="80" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="call-callable-smith-di" bpmnElement="call-callable-smith">
+        <dc:Bounds x="520" y="210" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-run-bean-job-di" bpmnElement="task-run-bean-job">
+        <dc:Bounds x="520" y="340" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-prepare-flow-job-di" bpmnElement="task-prepare-flow-job">
+        <dc:Bounds x="520" y="470" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="call-plugin-flow-di" bpmnElement="call-plugin-flow">
+        <dc:Bounds x="680" y="470" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-note-job-ended-di" bpmnElement="task-note-job-ended">
+        <dc:Bounds x="900" y="210" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="end-job-di" bpmnElement="end-job">
+        <dc:Bounds x="1062" y="232" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="flow-job-start-di" bpmnElement="flow-job-start">
+        <di:waypoint x="188" y="250" />
+        <di:waypoint x="250" y="250" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-job-noted-di" bpmnElement="flow-job-noted">
+        <di:waypoint x="350" y="250" />
+        <di:waypoint x="410" y="250" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-kind-refactor-di" bpmnElement="flow-kind-refactor">
+        <di:waypoint x="435" y="225" />
+        <di:waypoint x="435" y="120" />
+        <di:waypoint x="520" y="120" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="445" y="150" width="42" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-kind-prompt-di" bpmnElement="flow-kind-prompt">
+        <di:waypoint x="460" y="250" />
+        <di:waypoint x="520" y="250" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="470" y="226" width="38" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-kind-bean-di" bpmnElement="flow-kind-bean">
+        <di:waypoint x="435" y="275" />
+        <di:waypoint x="435" y="380" />
+        <di:waypoint x="520" y="380" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="462" y="356" width="26" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-kind-flow-di" bpmnElement="flow-kind-flow">
+        <di:waypoint x="435" y="275" />
+        <di:waypoint x="435" y="510" />
+        <di:waypoint x="520" y="510" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="465" y="486" width="22" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-prompt-ended-di" bpmnElement="flow-prompt-ended">
+        <di:waypoint x="620" y="250" />
+        <di:waypoint x="900" y="250" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-refactor-filed-di" bpmnElement="flow-refactor-filed">
+        <di:waypoint x="620" y="120" />
+        <di:waypoint x="950" y="120" />
+        <di:waypoint x="950" y="210" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-bean-ended-di" bpmnElement="flow-bean-ended">
+        <di:waypoint x="620" y="380" />
+        <di:waypoint x="940" y="380" />
+        <di:waypoint x="940" y="290" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-flow-prepared-di" bpmnElement="flow-flow-prepared">
+        <di:waypoint x="620" y="510" />
+        <di:waypoint x="680" y="510" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-flow-ended-di" bpmnElement="flow-flow-ended">
+        <di:waypoint x="780" y="510" />
+        <di:waypoint x="970" y="510" />
+        <di:waypoint x="970" y="290" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-job-end-di" bpmnElement="flow-job-end">
+        <di:waypoint x="1000" y="250" />
+        <di:waypoint x="1062" y="250" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

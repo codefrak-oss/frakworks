@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- A plugin flow FlowRules refuses: its service task names ${noteJobEnded}, a bean of the engine's own context, which
+     the engine's resolver would bind before the jar's (the bind rule; engine/README.md, "Custom jobs and the SDK"). -->
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:operaton="http://operaton.org/schema/1.0/bpmn" id="Definitions_clash_flow" targetNamespace="http://codefrak.com/engine/test">
+  <bpmn:process id="clash-flow" name="clash flow" isExecutable="true" operaton:historyTimeToLive="1">
+    <bpmn:startEvent id="start-clash-flow">
+      <bpmn:outgoing>flow-clash-to-task</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:serviceTask id="task-engine-bean" name="call an engine bean" operaton:delegateExpression="${noteJobEnded}">
+      <bpmn:incoming>flow-clash-to-task</bpmn:incoming>
+      <bpmn:outgoing>flow-clash-to-end</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="end-clash-flow">
+      <bpmn:incoming>flow-clash-to-end</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="flow-clash-to-task" sourceRef="start-clash-flow" targetRef="task-engine-bean" />
+    <bpmn:sequenceFlow id="flow-clash-to-end" sourceRef="task-engine-bean" targetRef="end-clash-flow" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_clash_flow">
+    <bpmndi:BPMNPlane id="BPMNPlane_clash_flow" bpmnElement="clash-flow">
+      <bpmndi:BPMNShape id="start-clash-flow-di" bpmnElement="start-clash-flow">
+        <dc:Bounds x="152" y="102" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-engine-bean-di" bpmnElement="task-engine-bean">
+        <dc:Bounds x="250" y="80" width="100" height="80" />
+        <bpmndi:BPMNLabel />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="end-clash-flow-di" bpmnElement="end-clash-flow">
+        <dc:Bounds x="412" y="102" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="flow-clash-to-task-di" bpmnElement="flow-clash-to-task">
+        <di:waypoint x="188" y="120" />
+        <di:waypoint x="250" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-clash-to-end-di" bpmnElement="flow-clash-to-end">
+        <di:waypoint x="350" y="120" />
+        <di:waypoint x="412" y="120" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

@@ -1,0 +1,161 @@
+{
+  "intakeId": "b89b453e-b81a-11f1-8e2f-de53398f0b08",
+  "ended": false,
+  "steps": [
+    {
+      "process": "intake",
+      "activity": "start-ask-submitted",
+      "name": "ask submitted"
+    },
+    {
+      "process": "intake",
+      "activity": "task-create-issue",
+      "name": "create intake issue (github)"
+    },
+    {
+      "process": "intake",
+      "activity": "gateway-authorized",
+      "name": "authorized?"
+    },
+    {
+      "process": "intake",
+      "activity": "call-refine-ask",
+      "name": "refine ask\n(smith run)"
+    },
+    {
+      "process": "reusable-smith-run",
+      "activity": "start-smith-run",
+      "name": null
+    },
+    {
+      "process": "reusable-smith-run",
+      "activity": "call-smith-run",
+      "name": "smith run\n(sibling container)"
+    },
+    {
+      "process": "smith-run",
+      "activity": "start-smith-run",
+      "name": null
+    },
+    {
+      "process": "smith-run",
+      "activity": "task-start-smith",
+      "name": "start smith"
+    },
+    {
+      "process": "smith-run",
+      "activity": "event-poll-interval",
+      "name": "poll interval"
+    },
+    {
+      "process": "smith-run",
+      "activity": "task-poll-smith",
+      "name": "poll smith"
+    },
+    {
+      "process": "smith-run",
+      "activity": "gateway-exited",
+      "name": "exited?"
+    },
+    {
+      "process": "smith-run",
+      "activity": "event-poll-interval",
+      "name": "poll interval"
+    },
+    {
+      "process": "smith-run",
+      "activity": "task-poll-smith",
+      "name": "poll smith"
+    },
+    {
+      "process": "smith-run",
+      "activity": "gateway-exited",
+      "name": "exited?"
+    },
+    {
+      "process": "smith-run",
+      "activity": "task-collect-result",
+      "name": "collect result"
+    },
+    {
+      "process": "smith-run",
+      "activity": "task-remove-sandbox",
+      "name": "remove sandbox"
+    },
+    {
+      "process": "smith-run",
+      "activity": "end-smith-run",
+      "name": null
+    },
+    {
+      "process": "reusable-smith-run",
+      "activity": "task-read-result",
+      "name": "read result"
+    },
+    {
+      "process": "reusable-smith-run",
+      "activity": "end-smith-run",
+      "name": null
+    },
+    {
+      "process": "intake",
+      "activity": "gateway-outcome",
+      "name": "outcome?"
+    },
+    {
+      "process": "intake",
+      "activity": "task-post-question",
+      "name": "post the smith's question\n(github issue)"
+    },
+    {
+      "process": "intake",
+      "activity": "user-task-answer-question",
+      "name": "answer the smith's question"
+    }
+  ],
+  "variables": {
+    "submittedBy": "lundmatt1",
+    "ask": "Tier: 4 (opus low) \u2014 prescribed by the user; do not re-judge\nAlter the README that describes the wrong world.  Likwise What's here table and Deploy section all assume the collector VM.  Frakworks is starting fresh on deployments and we will actually start with a desktop docker compose stack.  We will not integrate with anything running on VMs.  Find and remove anything in the repo's MD files or claude.md files that reference the VMs or even Tailscale",
+    "dryRun": false,
+    "repo": "codefrak-oss/frakworks",
+    "issue": 28,
+    "issueUrl": "https://github.com/codefrak-oss/frakworks/issues/28",
+    "authorizedBy": "lundmatt1",
+    "approvedTicket": "eyJudW1iZXIiOjI4LCJ0aXRsZSI6IkludGFrZTogVGllcjogNCAob3B1cyBsb3cpIOKAlCBwcmVzY3JpYmVkIGJ5IHRoZSB1c2VyOyBkbyBub3QgcmUtanVkZ2UiLCJib2R5IjoiIyMgR29hbFxuXG5UdXJuIHRoZSBhc2sgYmVsb3cgaW50byBhIGZpbGVkLCByZWxlYXNlZCBib3QtdGFzayDigJQgb3IgYXNrIHRoZSB1c2VyIHdoYXQgdGhleSBtZWFudC4gKipEbyBub3QgZG8gdGhlIHdvcmsgdGhlIGFzayBkZXNjcmliZXMuKiogVGhlIGFzayBpcyB2ZXJiYXRpbS5cblxuPiBUaWVyOiA0IChvcHVzIGxvdykg4oCUIHByZXNjcmliZWQgYnkgdGhlIHVzZXI7IGRvIG5vdCByZS1qdWRnZVxuPiBBbHRlciB0aGUgUkVBRE1FIHRoYXQgZGVzY3JpYmVzIHRoZSB3cm9uZyB3b3JsZC4gIExpa3dpc2UgV2hhdCdzIGhlcmUgdGFibGUgYW5kIERlcGxveSBzZWN0aW9uIGFsbCBhc3N1bWUgdGhlIGNvbGxlY3RvciBWTS4gIEZyYWt3b3JrcyBpcyBzdGFydGluZyBmcmVzaCBvbiBkZXBsb3ltZW50cyBhbmQgd2Ugd2lsbCBhY3R1YWxseSBzdGFydCB3aXRoIGEgZGVza3RvcCBkb2NrZXIgY29tcG9zZSBzdGFjay4gIFdlIHdpbGwgbm90IGludGVncmF0ZSB3aXRoIGFueXRoaW5nIHJ1bm5pbmcgb24gVk1zLiAgRmluZCBhbmQgcmVtb3ZlIGFueXRoaW5nIGluIHRoZSByZXBvJ3MgTUQgZmlsZXMgb3IgY2xhdWRlLm1kIGZpbGVzIHRoYXQgcmVmZXJlbmNlIHRoZSBWTXMgb3IgZXZlbiBUYWlsc2NhbGVcblxuIyMgQ29udGV4dFxuXG4tIEZpbGVkIGJ5IHRoZSBlbmdpbmUncyBgaW50YWtlYCBwcm9jZXNzLCBpbnN0YW5jZSBgYjg5YjQ1M2UtYjgxYS0xMWYxLThlMmYtZGU1MzM5OGYwYjA4YCAoZW5naW5lL1JFQURNRS5tZCwgXCJJbnRha2VcIikuXG4iLCJhdXRob3IiOiJsdW5kbWF0dDEifQ==",
+    "log": "c21pdGg6IHJ1bj1iOTNkNTFkMC1iODFhLTExZjEtOGUyZi1kZTUzMzk4ZjBiMDggcmVwbz1jb2RlZnJhay1vc3MvZnJha3dvcmtzIGlzc3VlPSMyOCBtb2RlPXJlZmluZSBtb2RlbD1jbGF1ZGUtc29ubmV0LTUgZWZmb3J0PW1lZGl1bQp7InR5cGUiOiJzeXN0ZW0iLCJzdWJ0eXBlIjoiaW5pdCIsImN3ZCI6Ii93b3JrL3JlcG8iLCJzZXNzaW9uX2lkIjoiZTcwN2VjZjctM2M4Ni00YmI3LTgyOGMtMzBmNzU1MDMwMDI2IiwidG9vbHMiOlsiVGFzayIsIkJhc2giLCJDcm9uQ3JlYXRlIiwiQ3JvbkRlbGV0ZSIsIkNyb25MaXN0IiwiRGVzaWduU3luYyIsIkVkaXQiLCJFbnRlcldvcmt0cmVlIiwiRXhpdFdvcmt0cmVlIiwiTGlzdEFnZW50cyIsIk1vbml0b3IiLCJOb3RlYm9va0VkaXQiLCJQdXNoTm90aWZpY2F0aW9uIiwiUmVhZCIsIlJlbW90ZVRyaWdnZXIiLCJSZXBvcnRGaW5kaW5ncyIsIlNjaGVkdWxlV2FrZXVwIiwiU2VuZE1lc3NhZ2UiLCJTa2lsbCIsIlRhc2tTdG9wIiwiVG9vbFNlYXJjaCIsIldlYkZldGNoIiwiV2ViU2VhcmNoIiwiV29ya2Zsb3ciLCJXcml0ZSJdLCJtY3Bfc2VydmVycyI6W10sIm1vZGVsIjoiY2xhdWRlLXNvbm5ldC01IiwicGVybWlzc2lvbk1vZGUiOiJhY2NlcHRFZGl0cyIsInNsYXNoX2NvbW1hbmRzIjpbImZpbGUtYm90LXRhc2siLCJmbGVldC1zdGF0dXMiLCJpbnRha2UiLCJzdGF0dXMtZmxlZXQiLCJ0ZXN0LWludGFrZSIsInRpY2tldCIsImRlZXAtcmVzZWFyY2giLCJkZXNpZ24iLCJkZXNpZ24tc3luYyIsImRhdGF2aXoiLCJ1cGRhdGUtY29uZmlnIiwidmVyaWZ5IiwiZGVidWciLCJjb2RlLXJldmlldyIsInNpbXBsaWZ5IiwiYmF0Y2giLCJmZXdlci1wZXJtaXNzaW9uLXByb21wdHMiLCJkb2N0b3IiLCJsb29wIiwic2NoZWR1bGUiLCJjbGF1ZGUtYXBpIiwid29ya2Zsb3ctYXV0aG9yaW5nIiwicnVuIiwicnVuLXNraWxsLWdlbmVyYXRvciIsImFkdmlzb3IiLCJhZ2VudHMiLCJhdXRvLW1vZGUtc2V0dXAiLCJhdXRvY29tcGFjdCIsImNsZWFyIiwiY29sb3IiLCJjb21wYWN0IiwiY29uZmlnIiwib3V0cHV0LXN0eWxlIiwiY29udGV4dCIsImVmZm9ydCIsImZhc3QiLCJoZWFwZHVtcCIsImluaXQiLCJtY3AiLCJpbXBvcnQiLCJtb2RlbCIsIl9fcmVtb3RlLXdvcmtmbG93Iiwid29ya2Zsb3ctbGF1bmNoLWV4ZWMiLCJyZWxvYWQtcGx1Z2lucyIsInJlbG9hZC1za2lsbHMiLCJyZW5hbWUiLCJ1bHRyYXJldmlldyIsInNlY3VyaXR5LXJldmlldyIsInVzYWdlIiwiaW5zaWdodHMiLCJyZWNhcCIsInNraWxsLWRvY3RvciIsImdvYWwiLCJkZXNpZ24tY29uc2VudCIsImRlc2lnbi1yZXZva2UiLCJsaXN0LWFnZW50cyIsInRlYW0tb25ib2FyZGluZyJdLCJ0ZXJtaW5hbF9zbGFzaF9jb21tYW5kcyI6WyJkb2N0b3IiLCJjb2xvciIsInJlbG9hZC1wbHVnaW5zIl0sImFwaUtleVNvdXJjZSI6Im5vbmUiLCJjbGF1ZGVfY29kZV92ZXJzaW9uIjoiMi4xLjI4MCIsIm91dHB1dF9zdHlsZSI6ImRlZmF1bHQiLCJhZ2VudHMiOlsiY2xhdWRlIiwiRXhwbG9yZSIsImdlbmVyYWwtcHVycG9zZSIsIlBsYW4iLCJzdGF0dXNsaW5lLXNldHVwIl0sInNraWxscyI6WyJmaWxlLWJvdC10YXNrIiwiZmxlZXQtc3RhdHVzIiwiaW50YWtlIiwic3RhdHVzLWZsZWV0IiwidGVzdC1pbnRha2UiLCJ0aWNrZXQiLCJkZWVwLXJlc2VhcmNoIiwiZGVzaWduIiwiZGVzaWduLXN5bmMiLCJkYXRhdml6IiwidXBkYXRlLWNvbmZpZyIsInZlcmlmeSIsImRlYnVnIiwiY29kZS1yZXZpZXciLCJzaW1wbGlmeSIsImJhdGNoIiwiZmV3ZXItcGVybWlzc2lvbi1wcm9tcHRzIiwiZG9jdG9yIiwibG9vcCIsInNjaGVkdWxlIiwiY2xhdWRlLWFwaSIsIndvcmtmbG93LWF1dGhvcmluZyIsInJ1biIsInJ1bi1za2lsbC1nZW5lcmF0b3IiXSwicGx1Z2lucyI6W3sibmFtZSI6InRlbGVtZXRyeSIsInBhdGgiOiJidWlsdGluIiwic291cmNlIjoidGVsZW1ldHJ5QGJ1aWx0aW4ifV0sImNhcGFiaWxpdGllcyI6WyJpbnRlcnJ1cHRfcmVjZWlwdF92MSIsImludGVycnVwdF9jYW5jZWxfcXVldWVkX3YxIiwibXNnX2xpZmVjeWNsZV92MSIsIm1jcF9yZWFkX3Jlc291cmNlX3YxIiwibWNwX3Rvb2xfdWlfbWV0YV92MSJdLCJhbmFseXRpY3NfZGlzYWJsZWQiOmZhbHNlLCJwcm9kdWN0X2ZlZWRiYWNrX2Rpc2FibGVkIjpmYWxzZSwidXVpZCI6ImU1MWIwMTVkLWNmNjQtNGNkZC05OThjLTMyZWRmZmIxOTYyNiIsIm1lbW9yeV9wYXRocyI6eyJhdXRvIjoiL2hvbWUvc21pdGgvLmNsYXVkZS9wcm9qZWN0cy8td29yay1yZXBvL21lbW9yeS8ifSwibWVzc2FnaW5nX3NvY2tldF9wYXRoIjoiL3RtcC9jYy1zb2Nrcy8yOC5zb2NrIiwiZmFzdF9tb2RlX3N0YXRlIjoib2ZmIiwiZmFzdF9tb2RlX2Rpc2FibGVkX3JlYXNvbiI6InNka19vcHRfaW5fcmVxdWlyZWQifQp7InR5cGUiOiJhc3Npc3RhbnQiLCJtZXNzYWdlIjp7Im1vZGVsIjoiY2xhdWRlLXNvbm5ldC01IiwiaWQiOiJtc2dfMDExQ2ZOTEdvczh3SFg1WlRGR0I5eTNIIiwidHlwZSI6Im1lc3NhZ2UiLCJyb2xlIjoiYXNzaXN0YW50IiwiY29udGVudCI6W3sidHlwZSI6InRoaW5raW5nIiwidGhpbmtpbmciOiIiLCJzaWduYXR1cmUiOiJFdm9DQ3FnQkNCSVlBaXBBdHI3aE0yQ29Gb1FycG00TkpPSlg0V3dyUDE3OFRBbXpkbzBWQnExemtJZzlma1lEVlRlMko4QjRqZFlScU9nWFJ6Vm10cUY4OXJPWVJRL1liVTdCRERJUFkyeGhkV1JsTFhOdmJtNWxkQzAxT0FCQ0NIUm9hVzVyYVc1bldpUXpPR0l4WmpVeE5pMWxOak5pTFRRelpqa3RZVFZrWmkwMk9Ea3hPRGxoWldVeU1tWnlFSlgwWERmU0tBUzdreEk4b3NCNlRWZUlBUUdvQWFmSDFOVUdzQUVDRWd4blVidFRXZDFzSlZpcDZnVWFET3oyd21sdmNEeXZoSWNBdmlJd2JrL2ZtOWxTZmoyQmFuaFhNaTVJcWdyZ0d2aTNqTXBEMnB2OW0yV3dZUEhrdXBCbDExeWZSUFc0bnk4NEorYmhLbjlDRzk2elMwb0dBRnBzaVFpbFFKU1A0bEZlNDVwaGhzc0pSTXBWUVJMTzhHaVkxRWhrZVZsSzN4WkFBci95bGoyUmNuU3MxMHpDVnAyTmMrQzZuWFI3WGs5dkVwSW5mVm1tZWFTbjFIYnh6TDdLV3FsWWJ5NWYyUy9jZi80eUZTMmNRYllUdzJpWEcwZk1Ca1o5",
+    "sandboxHandle": "650b2f2c3cb94ba9384052538c5b83eb472ff34807cc6d7ac4ae50139edfcb9e",
+    "logTail": "s, to describe the desktop Compose path without erasing the (still-real) collector VM deploy notes\\\\n  - id: broad\\\\n    label: Broad \\\\u2014 strip VM/Tailscale mentions everywhere, including bots/operator.md, webhook-wake, secrets-mcp and MDR docs, because those VMs are also going away, not just the observability collector\\\\n  - id: other\\\\n    label: Something else \\\\u2014 I'll explain in a reply\\\\nreply: label:answered\\\\n```\\\"\\n}\",\"stderr\":\"\",\"interrupted\":false,\"isImage\":false,\"noOutputExpected\":false}}\n{\"type\":\"assistant\",\"message\":{\"model\":\"claude-sonnet-5\",\"id\":\"msg_011CfNLLzo5Lp1XjfXaSqprd\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"Valid JSON. Done.\\n\\n**Summary:** Issue #28's ask (\\\"remove anything referencing VMs or Tailscale from repo MD/CLAUDE.md files\\\") conflicts with the repo's own current CLAUDE.md and ~25 files documenting live infrastructure (Oracle VM, webhook-wake, MDR's Tailscale Funnel, Smith-runner VMs) \u2014 filed as `outcome: ask` with a choice between narrow (just the named observability README) and broad (repo-wide) scope.\"}],\"container\":null,\"stop_reason\":null,\"stop_sequence\":null,\"stop_details\":null,\"usage\":{\"input_tokens\":2,\"cache_creation_input_tokens\":1046,\"cache_read_input_tokens\":68257,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":1046},\"output_tokens\":8,\"service_tier\":\"standard\",\"inference_geo\":\"not_available\"},\"input_transformations\":[],\"diagnostics\":null,\"context_management\":null},\"parent_tool_use_id\":null,\"session_id\":\"e707ecf7-3c86-4bb7-828c-30f755030026\",\"uuid\":\"efecb5fe-e6db-428e-93b9-08eb91aacec9\",\"timestamp\":\"2026-09-24T13:21:36.757Z\",\"request_id\":\"req_011CfNLLzP1vTBKUK2Kuq8XZ\"}\n{\"duration_api_ms\":58845,\"stop_reason\":\"end_turn\",\"session_id\":\"e707ecf7-3c86-4bb7-828c-30f755030026\",\"total_cost_usd\":0.347759,\"usage\":{\"input_tokens\":18,\"cache_creation_input_tokens\":50664,\"cache_read_input_tokens\":449735,\"output_tokens\":5512,\"output_tokens_details\":{\"thinking_tokens\":3603},\"server_tool_use\":{\"web_search_requests\":0,\"web_fetch_requests\":0},\"service_tier\":\"standard\",\"cache_creation\":{\"ephemeral_1h_input_tokens\":50664,\"ephemeral_5m_input_tokens\":0},\"inference_geo\":\"not_available\",\"iterations\":[{\"input_tokens\":2,\"output_tokens\":175,\"cache_read_input_tokens\":68257,\"cache_creation_input_tokens\":1046,\"cache_creation\":{\"ephemeral_5m_input_tokens\":0,\"ephemeral_1h_input_tokens\":1046},\"type\":\"message\"}],\"speed\":\"standard\"},\"modelUsage\":{\"claude-sonnet-5\":{\"inputTokens\":18,\"outputTokens\":5512,\"cacheReadInputTokens\":449735,\"cacheCreationInputTokens\":50664,\"webSearchRequests\":0,\"costUSD\":0.347759,\"contextWindow\":1000000,\"maxOutputTokens\":64000,\"thinkingTokens\":3603,\"canonicalModel\":\"claude-sonnet-5\",\"provider\":\"firstParty\",\"costBasis\":\"list\"}},\"permission_denials\":[],\"terminal_reason\":\"completed\",\"fast_mode_state\":\"off\",\"fast_mode_disabled_reason\":\"sdk_opt_in_required\",\"subagent_stats\":{\"spawned\":0,\"requested\":{\"background\":0,\"foreground\":0,\"unset\":0},\"started_in_background\":0,\"max_depth\":0,\"spawned_by_subagents\":0,\"completed\":0,\"failed\":0,\"killed\":{\"parent\":0,\"user\":0,\"system\":0},\"refused\":{\"depth_limit\":0,\"concurrency_limit\":0,\"budget\":0},\"by_type\":{}},\"is_error\":false,\"num_turns\":10,\"subtype\":\"success\",\"api_error_status\":null,\"result\":\"Valid JSON. Done.\\n\\n**Summary:** Issue #28's ask (\\\"remove anything referencing VMs or Tailscale from repo MD/CLAUDE.md files\\\") conflicts with the repo's own current CLAUDE.md and ~25 files documenting live infrastructure (Oracle VM, webhook-wake, MDR's Tailscale Funnel, Smith-runner VMs) \u2014 filed as `outcome: ask` with a choice between narrow (just the named observability README) and broad (repo-wide) scope.\",\"ttft_ms\":1509,\"type\":\"result\",\"duration_ms\":59125,\"uuid\":\"6ab1e228-1c69-415e-9ab1-b9a3629bf109\",\"ttft_stream_ms\":899,\"time_to_request_ms\":63,\"first_content_frame_ms\":899,\"queued_turn_count\":0,\"result_index\":0}\n",
+    "mode": "refine",
+    "running": false,
+    "result": "success",
+    "output": "ewogICJvdXRjb21lIjogImFzayIsCiAgInF1ZXN0aW9uIjogIlRoZSBhc2sgc2F5cyB0byBcImZpbmQgYW5kIHJlbW92ZSBhbnl0aGluZyBpbiB0aGUgcmVwbydzIE1EIGZpbGVzIG9yIGNsYXVkZS5tZCBmaWxlcyB0aGF0IHJlZmVyZW5jZSB0aGUgVk1zIG9yIGV2ZW4gVGFpbHNjYWxlLFwiIHJlYXNvbmluZyB0aGF0IGZyYWt3b3JrcyBpcyBzdGFydGluZyBmcmVzaCB3aXRoIGEgZGVza3RvcCBEb2NrZXIgQ29tcG9zZSBzdGFjayBhbmQgXCJ3aWxsIG5vdCBpbnRlZ3JhdGUgd2l0aCBhbnl0aGluZyBydW5uaW5nIG9uIFZNcy5cIiBJIGxvb2tlZCBmb3IgdGhlIFJFQURNRSBpdCBuYW1lcyAoXCJXaGF0J3MgaGVyZVwiIHRhYmxlICsgRGVwbG95IHNlY3Rpb24gYXNzdW1pbmcgdGhlIGNvbGxlY3RvciBWTSkgYW5kIGZvdW5kIGBvYnNlcnZhYmlsaXR5L1JFQURNRS5tZGAg4oCUIGJ1dCBWTS9UYWlsc2NhbGUgcmVmZXJlbmNlcyBhcmVuJ3QgY29uZmluZWQgdG8gdGhhdCBvbmUgc3RhbGUgZG9jLiBUaGV5J3JlIGxvYWQtYmVhcmluZyBhY3Jvc3MgfjI1IGZpbGVzLCBpbmNsdWRpbmcgb25lcyBkZXNjcmliaW5nIGluZnJhc3RydWN0dXJlIHRoaXMgcmVwbydzIG93biBDTEFVREUubWQgc3RpbGwgdHJlYXRzIGFzIGxpdmUgdG9kYXk6IGBib3RzL29wZXJhdG9yLm1kYCAoXCJ0aGUgZmxlZXQncyBydW50aW1lIGlzIHRoZSBMaW51eCBWTXNcIiksIGBkaXNwYXRjaC9SRUFETUUubWRgLCBgYm90cy9SRUFETUUubWRgICh0aGUgT3JhY2xlLCBcImEgZGVkaWNhdGVkIFZNXCIpLCBgYm90cy93ZWJob29rLXdha2UvUkVBRE1FLm1kYCBhbmQgYGJvdHMvc2VjcmV0cy1tY3AvUkVBRE1FLm1kYCAoYm90aCBmcm9udCByZWFsIGVuZHBvaW50cyB3aXRoIFRhaWxzY2FsZSBGdW5uZWwvU2VydmUpLCBhbmQgYG1hY3JvZGF0YS1yZWZpbmVyL3NlcnZlci9SRUFETUUubWRgIC8gYG1hY3JvZGF0YS1yZWZpbmVyL0NMQVVERS5tZGAgKE1EUiBpdHNlbGYgaXMgcmVhY2hlZCBvdmVyIFRhaWxzY2FsZSBGdW5uZWwgcGVyIHRoaXMgcmVwbydzIG93biBDTEFVREUubWQpLiBgZG9jcy9mcmFtZXdvcmstdnMtZGVwbG95bWVudC5tZGAgYWxzbyBhbHJlYWR5IHRyZWF0cyB0YWlsbmV0IG5hbWVzIGFuZCBWTSBudW1iZXJzIGFzICpkZXBsb3ltZW50IHZhbHVlcyogdG8gdGVtcGxhdGl6ZSwgbm90IGNvbmNlcHRzIHRvIGRlbGV0ZSDigJQgdGhlIHJlcG8ncyBleGlzdGluZyBjb252ZW50aW9uIGlzIHBsYWNlaG9sZGVyLWl6ZSAoYDxjb2xsZWN0b3ItaXA+YCwgYDx0YWlsbmV0PmApLCBub3QgZXJhc2UuXG5cbkEgYmxhbmtldCByZW1vdmFsIHdvdWxkIGRlbGV0ZSBhY2N1cmF0ZSBkb2N1bWVudGF0aW9uIG9mIHN5c3RlbXMgdGhhdCBhcmUgc3RpbGwgcnVubmluZyAodGhlIE9yYWNsZSwgTURSLCB3ZWJob29rIHJlY2VpdmVyLCBTbWl0aC1ydW5uZXIgVk1zKSBhbmQgY29udHJhZGljdHMgdGhlIHJlcG8ncyBvd24gY3VycmVudCBDTEFVREUubWQgZGVzY3JpcHRpb24gb2YgdGhlIGZsZWV0LiBJIGRvbid0IHdhbnQgdG8gZ3Vlc3Mgd2hpY2ggb2YgdGhlc2UgdHdvIHRoZSB1c2VyIG1lYW50IGFuZCBmaWxlIGEgdGlja2V0IHRoYXQgZWl0aGVyIGd1dHMgd29ya2luZyBydW5ib29rcyBvciBtaXNzZXMgdGhlIGFjdHVhbCBhc2suXG5cbmBgYGFza1xua2luZDogY2hvaWNlXG5xdWVzdGlvbjogSG93IHdpZGUgc2hvdWxkIHRoZSBWTS9UYWlsc2NhbGUgY2xlYW51cCBnbz9cbm9wdGlvbnM6XG4gIC0gaWQ6IG5hcnJvd1xuICAgIGxhYmVsOiBOYXJyb3cg4oCUIGp1c3Qgb2JzZXJ2YWJpbGl0eS9SRUFETUUubWQncyBXaGF0J3MgaGVyZS9EZXBsb3kgc2VjdGlvbnMgYW5kIHRoZSBsb2NhbC1jb21wb3NlL2ZyYW1ld29yay12cy1kZXBsb3ltZW50IGRvY3MsIHRvIGRlc2NyaWJlIHRoZSBkZXNrdG9wIENvbXBvc2UgcGF0aCB3aXRob3V0IGVyYXNpbmcgdGhlIChzdGlsbC1yZWFsKSBjb2xsZWN0b3IgVk0gZGVwbG95IG5vdGVzXG4gIC0gaWQ6IGJyb2FkXG4gICAgbGFiZWw6IEJyb2FkIOKAlCBzdHJpcCBWTS9UYWlsc2NhbGUgbWVudGlvbnMgZXZlcnl3aGVyZSwgaW5jbHVkaW5nIGJvdHMvb3BlcmF0b3IubWQsIHdlYmhvb2std2FrZSwgc2VjcmV0cy1tY3AgYW5kIE1EUiBkb2NzLCBiZWNhdXNlIHRob3NlIFZNcyBhcmUgYWxzbyBnb2luZyBhd2F5LCBub3QganVzdCB0aGUgb2JzZXJ2YWJpbGl0eSBjb2xsZWN0b3JcbiAgLSBpZDogb3RoZXJcbiAgICBsYWJlbDogU29tZXRoaW5nIGVsc2Ug4oCUIEknbGwgZXhwbGFpbiBpbiBhIHJlcGx5XG5yZXBseTogbGFiZWw6YW5zd2VyZWRcbmBgYCIKfQo=",
+    "pollInterval": "PT30S",
+    "exitCode": 0,
+    "account": null,
+    "outcome": "ask"
+  },
+  "pendingQuestion": {
+    "id": 1,
+    "intake": "b89b453e-b81a-11f1-8e2f-de53398f0b08",
+    "repo": "codefrak-oss/frakworks",
+    "issue": 28,
+    "question": "The ask says to \"find and remove anything in the repo's MD files or claude.md files that reference the VMs or even Tailscale,\" reasoning that frakworks is starting fresh with a desktop Docker Compose stack and \"will not integrate with anything running on VMs.\" I looked for the README it names (\"What's here\" table + Deploy section assuming the collector VM) and found `observability/README.md` \u2014 but VM/Tailscale references aren't confined to that one stale doc. They're load-bearing across ~25 files, including ones describing infrastructure this repo's own CLAUDE.md still treats as live today: `bots/operator.md` (\"the fleet's runtime is the Linux VMs\"), `dispatch/README.md`, `bots/README.md` (the Oracle, \"a dedicated VM\"), `bots/webhook-wake/README.md` and `bots/secrets-mcp/README.md` (both front real endpoints with Tailscale Funnel/Serve), and `macrodata-refiner/server/README.md` / `macrodata-refiner/CLAUDE.md` (MDR itself is reached over Tailscale Funnel per this repo's own CLAUDE.md). `docs/framework-vs-deployment.md` also already treats tailnet names and VM numbers as *deployment values* to templatize, not concepts to delete \u2014 the repo's existing convention is placeholder-ize (`<collector-ip>`, `<tailnet>`), not erase.\n\nA blanket removal would delete accurate documentation of systems that are still running (the Oracle, MDR, webhook receiver, Smith-runner VMs) and contradicts the repo's own current CLAUDE.md description of the fleet. I don't want to guess which of these two the user meant and file a ticket that either guts working runbooks or misses the actual ask.\n\n```ask\nkind: choice\nquestion: How wide should the VM/Tailscale cleanup go?\noptions:\n  - id: narrow\n    label: Narrow \u2014 just observability/README.md's What's here/Deploy sections and the local-compose/framework-vs-deployment docs, to describe the desktop Compose path without erasing the (still-real) collector VM deploy notes\n  - id: broad\n    label: Broad \u2014 strip VM/Tailscale mentions everywhere, including bots/operator.md, webhook-wake, secrets-mcp and MDR docs, because those VMs are also going away, not just the observability collector\n  - id: other\n    label: Something else \u2014 I'll explain in a reply\nreply: label:answered\n```",
+    "askedAt": "2026-09-24T13:21:44.625606Z",
+    "answer": null,
+    "answeredBy": null,
+    "answeredAt": null
+  },
+  "questions": [
+    {
+      "id": 1,
+      "intake": "b89b453e-b81a-11f1-8e2f-de53398f0b08",
+      "repo": "codefrak-oss/frakworks",
+      "issue": 28,
+      "question": "The ask says to \"find and remove anything in the repo's MD files or claude.md files that reference the VMs or even Tailscale,\" reasoning that frakworks is starting fresh with a desktop Docker Compose stack and \"will not integrate with anything running on VMs.\" I looked for the README it names (\"What's here\" table + Deploy section assuming the collector VM) and found `observability/README.md` \u2014 but VM/Tailscale references aren't confined to that one stale doc. They're load-bearing across ~25 files, including ones describing infrastructure this repo's own CLAUDE.md still treats as live today: `bots/operator.md` (\"the fleet's runtime is the Linux VMs\"), `dispatch/README.md`, `bots/README.md` (the Oracle, \"a dedicated VM\"), `bots/webhook-wake/README.md` and `bots/secrets-mcp/README.md` (both front real endpoints with Tailscale Funnel/Serve), and `macrodata-refiner/server/README.md` / `macrodata-refiner/CLAUDE.md` (MDR itself is reached over Tailscale Funnel per this repo's own CLAUDE.md). `docs/framework-vs-deployment.md` also already treats tailnet names and VM numbers as *deployment values* to templatize, not concepts to delete \u2014 the repo's existing convention is placeholder-ize (`<collector-ip>`, `<tailnet>`), not erase.\n\nA blanket removal would delete accurate documentation of systems that are still running (the Oracle, MDR, webhook receiver, Smith-runner VMs) and contradicts the repo's own current CLAUDE.md description of the fleet. I don't want to guess which of these two the user meant and file a ticket that either guts working runbooks or misses the actual ask.\n\n```ask\nkind: choice\nquestion: How wide should the VM/Tailscale cleanup go?\noptions:\n  - id: narrow\n    label: Narrow \u2014 just observability/README.md's What's here/Deploy sections and the local-compose/framework-vs-deployment docs, to describe the desktop Compose path without erasing the (still-real) collector VM deploy notes\n  - id: broad\n    label: Broad \u2014 strip VM/Tailscale mentions everywhere, including bots/operator.md, webhook-wake, secrets-mcp and MDR docs, because those VMs are also going away, not just the observability collector\n  - id: other\n    label: Something else \u2014 I'll explain in a reply\nreply: label:answered\n```",
+      "askedAt": "2026-09-24T13:21:44.625606Z",
+      "answer": null,
+      "answeredBy": null,
+      "answeredAt": null
+    }
+  ]
+}

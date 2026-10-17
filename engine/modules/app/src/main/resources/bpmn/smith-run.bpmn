@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:operaton="http://operaton.org/schema/1.0/bpmn" id="Definitions_smith_run" targetNamespace="http://codefrak.com/agent-army/bpmn">
+  <!-- One Smith run: start a sandbox, wait for the message that says it
+       exited (SmithExitNotifier: Docker's die event, or the backstop scan) so
+       no engine job is locked for the hours a run can take, collect the
+       outcome, done. -->
+  <bpmn:message id="message-smith-exited" name="message-smith-exited" />
+  <bpmn:process id="smith-run" name="smith run" isExecutable="true" operaton:historyTimeToLive="30">
+    <bpmn:startEvent id="start-smith-run">
+      <bpmn:outgoing>flow-start</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:serviceTask id="task-start-smith" name="start smith" operaton:delegateExpression="${startSmith}" operaton:asyncBefore="true">
+      <bpmn:extensionElements>
+        <!-- Docker 409s on a name collision are only worth retrying once the
+             orphan check (DockerSandbox.reclaim) has had a moment to see a
+             quiescent daemon: Operaton's default of 3 immediate retries
+             burned all three in under a second (engine/README.md incident). -->
+        <operaton:failedJobRetryTimeCycle>R3/PT30S</operaton:failedJobRetryTimeCycle>
+      </bpmn:extensionElements>
+      <bpmn:incoming>flow-start</bpmn:incoming>
+      <bpmn:outgoing>flow-to-wait</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <!-- Correlated by process instance id, with the exit code as a message
+         variable; the one subscription here is what makes the event and the
+         backstop collect exactly once. -->
+    <bpmn:intermediateCatchEvent id="event-smith-exited" name="smith exited">
+      <bpmn:incoming>flow-to-wait</bpmn:incoming>
+      <bpmn:outgoing>flow-exited</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="MessageEventDefinition_smith_exited" messageRef="message-smith-exited" />
+    </bpmn:intermediateCatchEvent>
+    <!-- asyncBefore: the exit commits with the correlation alone. Collect ran
+         inside it before, so a throw there rolled the exit back with no
+         incident and the run waited forever (#1668); now it is a job that
+         retries and becomes an incident. -->
+    <bpmn:serviceTask id="task-collect-result" name="collect result" operaton:delegateExpression="${collectSmith}" operaton:asyncBefore="true">
+      <bpmn:incoming>flow-exited</bpmn:incoming>
+      <bpmn:outgoing>flow-to-remove</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <!-- asyncBefore: a transaction boundary, so the result above is committed
+         before the container (and its log) is gone. The caller's read result runs
+         in this job's transaction, so a stored result that is not success fails it
+         the same way on every try: one try, then the incident, whose retry reruns
+         the Smith (IncidentRetrier.reruns; #2376). Any other run keeps the three. -->
+    <bpmn:serviceTask id="task-remove-sandbox" name="remove sandbox" operaton:delegateExpression="${removeSmith}" operaton:asyncBefore="true">
+      <bpmn:extensionElements>
+        <operaton:failedJobRetryTimeCycle>${execution.getVariable('result') != null &amp;&amp; execution.getVariable('result') != 'success' ? 'R1/PT0S' : 'R3/PT0S'}</operaton:failedJobRetryTimeCycle>
+      </bpmn:extensionElements>
+      <bpmn:incoming>flow-to-remove</bpmn:incoming>
+      <bpmn:outgoing>flow-end</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="end-smith-run">
+      <bpmn:incoming>flow-end</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="flow-start" sourceRef="start-smith-run" targetRef="task-start-smith" />
+    <bpmn:sequenceFlow id="flow-to-wait" sourceRef="task-start-smith" targetRef="event-smith-exited" />
+    <bpmn:sequenceFlow id="flow-exited" sourceRef="event-smith-exited" targetRef="task-collect-result" />
+    <bpmn:sequenceFlow id="flow-to-remove" sourceRef="task-collect-result" targetRef="task-remove-sandbox" />
+    <bpmn:sequenceFlow id="flow-end" sourceRef="task-remove-sandbox" targetRef="end-smith-run" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_smith_run">
+    <bpmndi:BPMNPlane id="BPMNPlane_smith_run" bpmnElement="smith-run">
+      <bpmndi:BPMNShape id="start-smith-run-di" bpmnElement="start-smith-run"><dc:Bounds x="152" y="102" width="36" height="36" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-start-smith-di" bpmnElement="task-start-smith"><dc:Bounds x="240" y="80" width="100" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="event-smith-exited-di" bpmnElement="event-smith-exited"><dc:Bounds x="392" y="102" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="378" y="70" width="64" height="14" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-collect-result-di" bpmnElement="task-collect-result"><dc:Bounds x="480" y="80" width="100" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-remove-sandbox-di" bpmnElement="task-remove-sandbox"><dc:Bounds x="630" y="80" width="100" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="end-smith-run-di" bpmnElement="end-smith-run"><dc:Bounds x="782" y="102" width="36" height="36" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="flow-start-di" bpmnElement="flow-start"><di:waypoint x="188" y="120" /><di:waypoint x="240" y="120" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-to-wait-di" bpmnElement="flow-to-wait"><di:waypoint x="340" y="120" /><di:waypoint x="392" y="120" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-exited-di" bpmnElement="flow-exited"><di:waypoint x="428" y="120" /><di:waypoint x="480" y="120" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-to-remove-di" bpmnElement="flow-to-remove"><di:waypoint x="580" y="120" /><di:waypoint x="630" y="120" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-end-di" bpmnElement="flow-end"><di:waypoint x="730" y="120" /><di:waypoint x="782" y="120" /></bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

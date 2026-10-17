@@ -1,0 +1,154 @@
+# The engine: one replica, which holds the leader lease and runs the singleton
+# work (engine/README.md, "Replicas and the lease"). During a rollout the surge
+# pod is the standby: only the lease holder is ready, so traffic follows the
+# lease, with a short handover gap; its ServiceAccount for the Kubernetes client (in-cluster config,
+# engine/README.md "Hosting models"), the Service a Smith reaches it at
+# (engineUrl http://engine.frakworks.svc:8080), and the plugin jars' PVC.
+# No Docker socket: smith.hosting is kubernetes here.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: frakworks-engine
+  namespace: frakworks
+---
+# POST /engine/restart (a deploy, by hand): the engine may
+# get and patch its own Deployment, by name, and nothing else in its namespace.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: engine-self-restart
+  namespace: frakworks
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    resourceNames: ["engine"]
+    verbs: ["get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: engine-self-restart
+  namespace: frakworks
+subjects:
+  - kind: ServiceAccount
+    name: frakworks-engine
+    namespace: frakworks
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: engine-self-restart
+---
+# Settings that are no secret. Telemetry is blank (off) in the base: the
+# overlay points ENGINE_TELEMETRY_LOGS_URL / _METRICS_URL at the site's
+# VictoriaLogs and VictoriaMetrics.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: engine
+  namespace: frakworks
+data:
+  JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=60
+  SPRING_DATASOURCE_URL: jdbc:postgresql://engine-db:5432/engine?currentSchema=public
+  SPRING_DATASOURCE_USERNAME: engine
+  ENGINE_TELEMETRY_LOGS_URL: ""
+  ENGINE_TELEMETRY_METRICS_URL: ""
+  # The HITLP server the engine files its flow waits on as a requester (#2447) is
+  # no variable: the deployment sets it once with PUT /settings/hitlp (#2500).
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: engine-jobs
+  namespace: frakworks
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests: {storage: 1Gi}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: engine
+  namespace: frakworks
+  labels: {app.kubernetes.io/name: engine}
+spec:
+  # One pod. A rollout starts the surge pod (maxSurge 1) as the standby and
+  # stops the old one without waiting for the new one to be ready
+  # (maxUnavailable 1: only the holder is ever ready, so the surge pod cannot be
+  # until the old one lets go). The old pod's preStop waits for the standby to
+  # be warm; it then releases the lease and the standby takes it within 1 s.
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: {maxSurge: 1, maxUnavailable: 1}
+  selector:
+    matchLabels: {app.kubernetes.io/name: engine}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: engine}
+    spec:
+      serviceAccountName: frakworks-engine
+      # Above every Smith (smith.yaml): evicted last, memory requested at its limit.
+      priorityClassName: frakworks-core
+      # No service-link variables: the Service `engine` would inject ENGINE_PORT,
+      # ENGINE_SERVICE_HOST and the like, which the engine refuses as unknown
+      # engine.* properties at startup (UnknownEngineProperties).
+      enableServiceLinks: false
+      # Spring's graceful shutdown (30 s a phase) and the job executor's drain fit in it.
+      terminationGracePeriodSeconds: 90
+      # The plugin jar volume is ReadWriteOnce: every replica (and a rollout's
+      # surge pod) runs on the node that has it mounted. Only the lease holder
+      # runs plugin flow jobs (its job executor); the others never need the jars.
+      affinity:
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels: {app.kubernetes.io/name: engine}
+              topologyKey: kubernetes.io/hostname
+      containers:
+        - name: engine
+          image: frakworks-engine:main
+          imagePullPolicy: Always
+          ports:
+            - {name: http, containerPort: 8080}
+          envFrom:
+            - configMapRef: {name: engine}
+          env:
+            # Secret `engine`: create it with kubectl (deploy/k8s/README.md).
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom: {secretKeyRef: {name: engine, key: db-password}}
+            - name: ENGINE_SECRETS_KEY
+              valueFrom: {secretKeyRef: {name: engine, key: secrets-key}}
+          resources:
+            requests: {memory: 2Gi}
+            limits: {memory: 2Gi}
+          # Ready when the database answers, the lease runs, the event relay
+          # listens and this pod holds the lease (GET /ready); a standby and a
+          # stopping pod answer 503, so the Service sends only to the holder.
+          readinessProbe:
+            httpGet: {path: /ready, port: http}
+            periodSeconds: 5
+            failureThreshold: 2
+          # Waits (at most 60 s, inside terminationGracePeriodSeconds 90) for a
+          # warm standby, and /ready answers 503 from its start; then SIGTERM
+          # releases the lease. Loopback only, so exec, not httpGet (the kubelet
+          # calls the pod IP).
+          lifecycle:
+            preStop:
+              exec:
+                command: [curl, -fsS, --max-time, "70", "http://127.0.0.1:8080/lease/await-standby"]
+          volumeMounts:
+            - {name: jobs, mountPath: /var/lib/frakworks/jobs}
+      volumes:
+        - name: jobs
+          persistentVolumeClaim: {claimName: engine-jobs}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: engine
+  namespace: frakworks
+spec:
+  selector: {app.kubernetes.io/name: engine}
+  ports:
+    - {name: http, port: 8080, targetPort: http}

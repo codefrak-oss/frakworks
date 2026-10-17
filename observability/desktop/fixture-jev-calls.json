@@ -1,0 +1,17 @@
+{
+  "total": 3, "limit": 50, "offset": 0,
+  "calls": [
+    { "id": "4f1c2d3e-0000-4000-8000-000000000003", "called_at": "2026-09-27T09:14:02Z", "use_case": "ci-triage",
+      "process_instance": "b1", "repo": "codefrak-oss/frakworks", "issue": 553, "model": "jev-1",
+      "latency_ms": 910, "threshold": 0.7, "action": "re-ran the job", "outcome": "the re-run passed",
+      "pick": "infrastructure", "confidence": 0.82, "no_answer": false },
+    { "id": "4f1c2d3e-0000-4000-8000-000000000002", "called_at": "2026-09-26T16:40:00Z", "use_case": "acceptance",
+      "process_instance": "b0", "repo": "codefrak-oss/frakworks", "issue": 553, "model": "jev-1",
+      "latency_ms": 700, "threshold": 0.85, "action": "left for review", "outcome": null,
+      "pick": "no", "confidence": 0.21, "no_answer": false },
+    { "id": "4f1c2d3e-0000-4000-8000-000000000001", "called_at": "2026-09-26T08:02:11Z", "use_case": "ci-triage",
+      "process_instance": "b0", "repo": "codefrak-oss/frakworks", "issue": 553, "model": "jev-1",
+      "latency_ms": null, "threshold": 0.7, "action": "no answer", "outcome": null,
+      "pick": null, "confidence": null, "no_answer": true }
+  ]
+}

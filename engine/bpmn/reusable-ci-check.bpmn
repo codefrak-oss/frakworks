@@ -1,0 +1,308 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:camunda="http://camunda.org/schema/1.0/bpmn" xmlns:operaton="http://operaton.org/schema/1.0/bpmn" xmlns:modeler="http://camunda.org/schema/modeler/1.0" id="Definitions_reusable_ci_check" targetNamespace="http://codefrak.com/agent-army/bpmn" exporter="Camunda Modeler" exporterVersion="5.51.1" modeler:executionPlatform="Camunda Platform" modeler:executionPlatformVersion="7.23.0">
+  <bpmn:message id="message-ci-check-completed" name="ci check completed" />
+  <bpmn:process id="reusable-ci-check" name="reusable ci check" isExecutable="true" camunda:historyTimeToLive="30">
+    <bpmn:documentation>The engine check on what open/update pr pushed (engine/README.md, "Chore"): skipped when the repo has no check or the branch touches none of its paths; otherwise, once the engine's own merge of the default branch finds no conflict (a PR GitHub cannot merge gets no check run: conflict, with a rebase-n-1 finding, goes back to the work), parked at a message, with no Smith running, until CiCheckWaits sees the check run completed (webhook-wake, the hourly scan, POST /scan). Sets ciOutcome: skipped, conflict, passed, or failed with a ci-n-1 finding in findings. A failure Jev reads as infrastructure or flaky at the floor re-runs the check once per round and waits again. A check GitHub never started (a dropped pull_request event) is re-triggered by closing and reopening the PR, a bounded number of times. The timeout, and a conclusion that says nothing about the code, are incidents.</bpmn:documentation>
+    <bpmn:startEvent id="start-ci-check" name="pushed">
+      <bpmn:outgoing>flow-start-needed</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:serviceTask id="task-ci-check-needed" name="check needed?&#10;(engine)" camunda:delegateExpression="${ciCheckNeeded}">
+      <bpmn:documentation>CiCheckNeededDelegate: ciOutcome waiting when open/update pr set ciCheck (the repo's engine.target_repo row names a check and the branch changes one of its paths), else skipped</bpmn:documentation>
+      <bpmn:incoming>flow-start-needed</bpmn:incoming>
+      <bpmn:outgoing>flow-needed-gateway</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="gateway-ci-needed" name="wait?" default="flow-ci-skipped">
+      <bpmn:incoming>flow-needed-gateway</bpmn:incoming>
+      <bpmn:outgoing>flow-ci-wait</bpmn:outgoing>
+      <bpmn:outgoing>flow-ci-skipped</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:endEvent id="end-ci-skipped" name="skipped">
+      <bpmn:incoming>flow-ci-skipped</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:serviceTask id="task-ci-conflict" name="mergeable?&#10;(git)" camunda:asyncBefore="true" camunda:delegateExpression="${ciCheckConflict}">
+      <bpmn:documentation>CiCheckConflictDelegate: merges the default branch into the pushed branch in the engine's bare clone, pushing nothing. A conflict is ciOutcome conflict with the rebase step's rebase-n-1 finding for the work (the same conflict count: the third is an incident), because GitHub makes no check run for a PR it cannot merge and the wait would only end in the timeout. Current or clean waits</bpmn:documentation>
+      <bpmn:extensionElements>
+        <!-- A GitHub 5xx or a git hiccup gets five tries a minute apart before it is an
+             incident: Operaton's default of three immediate retries burned all three in
+             ~2 s on #1574 (RestCheckRuns.latest, 500 from the check-runs API). -->
+        <operaton:failedJobRetryTimeCycle>R5/PT1M</operaton:failedJobRetryTimeCycle>
+      </bpmn:extensionElements>
+      <bpmn:incoming>flow-ci-wait</bpmn:incoming>
+      <bpmn:outgoing>flow-conflict-gateway</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="gateway-ci-mergeable" name="mergeable?" default="flow-ci-mergeable">
+      <bpmn:incoming>flow-conflict-gateway</bpmn:incoming>
+      <bpmn:outgoing>flow-ci-mergeable</bpmn:outgoing>
+      <bpmn:outgoing>flow-ci-conflict</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:endEvent id="end-ci-conflict" name="conflict">
+      <bpmn:incoming>flow-ci-conflict</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:receiveTask id="receive-ci-check" name="wait for the engine check" messageRef="message-ci-check-completed">
+      <bpmn:documentation>No Smith runs: CiCheckWaits correlates ci check completed once the check run on headSha has completed, with its conclusion, id and page; after a re-run, not the run that was re-run (ciRerunOf)</bpmn:documentation>
+      <bpmn:incoming>flow-ci-mergeable</bpmn:incoming>
+      <bpmn:incoming>flow-rerun-wait</bpmn:incoming>
+      <bpmn:outgoing>flow-completed-read</bpmn:outgoing>
+    </bpmn:receiveTask>
+    <bpmn:boundaryEvent id="event-ci-check-timeout" name="timeout" attachedToRef="receive-ci-check">
+      <bpmn:outgoing>flow-timeout-recheck</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="TimerEventDefinition_ci_check_timeout">
+        <bpmn:timeDuration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="bpmn:tFormalExpression">${ciChecks.timeout}</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:boundaryEvent>
+    <bpmn:boundaryEvent id="event-ci-check-retrigger" name="not started?" cancelActivity="false" attachedToRef="receive-ci-check">
+      <bpmn:outgoing>flow-retrigger</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="TimerEventDefinition_ci_check_retrigger">
+        <bpmn:timeCycle xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="bpmn:tFormalExpression">${ciChecks.retriggerCycle}</bpmn:timeCycle>
+      </bpmn:timerEventDefinition>
+    </bpmn:boundaryEvent>
+    <bpmn:serviceTask id="task-ci-check-retrigger" name="re-trigger if not started&#10;(github)" camunda:asyncBefore="true" camunda:delegateExpression="${ciCheckRetrigger}">
+      <bpmn:documentation>CiCheckRetriggerDelegate: no run of the check on headSha at all (a dropped pull_request event) closes and reopens the PR, at most engine.ci-check.retriggers times per wait (ciRetriggers); a run that exists, however slow, is left alone. The wait goes on: its timeout still bounds it</bpmn:documentation>
+      <bpmn:extensionElements>
+        <!-- A GitHub 5xx or a git hiccup gets five tries a minute apart before it is an
+             incident: Operaton's default of three immediate retries burned all three in
+             ~2 s on #1574 (RestCheckRuns.latest, 500 from the check-runs API). -->
+        <operaton:failedJobRetryTimeCycle>R5/PT1M</operaton:failedJobRetryTimeCycle>
+      </bpmn:extensionElements>
+      <bpmn:incoming>flow-retrigger</bpmn:incoming>
+      <bpmn:outgoing>flow-retrigger-end</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="end-ci-retriggered" name="looked">
+      <bpmn:incoming>flow-retrigger-end</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:serviceTask id="task-ci-check-timed-out" name="check once more&#10;(github)" camunda:asyncBefore="true" camunda:delegateExpression="${ciCheckTimedOut}">
+      <bpmn:documentation>CiCheckTimedOutDelegate: reads the check run once more (a lost wake); completed goes on to read check, anything else fails: the incident. A retry looks again</bpmn:documentation>
+      <bpmn:extensionElements>
+        <!-- A GitHub 5xx or a git hiccup gets five tries a minute apart before it is an
+             incident: Operaton's default of three immediate retries burned all three in
+             ~2 s on #1574 (RestCheckRuns.latest, 500 from the check-runs API). -->
+        <operaton:failedJobRetryTimeCycle>R5/PT1M</operaton:failedJobRetryTimeCycle>
+      </bpmn:extensionElements>
+      <bpmn:incoming>flow-timeout-recheck</bpmn:incoming>
+      <bpmn:outgoing>flow-recheck-read</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="task-read-ci-check" name="read check&#10;(github)" camunda:asyncBefore="true" camunda:delegateExpression="${readCiCheck}">
+      <bpmn:documentation>ReadCiCheckDelegate: success, neutral or skipped is passed; failure or timed_out is triaged by Jev (code, infrastructure or flaky): infrastructure or flaky at engine.jev.ci-triage-floor re-runs the check's job, once per round, and is rerun; anything else is failed, with a ci-n-1 finding carrying the failing tests, the job log's end and Jev's pick; any other conclusion is an incident</bpmn:documentation>
+      <bpmn:extensionElements>
+        <!-- A GitHub 5xx or a git hiccup gets five tries a minute apart before it is an
+             incident: Operaton's default of three immediate retries burned all three in
+             ~2 s on #1574 (RestCheckRuns.latest, 500 from the check-runs API). -->
+        <operaton:failedJobRetryTimeCycle>R5/PT1M</operaton:failedJobRetryTimeCycle>
+      </bpmn:extensionElements>
+      <bpmn:incoming>flow-completed-read</bpmn:incoming>
+      <bpmn:incoming>flow-recheck-read</bpmn:incoming>
+      <bpmn:outgoing>flow-read-rerun</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="gateway-ci-rerun" name="re-run?" default="flow-read-end">
+      <bpmn:incoming>flow-read-rerun</bpmn:incoming>
+      <bpmn:outgoing>flow-read-end</bpmn:outgoing>
+      <bpmn:outgoing>flow-rerun-wait</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:endEvent id="end-ci-checked" name="checked">
+      <bpmn:incoming>flow-read-end</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="flow-start-needed" sourceRef="start-ci-check" targetRef="task-ci-check-needed" />
+    <bpmn:sequenceFlow id="flow-needed-gateway" sourceRef="task-ci-check-needed" targetRef="gateway-ci-needed" />
+    <bpmn:sequenceFlow id="flow-ci-wait" name="yes" sourceRef="gateway-ci-needed" targetRef="task-ci-conflict">
+      <bpmn:conditionExpression xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="bpmn:tFormalExpression">${ciOutcome == 'waiting'}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow-conflict-gateway" sourceRef="task-ci-conflict" targetRef="gateway-ci-mergeable" />
+    <bpmn:sequenceFlow id="flow-ci-mergeable" name="yes" sourceRef="gateway-ci-mergeable" targetRef="receive-ci-check" />
+    <bpmn:sequenceFlow id="flow-ci-conflict" name="conflict" sourceRef="gateway-ci-mergeable" targetRef="end-ci-conflict">
+      <bpmn:conditionExpression xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="bpmn:tFormalExpression">${ciOutcome == 'conflict'}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="flow-ci-skipped" name="no" sourceRef="gateway-ci-needed" targetRef="end-ci-skipped" />
+    <bpmn:sequenceFlow id="flow-completed-read" name="completed" sourceRef="receive-ci-check" targetRef="task-read-ci-check" />
+    <bpmn:sequenceFlow id="flow-timeout-recheck" sourceRef="event-ci-check-timeout" targetRef="task-ci-check-timed-out" />
+    <bpmn:sequenceFlow id="flow-retrigger" sourceRef="event-ci-check-retrigger" targetRef="task-ci-check-retrigger" />
+    <bpmn:sequenceFlow id="flow-retrigger-end" sourceRef="task-ci-check-retrigger" targetRef="end-ci-retriggered" />
+    <bpmn:sequenceFlow id="flow-recheck-read" name="completed after all" sourceRef="task-ci-check-timed-out" targetRef="task-read-ci-check" />
+    <bpmn:sequenceFlow id="flow-read-rerun" sourceRef="task-read-ci-check" targetRef="gateway-ci-rerun" />
+    <bpmn:sequenceFlow id="flow-read-end" name="no" sourceRef="gateway-ci-rerun" targetRef="end-ci-checked" />
+    <bpmn:sequenceFlow id="flow-rerun-wait" name="re-ran" sourceRef="gateway-ci-rerun" targetRef="receive-ci-check">
+      <bpmn:conditionExpression xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="bpmn:tFormalExpression">${ciOutcome == 'rerun'}</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:textAnnotation id="annotation-no-smith">
+      <bpmn:text>no smith waits: the flow is parked at the message, and every wake, the hourly scan and post /scan look at the check run on the pushed head. a check with no run re-triggers by reopening the pr (engine.ci-check.retrigger-after, engine.ci-check.retriggers). the timeout (engine.ci-check.timeout) ends in an incident, never a wait forever</bpmn:text>
+    </bpmn:textAnnotation>
+    <bpmn:association id="association-no-smith" sourceRef="receive-ci-check" targetRef="annotation-no-smith" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_reusable_ci_check">
+    <bpmndi:BPMNPlane id="BPMNPlane_reusable_ci_check" bpmnElement="reusable-ci-check">
+      <bpmndi:BPMNShape id="start-ci-check-di" bpmnElement="start-ci-check">
+        <dc:Bounds x="152" y="102" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="152" y="145" width="36" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-ci-check-needed-di" bpmnElement="task-ci-check-needed">
+        <dc:Bounds x="240" y="80" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="gateway-ci-needed-di" bpmnElement="gateway-ci-needed" isMarkerVisible="true">
+        <dc:Bounds x="400" y="95" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="411" y="73" width="28" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="end-ci-skipped-di" bpmnElement="end-ci-skipped">
+        <dc:Bounds x="407" y="242" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="405" y="285" width="40" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-ci-conflict-di" bpmnElement="task-ci-conflict">
+        <dc:Bounds x="510" y="80" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="gateway-ci-mergeable-di" bpmnElement="gateway-ci-mergeable" isMarkerVisible="true">
+        <dc:Bounds x="670" y="95" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="666" y="73" width="58" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="end-ci-conflict-di" bpmnElement="end-ci-conflict">
+        <dc:Bounds x="677" y="242" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="677" y="285" width="37" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="receive-ci-check-di" bpmnElement="receive-ci-check">
+        <dc:Bounds x="780" y="80" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="event-ci-check-timeout-di" bpmnElement="event-ci-check-timeout">
+        <dc:Bounds x="812" y="142" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="854" y="180" width="38" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="event-ci-check-retrigger-di" bpmnElement="event-ci-check-retrigger">
+        <dc:Bounds x="772" y="142" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="701" y="180" width="46" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-ci-check-retrigger-di" bpmnElement="task-ci-check-retrigger">
+        <dc:Bounds x="700" y="380" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="end-ci-retriggered-di" bpmnElement="end-ci-retriggered">
+        <dc:Bounds x="852" y="402" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="853" y="445" width="34" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-ci-check-timed-out-di" bpmnElement="task-ci-check-timed-out">
+        <dc:Bounds x="780" y="240" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="task-read-ci-check-di" bpmnElement="task-read-ci-check">
+        <dc:Bounds x="990" y="80" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="end-ci-checked-di" bpmnElement="end-ci-checked">
+        <dc:Bounds x="1252" y="102" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1248" y="145" width="44" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="gateway-ci-rerun-di" bpmnElement="gateway-ci-rerun" isMarkerVisible="true">
+        <dc:Bounds x="1145" y="95" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1151" y="152" width="38" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="annotation-no-smith-di" bpmnElement="annotation-no-smith">
+        <dc:Bounds x="160" y="310" width="300" height="70" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="association-no-smith-di" bpmnElement="association-no-smith">
+        <di:waypoint x="780" y="150" />
+        <di:waypoint x="460" y="340" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-start-needed-di" bpmnElement="flow-start-needed">
+        <di:waypoint x="188" y="120" />
+        <di:waypoint x="240" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-needed-gateway-di" bpmnElement="flow-needed-gateway">
+        <di:waypoint x="340" y="120" />
+        <di:waypoint x="400" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-ci-wait-di" bpmnElement="flow-ci-wait">
+        <di:waypoint x="450" y="120" />
+        <di:waypoint x="510" y="120" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="471" y="100" width="18" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-conflict-gateway-di" bpmnElement="flow-conflict-gateway">
+        <di:waypoint x="610" y="120" />
+        <di:waypoint x="670" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-ci-mergeable-di" bpmnElement="flow-ci-mergeable">
+        <di:waypoint x="720" y="120" />
+        <di:waypoint x="780" y="120" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="741" y="100" width="18" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-ci-conflict-di" bpmnElement="flow-ci-conflict">
+        <di:waypoint x="695" y="145" />
+        <di:waypoint x="695" y="242" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="703" y="186" width="37" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-ci-skipped-di" bpmnElement="flow-ci-skipped">
+        <di:waypoint x="425" y="145" />
+        <di:waypoint x="425" y="242" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="433" y="186" width="13" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-completed-read-di" bpmnElement="flow-completed-read">
+        <di:waypoint x="880" y="120" />
+        <di:waypoint x="990" y="120" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="910" y="100" width="52" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-timeout-recheck-di" bpmnElement="flow-timeout-recheck">
+        <di:waypoint x="830" y="178" />
+        <di:waypoint x="830" y="240" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-retrigger-di" bpmnElement="flow-retrigger">
+        <di:waypoint x="790" y="178" />
+        <di:waypoint x="790" y="200" />
+        <di:waypoint x="750" y="200" />
+        <di:waypoint x="750" y="380" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-retrigger-end-di" bpmnElement="flow-retrigger-end">
+        <di:waypoint x="800" y="420" />
+        <di:waypoint x="852" y="420" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-recheck-read-di" bpmnElement="flow-recheck-read">
+        <di:waypoint x="880" y="280" />
+        <di:waypoint x="1040" y="280" />
+        <di:waypoint x="1040" y="160" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="900" y="285" width="96" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-read-rerun-di" bpmnElement="flow-read-rerun">
+        <di:waypoint x="1090" y="120" />
+        <di:waypoint x="1145" y="120" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-read-end-di" bpmnElement="flow-read-end">
+        <di:waypoint x="1195" y="120" />
+        <di:waypoint x="1252" y="120" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1215" y="100" width="13" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flow-rerun-wait-di" bpmnElement="flow-rerun-wait">
+        <di:waypoint x="1170" y="95" />
+        <di:waypoint x="1170" y="40" />
+        <di:waypoint x="860" y="40" />
+        <di:waypoint x="860" y="80" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="982" y="22" width="32" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

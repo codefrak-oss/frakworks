@@ -1,0 +1,86 @@
+# What the engine may do in the Smith namespace, and nothing outside it: run
+# Jobs, read their pods, logs and exits, exec into a pod (the inputs in, the
+# outputs out), and keep each run's env Secret. Bound to the engine's
+# ServiceAccount in frakworks; frakworks-smith has no ServiceAccount of its
+# own (a Smith pod mounts no token).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: frakworks-engine
+  namespace: frakworks-smith
+rules:
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch", "delete", "deletecollection"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["get", "create"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "create", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: frakworks-engine
+  namespace: frakworks-smith
+subjects:
+  - kind: ServiceAccount
+    name: frakworks-engine
+    namespace: frakworks
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: frakworks-engine
+---
+# Smith pods are Burstable (engine/README.md, "Smith runs", "Hosting models"):
+# each requests smith.k8s.memory-request-bytes and smith.k8s.cpu-request (1 GiB
+# and 0.5 CPU by default, PUT /settings/smith-hosting) and is capped at
+# engine.smith.memory-bytes and engine.smith.cpus (3 GiB, 2 CPU). The keeper
+# adds 32Mi/50m and the inputs init container fits under the Smith's, so a pod
+# counts about 1056Mi/0.55 CPU of requests and 3104Mi/2.05 CPU of limits.
+# Sized for at least 12 at once at the defaults:
+#   requests.memory 14Gi >= 12 x 1056Mi (12.4Gi)    limits.memory 48Gi >= 12 x 3104Mi (36.4Gi)
+#   requests.cpu    7    >= 12 x 0.55   (6.6)       limits.cpu    32   >= 12 x 2.05   (24.6)
+# Limits overcommit the nodes on purpose: under node pressure the kubelet
+# evicts Smiths first (PriorityClass frakworks-smith, lowest; requests below
+# limits), and the engine reruns an evicted run. The overlay may raise these.
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: smith-memory
+  namespace: frakworks-smith
+spec:
+  hard:
+    requests.memory: 14Gi
+    limits.memory: 48Gi
+    requests.cpu: "7"
+    limits.cpu: "32"
+---
+# Every Smith pod's class (KubernetesSandbox's SMITH_PRIORITY_CLASS): the
+# lowest, so a Smith is evicted before anything else under node pressure, and
+# never preempts another pod to be scheduled; it waits as Pending instead.
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: frakworks-smith
+value: 0
+preemptionPolicy: Never
+globalDefault: false
+description: Smith runs; evicted first, rerun by the engine.
+---
+# The engine and Postgres: above every Smith, so they are evicted last and may
+# preempt a Smith to be scheduled.
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: frakworks-core
+value: 1000000
+globalDefault: false
+description: The frakworks engine and its Postgres; above the Smiths.

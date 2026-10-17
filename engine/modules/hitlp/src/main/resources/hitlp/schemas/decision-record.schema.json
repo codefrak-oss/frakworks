@@ -1,0 +1,193 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/codefrak-oss/hitlp/spec/schemas/decision-record.schema.json",
+  "title": "HITLP decision record",
+  "type": "object",
+  "required": [
+    "requestId",
+    "idempotencyKey",
+    "primitive",
+    "outcome",
+    "decidedBy",
+    "decidedAt"
+  ],
+  "properties": {
+    "requestId": {
+      "type": "string"
+    },
+    "idempotencyKey": {
+      "type": "string"
+    },
+    "primitive": {
+      "enum": [
+        "ask",
+        "approve"
+      ]
+    },
+    "outcome": {
+      "enum": [
+        "answered",
+        "approved",
+        "rejected",
+        "timed_out",
+        "cancelled"
+      ]
+    },
+    "answer": true,
+    "reason": {
+      "type": "string"
+    },
+    "decidedBy": {
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "enum": [
+            "human",
+            "rule",
+            "model",
+            "policy"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "roles": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "decidedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "channel": {
+      "type": "string"
+    },
+    "payloadDigest": {
+      "type": "string"
+    },
+    "signature": {
+      "type": "object",
+      "required": [
+        "alg",
+        "keyId",
+        "value"
+      ],
+      "properties": {
+        "alg": {
+          "type": "string"
+        },
+        "keyId": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      }
+    },
+    "attested": {
+      "type": "object",
+      "required": [
+        "requester",
+        "by"
+      ],
+      "properties": {
+        "requester": {
+          "type": "string"
+        },
+        "onBehalfOf": {
+          "type": "object"
+        },
+        "by": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "recommendation": {
+      "type": "object",
+      "required": [
+        "verdict"
+      ],
+      "properties": {
+        "verdict": {
+          "enum": [
+            "allow",
+            "deny",
+            "escalate",
+            "none"
+          ]
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "by": {
+          "type": "object"
+        },
+        "reasons": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "outcome": {
+            "const": "answered"
+          }
+        },
+        "required": [
+          "outcome"
+        ]
+      },
+      "then": {
+        "required": [
+          "answer"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "outcome": {
+            "enum": [
+              "timed_out"
+            ]
+          }
+        },
+        "required": [
+          "outcome"
+        ]
+      },
+      "then": {
+        "properties": {
+          "decidedBy": {
+            "properties": {
+              "type": {
+                "const": "policy"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

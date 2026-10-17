@@ -1,0 +1,13 @@
+# The engine on Kubernetes, generic (deploy/k8s/README.md): no site value in
+# it. An overlay adds the image registry, the storage class, sizes, an Ingress
+# and the telemetry URLs; the Secrets are created with kubectl, never in git.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespaces.yaml
+  - engine.yaml
+  - postgres.yaml
+  - smith.yaml
+  - firstmate.yaml
+  - web.yaml
+  - networkpolicy.yaml
