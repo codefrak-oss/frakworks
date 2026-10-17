@@ -6,12 +6,16 @@ import com.codefrak.engine.events.EngineEvents
 import com.codefrak.engine.firstmate.DesktopChannel
 import com.codefrak.engine.friction.FrictionFixLinks
 import com.codefrak.engine.friction.FrictionLog
+import com.codefrak.engine.github.GitHubCompare
 import com.codefrak.engine.github.GitHubPulls
+import com.codefrak.engine.github.IssueDetails
 import com.codefrak.engine.github.GitPush
 import com.codefrak.engine.intake.AnswerAttachments
+import com.codefrak.engine.repos.CompareCommits
 import com.codefrak.engine.repos.McpProbe
 import com.codefrak.engine.repos.RepoDocs
 import com.codefrak.engine.repos.RepoMcpServers
+import com.codefrak.engine.repos.TicketTitles
 import com.codefrak.engine.tier.TierTable
 import com.codefrak.engine.workitems.WorkItemStore
 import org.springframework.stereotype.Component
@@ -55,6 +59,7 @@ import java.util.Locale
  * screenshot_desktop (#100105, [ScreenshotTool]) asks the caller's desktop app for a screenshot over its desktop channel:
  * First mate's only, with a login; a Smith neither lists it nor may call it.
  * read_version (#100101, [VersionTool]) answers the engine's build version and commit, as `GET /version` does: every role's.
+ * read_desktop_release (#100117, [DesktopReleaseTool]) maps a desktop version to its commit and tickets, and a ticket to the first release shipping it: every role's.
  *
  * First mate's role ([McpCaller.Nobody]) lists [TOOLS]; its login is the
  * one its bearer token proved. A Smith's role lists [SMITH_TOOLS] only:
@@ -70,7 +75,9 @@ class FrakworksMcp(private val engine: FrakworksEngine, private val tiers: TierT
                    probe: McpProbe? = null, childWatch: ChildWatch? = null,
                    workItems: WorkItemStore? = null, parentNotes: ParentNoteLog? = null,
                    git: GitPush? = null, pulls: GitHubPulls? = null, events: EngineEvents? = null,
-                   build: EngineBuild? = null, desktops: DesktopChannel? = null) : EngineMcpServer {
+                   build: EngineBuild? = null, desktops: DesktopChannel? = null,
+                   compare: CompareCommits? = null, titles: TicketTitles? = null, gitCompare: GitHubCompare? = null,
+                   details: IssueDetails? = null, merges: TicketMerges? = details?.let { d -> TicketMerges { r, n -> d.ticket(r, n)?.prs } }) : EngineMcpServer {
     private val askTool = AskTool(engine, tiers)
     private val frictionNoteTool = FrictionNoteTool(friction, engine)
     private val fixTool = fixes?.let { FrictionFixTool(it) }
@@ -98,6 +105,7 @@ class FrakworksMcp(private val engine: FrakworksEngine, private val tiers: TierT
     private val workItemTools = workItems?.let { WorkItemTools(it) }
     private val pushChunkTool = PushChunkTool(engine, git, pulls, events)
     private val versionTool = VersionTool(build)
+    private val desktopReleaseTool = DesktopReleaseTool(engine, checkRuns, compare, titles, gitCompare, merges)
     private val screenshotTool = ScreenshotTool(desktops)
     override val name = NAME
     override val version = "1"
@@ -138,7 +146,7 @@ class FrakworksMcp(private val engine: FrakworksEngine, private val tiers: TierT
             TicketRunsTool.READ_TICKET_RUNS_TOOL,
             SearchTool.TOOL,
         ) + AccessTool.TOOLS + TokenTool.TOOLS + listOf(TicketTool.TOOL, PrivateDocTools.MATE_LIST_TOOL, PrivateDocTools.MATE_READ_TOOL) +
-            McpServerTools.TOOLS + CiJobsTool.TOOLS + VersionTool.TOOL + ScreenshotTool.TOOL
+            McpServerTools.TOOLS + CiJobsTool.TOOLS + VersionTool.TOOL + DesktopReleaseTool.TOOL + ScreenshotTool.TOOL
 
         /** The tools a Smith may call (engine/README.md, "The frakworks server in a Smith"). */
         val SMITH_TOOLS: List<McpTool> = listOf(
@@ -150,7 +158,7 @@ class FrakworksMcp(private val engine: FrakworksEngine, private val tiers: TierT
             PrivateDocTools.READ_TOOL,
             AttachmentTools.LIST_TOOL,
             AttachmentTools.READ_TOOL,
-        ) + ParentTools.TOOLS + CiJobsTool.TOOLS + VersionTool.TOOL
+        ) + ParentTools.TOOLS + CiJobsTool.TOOLS + VersionTool.TOOL + DesktopReleaseTool.TOOL
 
         /** A JSON integer above zero (a whole float too, as JavaScript's `Number.isInteger` takes it), else null. */
         fun ticketOf(v: Any?): Long? = wholeNumberOf(v)?.takeIf { it > 0 }
@@ -209,6 +217,7 @@ class FrakworksMcp(private val engine: FrakworksEngine, private val tiers: TierT
                 in ParentTools.NAMES -> parentTools.call(tool, args, caller)
                 PushChunkTool.NAME -> pushChunkTool.call(args, caller)
                 VersionTool.NAME -> versionTool.call(args)
+                DesktopReleaseTool.NAME -> desktopReleaseTool.call(args)
                 in WorkItemTools.NAMES -> workItemTools?.call(tool, args, caller) ?: McpToolResult.error("unknown tool: ${json(tool)}")
                 FrictionFixIntakeTool.NAME -> fixIntakeTool?.call(args, "smith run ${caller.caller.runId}") ?: McpToolResult.error("unknown tool: ${json(tool)}")
                 in REPO_TOOLS -> mateOnly(caller, tool, "target repos are First mate's to manage")
@@ -258,6 +267,7 @@ class FrakworksMcp(private val engine: FrakworksEngine, private val tiers: TierT
             CiRunsTool.NAME -> ciRunsTool.call(args)
             in CiJobsTool.NAMES -> ciJobsTool.call(tool, args)
             VersionTool.NAME -> versionTool.call(args)
+            DesktopReleaseTool.NAME -> desktopReleaseTool.call(args)
             ScreenshotTool.NAME -> screenshotTool.call(args, caller)
             FrictionFixIntakeTool.NAME -> fixIntakeTool?.let { t -> login(caller)?.let { t.call(args, it) } ?: noLogin("link") }
                 ?: McpToolResult.error("unknown tool: ${json(tool)}")

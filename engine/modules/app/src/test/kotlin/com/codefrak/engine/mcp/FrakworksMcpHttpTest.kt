@@ -73,16 +73,17 @@ class FrakworksMcpHttpTest {
     private val mateSubmit = """{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"submit_ask","arguments":{"ask":"do it","repo":"acme/widgets"}}}"""
 
     @Test
-    fun `initialize names frakworks, and tools-list is First mate's thirty-nine, or a Smith's twenty-one`() {
+    fun `initialize names frakworks, and tools-list is First mate's forty, or a Smith's twenty-two`() {
         rpc("""{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18"}}""").andExpect {
             status { isOk() }
             jsonPath("$.result.serverInfo.name") { value("frakworks") }
             jsonPath("$.result.capabilities.tools") { isMap() }
         }
         rpc("""{"jsonrpc":"2.0","id":2,"method":"tools/list"}""").andExpect {
-            jsonPath("$.result.tools.length()") { value(39) }
+            jsonPath("$.result.tools.length()") { value(40) }
             jsonPath("$.result.tools[37].name") { value("read_version") }
-            jsonPath("$.result.tools[38].name") { value("screenshot_desktop") }
+            jsonPath("$.result.tools[38].name") { value("read_desktop_release") }
+            jsonPath("$.result.tools[39].name") { value("screenshot_desktop") }
             jsonPath("$.result.tools[37].inputSchema.additionalProperties") { value(false) }
             jsonPath("$.result.tools[0].name") { value("submit_ask") }
             jsonPath("$.result.tools[0].inputSchema.properties.tier.maximum") { value(10) }
@@ -125,8 +126,9 @@ class FrakworksMcpHttpTest {
             jsonPath("$.result.tools[27].inputSchema.required[0]") { value("repo") }
         }
         rpc("""{"jsonrpc":"2.0","id":2,"method":"tools/list"}""", from = smithAddress).andExpect {
-            jsonPath("$.result.tools.length()") { value(21) }
+            jsonPath("$.result.tools.length()") { value(22) }
             jsonPath("$.result.tools[20].name") { value("read_version") }
+            jsonPath("$.result.tools[21].name") { value("read_desktop_release") }
             jsonPath("$.result.tools[0].name") { value("submit_ask") }
             jsonPath("$.result.tools[1].name") { value("note_friction") }
             jsonPath("$.result.tools[2].name") { value("read_ci_log") }

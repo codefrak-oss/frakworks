@@ -822,7 +822,7 @@ Neither spawns a server process any more; the desktop's old stdio server,
 
 - **Who is calling.** The role is the caller's address, as for `POST /intake`
   (the controller's `McpCaller`): a running Smith is that Smith and is listed only
-  its `submit_ask`, `note_friction`, `read_ci_log`, `read_ci_jobs`, `read_ci_job`, `search_ci_log`, `rerun_ci_jobs` (on its run's repo only: another `repo` is refused, a missing one is its run's), `read_run_log`, `read_version` and `link_friction_fix_intake` ("The frakworks server in a Smith"); any other caller is First
+  its `submit_ask`, `note_friction`, `read_ci_log`, `read_ci_jobs`, `read_ci_job`, `search_ci_log`, `rerun_ci_jobs` (on its run's repo only: another `repo` is refused, a missing one is its run's), `read_run_log`, `read_version`, `read_desktop_release` and `link_friction_fix_intake` ("The frakworks server in a Smith"); any other caller is First
   mate. First mate proves who it acts for with a bearer token the engine issued
   (`Authorization: Bearer frk_...`, "Tokens"): the token's login is the caller's
   login, where `McpCaller.Nobody.login` and `Actor.Login` are built, and reaches
@@ -838,7 +838,7 @@ Neither spawns a server process any more; the desktop's old stdio server,
 - **First mate's tools.** `submit_ask`, `read_transcript`,
   `read_needs` (its rows carry `question`, the pending question's full text,
   the preceding run's for a flow with none recorded, and `for`, the login the
-  row waits on, null when it is everyone's, "What needs you"), `read_ticket_pr`, `approve`, `reauthorize`, `note_friction`, `read_version` (the engine's build version and commit, as `GET /version` answers),
+  row waits on, null when it is everyone's, "What needs you"), `read_ticket_pr`, `approve`, `reauthorize`, `note_friction`, `read_version` (the engine's build version and commit, as `GET /version` answers), `read_desktop_release` (#100117, read-only, `repo` required: a desktop version `0.2.N` is run N of the repo's successful `desktop-release.yml` runs on main, its commit the run's head commit; `version` answers that commit and the tickets merged since `since` or the previous release, from the squash subjects as `GET /repos/{owner}/{name}/changes` reads them; `ticket` answers the first release whose commit contains the ticket's PR merge commit, `released: null` when none does yet, `merged: false` when no PR of it is merged),
   `read_repos`, `add_repo`, `edit_repo`, `remove_repo`, `read_ci_runs` (#1629, below; refused to a Smith), `read_ci_jobs`, `read_ci_job`, `search_ci_log` (#2188) and `rerun_ci_jobs` (#2249) (below; a Smith's on its run's repo only), `read_ticket_runs`, `search_tickets` (below), `read_access`, `add_access`, `remove_access`, `read_tokens`, `mint_token`, `revoke_token` (below; refused to a Smith), `read_ticket`, `list_private_docs` and `read_private_doc` (#1735, below; `read_ticket` refused to a Smith), `read_repo_mcp_servers`, `add_repo_mcp_server`, `edit_repo_mcp_server`, `remove_repo_mcp_server` and `test_repo_mcp_server` (#1801, "First mate's MCP servers"; each takes a required `repo`, refused naming the target repos without one, and refused to a Smith), `link_friction_fix`
   (#1200, "Friction notes", "Fixed by"; refused to a Smith), `link_friction_fix_intake` (#1337, "Fixed by"; a Smith's
   too), `cancel_intake`, `amend_intake`, `amend_ticket`, `close_ticket` and `comment_ticket` (below), the first four with the descriptions, schemas and error texts the desktop's server
@@ -1313,7 +1313,7 @@ the engine's, and since #2449 the repo's own Smith-audience servers ride beside 
   container's reach. Every caller of the engine (the desktop app, a session's MCP client)
   is on the host and uses `localhost:8090`. Do not publish the port beyond loopback
   while the API is unauthenticated: that route reopens.
-- **The tools.** A Smith sees `submit_ask({ask})`, `note_friction`, `read_ci_log`, `read_run_log`, `read_version` (the engine's build version and commit, as `GET /version` answers, read-only), `list_private_docs` and `read_private_doc` (below), and a `work` run on a ticket `push_chunk` (below). `submit_ask` refuses any other
+- **The tools.** A Smith sees `submit_ask({ask})`, `note_friction`, `read_ci_log`, `read_run_log`, `read_version` (the engine's build version and commit, as `GET /version` answers, read-only), `read_desktop_release` (which desktop release ships a ticket, read-only, as First mate's), `list_private_docs` and `read_private_doc` (below), and a `work` run on a ticket `push_chunk` (below). `submit_ask` refuses any other
   argument (no `tier`: its header says "prescribed by the user", and a Smith is not the
   user; no `authorize`; no `repo`) and answers any other tool with a JSON-RPC error
   (-32602). A Smith answers no question: an answer is the next refiner's
