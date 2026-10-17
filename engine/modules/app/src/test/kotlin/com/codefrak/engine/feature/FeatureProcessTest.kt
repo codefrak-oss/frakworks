@@ -321,7 +321,7 @@ class FeatureProcessTest {
         runAllJobs()
         val redesign = sandbox.started.filter { it.mode == "design" }.last()
         val answer = brief(redesign)!!.answers.single()
-        assertTrue("**Which model?**" in answer.question && answer.answer == "fable low" && answer.by == "lundmatt1", "the second design run is told the answer: $answer")
+        assertTrue("### 1. Which model?" in answer.question && answer.answer == "fable low" && answer.by == "lundmatt1", "the second design run is told the answer: $answer")
 
         // Merged, then the accept Smith's check and the close: nothing after the merge waits on the user.
         assertTrue(history.finished(feature.id))
