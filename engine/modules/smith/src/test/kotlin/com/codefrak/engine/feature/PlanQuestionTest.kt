@@ -39,7 +39,12 @@ class PlanQuestionTest {
     @Test
     fun `one important question with options is a choice block, its options the buttons`() {
         val asked = design("[${question("Which pane layout?", abc)}]").userQuestion()!!
-        assertTrue("**Which pane layout?** (confidence 0.4, impact high). Without an answer it would assume: b" in asked, asked)
+        assertTrue(
+            "### 1. Which pane layout?\n\n" +
+                "- **a**: Keep the pane\n- **b**: Drop the pane\n- **c**: Move it to the sidebar\n\n" +
+                "Without an answer it would assume: b\n\n_Confidence 0.4, impact high._\n\n" in asked,
+            asked,
+        )
         assertTrue(asked.endsWith(
             "\n\n```ask\nkind: choice\nquestion: Which pane layout?\noptions:\n" +
                 "  - id: a\n    label: Keep the pane\n" +
@@ -64,8 +69,15 @@ class PlanQuestionTest {
         val asked = DesignResult.parse("""{"outcome":"planned","plan":{"summary":"  The pane.\n\n$svg  ","acceptance":["a"]},"questions":[${question("Which?")}]}""".toByteArray()).userQuestion()!!
         val drawn = "The plan:\n\nThe pane.\n\n<svg viewBox=\"0 0 10 10\"><rect width=\"10\" height=\"10\"/></svg>"
         assertTrue(drawn in asked, asked)
-        assertTrue(asked.indexOf("confirm mode") < asked.indexOf(drawn) && asked.indexOf(drawn) < asked.indexOf("1. **Which?**"), asked)
+        assertTrue(asked.indexOf("confirm mode") < asked.indexOf(drawn) && asked.indexOf(drawn) < asked.indexOf("### 1. Which?"), asked)
         assertEquals(1, Regex("```ask").findAll(asked).count(), asked)
+    }
+
+    @Test
+    fun `several questions are each their own heading, never one bolded line`() {
+        val two = design("[${question("Which?", abc)},${question("Why?")}]").userQuestion()!!
+        assertTrue("\n\n### 1. Which?\n\n- **a**: Keep the pane\n" in two && "\n\n### 2. Why?\n\n" in two, two)
+        assertTrue("**Which?**" !in two && "\n\n\n" !in two, two)
     }
 
     @Test

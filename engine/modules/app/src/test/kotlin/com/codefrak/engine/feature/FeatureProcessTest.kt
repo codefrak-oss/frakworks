@@ -306,7 +306,7 @@ class FeatureProcessTest {
         assertTrue(!history.finished(feature.id))
         assertEquals(listOf("user-task-answer-question"), runtime.getActiveActivityIds(feature.id))
         val pending = assertNotNull(questions.pending(feature.id))
-        assertTrue("**Which model?** (confidence 0.4, impact high)" in pending.question && "assume: fable low" in pending.question, pending.question)
+        assertTrue("### 1. Which model?" in pending.question && "_Confidence 0.4, impact high._" in pending.question && "assume: fable low" in pending.question, pending.question)
         assertTrue("```ask\nkind: text\nquestion: Which model?\n```" in pending.question, pending.question)
         assertTrue(github.commentsOn(33).last().let { "The design Smith has a question (1)" in it && "Decide it on " in it })
         // The plan is kept for the design deck, and the comment points at it (#100114).
@@ -321,7 +321,7 @@ class FeatureProcessTest {
         runAllJobs()
         val redesign = sandbox.started.filter { it.mode == "design" }.last()
         val answer = brief(redesign)!!.answers.single()
-        assertTrue("**Which model?**" in answer.question && answer.answer == "fable low" && answer.by == "lundmatt1", "the second design run is told the answer: $answer")
+        assertTrue("### 1. Which model?" in answer.question && answer.answer == "fable low" && answer.by == "lundmatt1", "the second design run is told the answer: $answer")
 
         // Merged, then the accept Smith's check and the close: nothing after the merge waits on the user.
         assertTrue(history.finished(feature.id))
