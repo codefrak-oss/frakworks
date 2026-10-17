@@ -6,6 +6,7 @@ import com.codefrak.engine.smith.smithJob
 import org.junit.jupiter.api.Test
 import java.time.Duration
 import java.time.OffsetDateTime
+import io.fabric8.kubernetes.api.model.Quantity
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
@@ -51,7 +52,7 @@ class FirstMatePodSpecTest {
         assertEquals(listOf("fm-relay", "--"), mate.command.take(2))
         assertEquals(listOf("claude", "-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose",
             "--model", "claude-opus-5-5", "--effort", "high",
-            "--allowedTools", "mcp__frakworks__submit_ask,Read", "--disallowedTools", "Bash",
+            "--allowedTools", "mcp__frakworks__submit_ask,Read,mcp__checkout__checkout_repo", "--disallowedTools", "Bash",
             "--strict-mcp-config", "--mcp-config", "/etc/firstmate/mcp.json",
             "--append-system-prompt", "You are the first mate."), mate.command.drop(2))
         assertFalse(mate.stdin, "the engine never attaches")
@@ -112,7 +113,7 @@ class FirstMatePodSpecTest {
     }
 
     @Test
-    fun `an init container alone gets the repo's git token from the Secret and clones, and the main container never sees it`() {
+    fun `a native sidecar alone gets the repo's git token from the Secret and clones in the background, and the main container never sees it`() {
         val mate = pod.spec.containers.single()
         assertEquals("acme/tickets", mate.env.single { it.name == "FM_REPO" }.value)
         assertEquals(FIRST_MATE_CLONE, mate.env.single { it.name == "FM_CLONE" }.value)
@@ -122,7 +123,10 @@ class FirstMatePodSpecTest {
         assertNull(spec.containers.single().env.singleOrNull { it.name == "FM_GIT_TOKEN" }, "the main container never has the token")
         assertTrue(spec.containers.single().volumeMounts.any { it.mountPath == FIRST_MATE_CLONE })
         val withToken = spec.initContainers.single()
-        assertEquals(listOf("fm-relay", "--clone", FIRST_MATE_CLONE), withToken.command)
+        assertEquals(listOf("fm-relay", "--clone-sidecar", FIRST_MATE_CLONE), withToken.command)
+        assertEquals("Always", withToken.restartPolicy, "a native sidecar: claude does not wait for it")
+        val big = firstMatePod(name, session, "img", firstMateCommand(argv), name, null, 4L shl 30, 2.0).spec.initContainers.single().resources
+        assertEquals(Quantity(CLONE_MEMORY_REQUEST.toString()) to Quantity((4L shl 30).toString()), big.requests["memory"] to big.limits["memory"])
         assertEquals("acme/tickets", withToken.env.single { it.name == "FM_REPO" }.value)
         val ref = withToken.env.single { it.name == "FM_GIT_TOKEN" }.valueFrom.secretKeyRef
         assertEquals(name to FIRST_MATE_GIT_TOKEN_KEY, ref.name to ref.key)

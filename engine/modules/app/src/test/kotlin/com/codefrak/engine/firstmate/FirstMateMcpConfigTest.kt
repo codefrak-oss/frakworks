@@ -22,7 +22,7 @@ class FirstMateMcpConfigTest {
     fun `the engine's two servers carry the token, and http and sse rows are kept as they are`() {
         val c = FirstMateMcpConfig.build("http://engine.frakworks:8090/", "frk_abc",
             listOf(http("linear", "https://mcp.linear.app/mcp"), http("events", "https://events.example.com/sse", McpServerKind.SSE))) { false }
-        assertEquals(listOf("frakworks", "frakworks-engine-diagnostics", "linear", "events"), c.servers.keys.toList())
+        assertEquals(listOf("frakworks", "frakworks-engine-diagnostics", "checkout", "linear", "events"), c.servers.keys.toList())
         for (n in FirstMateMcpConfig.ENGINE_SERVERS) {
             assertEquals("http://engine.frakworks:8090/mcp/$n", c.servers[n]!!["url"])
             assertEquals(mapOf("Authorization" to "Bearer frk_abc"), c.servers[n]!!["headers"])
@@ -73,7 +73,7 @@ class FirstMateMcpConfigTest {
             http("shared", "https://shared.example.com/mcp").copy(audience = McpAudience.BOTH),
             http("cluster", "http://ops.ops.svc.cluster.local:8737/mcp").copy(audience = McpAudience.SMITH)))
         val c = FirstMateMcpConfig(store).forSession("http://e", "t", "acme/widgets")
-        assertEquals(FirstMateMcpConfig.ENGINE_SERVERS + listOf("laptop", "shared"), c.servers.keys.toList())
+        assertEquals(FirstMateMcpConfig.ENGINE_SERVERS + listOf(FirstMateMcpConfig.CHECKOUT_SERVER, "laptop", "shared"), c.servers.keys.toList())
         assertFalse("cluster" in c.servers)
         assertEquals(emptyList(), c.dropped)
     }

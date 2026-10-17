@@ -330,7 +330,65 @@ class RelayTest(unittest.TestCase):
         argv = json.loads(self.engine.out[1])["argv"]
         self.assertEqual("--append-system-prompt", argv[1])
         self.assertIn("owner/missing could not be cloned", argv[2])
+        self.assertIn("retry", argv[2])
         self.assertEqual("running", self.engine.statuses[0]["state"])
+
+    def test_claude_starts_before_the_clone_and_gets_the_code_and_a_ready_note_once_it_is_done(self):
+        cwd = os.path.join(self.tmp, "work")
+        os.makedirs(cwd)
+        base = os.path.join(self.tmp, "clone")
+        os.makedirs(base)
+        self.relay(cwd=cwd, FM_REPO="owner/repo", FM_CLONE=base)
+        self.engine.wait_for(lambda: len(self.engine.out) >= 1)
+        argv = json.loads(self.engine.out[1])["argv"]
+        self.assertIn("being cloned", argv[2])
+        self.assertFalse(os.path.exists(os.path.join(cwd, "README.md")))
+        sidecar = subprocess.Popen([sys.executable, "-I", RELAY_PY, "--clone-sidecar", base],
+                                   env=dict(os.environ, FM_REPO="owner/repo", FM_GIT_URL=self.origin(), FM_GIT_TOKEN="github_pat_secret"),
+                                   stderr=subprocess.DEVNULL)
+        self.procs.append(sidecar)
+        self.engine.wait_for(lambda: any("now checked out" in l for l in self.engine.out.values()))
+        with open(os.path.join(cwd, "README.md")) as f:
+            self.assertEqual("the code\n", f.read())
+        with open(os.path.join(cwd, ".git", "config")) as f:
+            self.assertNotIn("github_pat_secret", f.read())
+
+    def test_a_failed_clone_is_noted_and_checkout_repo_retries_it(self):
+        cwd = os.path.join(self.tmp, "work")
+        os.makedirs(cwd)
+        base = os.path.join(self.tmp, "clone")
+        os.makedirs(base)
+        origin = self.origin()
+        sidecar = subprocess.Popen([sys.executable, "-I", RELAY_PY, "--clone-sidecar", base],
+                                   env=dict(os.environ, FM_REPO="owner/later", FM_GIT_URL=origin), stderr=subprocess.DEVNULL)
+        self.procs.append(sidecar)
+        mcp = subprocess.Popen([sys.executable, "-I", RELAY_PY, "--mcp-checkout"], cwd=cwd, env=dict(os.environ, FM_CLONE=base),
+                               stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+        self.procs.append(mcp)
+
+        def call(i, method, params):
+            mcp.stdin.write(json.dumps({"jsonrpc": "2.0", "id": i, "method": method, "params": params}) + "\n")
+            mcp.stdin.flush()
+            return json.loads(mcp.stdout.readline())["result"]
+
+        call(1, "initialize", {"protocolVersion": "2025-06-18"})
+        self.assertEqual(["checkout_repo"], [t["name"] for t in call(2, "tools/list", {})["tools"]])
+        text = lambda r: r["content"][0]["text"]
+        self.assertTrue(text(call(3, "tools/call", {"name": "checkout_repo", "arguments": {"wait": 30}})).startswith("failed"))
+        self.relay(cwd=cwd, FM_REPO="owner/later", FM_CLONE=base)
+        self.engine.wait_for(lambda: len(self.engine.out) >= 1)
+        self.assertIn("could not be cloned", json.loads(self.engine.out[1])["argv"][2])
+        os.rename(os.path.join(self.tmp, "origin", "owner", "repo"), os.path.join(self.tmp, "origin", "owner", "later"))
+        self.assertTrue(text(call(4, "tools/call", {"name": "checkout_repo", "arguments": {"retry": True, "wait": 30}})).startswith("ready"))
+        with open(os.path.join(cwd, "README.md")) as f:
+            self.assertEqual("the code\n", f.read())
+
+    def test_a_resumed_checkout_is_kept_and_no_note_is_added(self):
+        cwd = os.path.join(self.tmp, "work")
+        os.makedirs(os.path.join(cwd, ".git"))
+        self.relay(cwd=cwd, FM_REPO="owner/repo", FM_CLONE=os.path.join(self.tmp, "clone"))
+        self.engine.wait_for(lambda: len(self.engine.out) >= 1)
+        self.assertEqual(["-p"], json.loads(self.engine.out[1])["argv"])
 
     def test_a_resumed_snapshot_without_a_checkout_keeps_its_files_and_gets_the_repo_cloned(self):
         buf = io.BytesIO()
