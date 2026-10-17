@@ -76,6 +76,35 @@ A 2 changes one thing in one place; a 3 carries a change through a few files
 in one area. When an ask could be either, find the second place it must
 touch: none is a 2.
 
+## Calibration in target repos
+
+The reference tickets above are frakworks work. In another target repo, point
+against references from that repo, in this order:
+
+1. **The repo's own tickets**, once it has about 10 closed, pointed tickets:
+   compare the ask with them as with the table above.
+2. **Its seed file**, `docs/research/story-point-calibration-<owner>-<name>.md`
+   in frakworks, when there is one: per-value reference changes from the
+   repo's own history.
+3. **Pointing by shape** otherwise (a new repo's first tickets): read the code
+   the ask touches in that repo, count the places it must change and what is
+   still unknown, and match that shape with the table's "The work" column.
+   The frakworks tickets are wording examples only; never point by how the
+   ask's words resemble theirs.
+
+**The seed.** A repo's seed file is requested as an ordinary ask filed in
+frakworks ("seed story-point calibration for `<owner>/<name>`"), when the repo
+is added or later on request. The Smith working it reads the target repo's git
+history and merged PRs (completed work from before frakworks), retro-points
+them with this rubric, and writes two or three changes per value (1, 2, 3, 5,
+8, 13) to the seed file, as a table like the one above: points, the commit or
+PR, the work in one line. The target repo is not touched. A repo with no
+history gets no seed; its refiner points by shape (3.) until it has tickets.
+
+Calibration feeds future refines only: points already recorded on tickets
+never change. The four approaches weighed and the choice:
+[`docs/proposals/story-point-calibration.md`](../docs/proposals/story-point-calibration.md).
+
 ## The user's value binds
 
 A `Points: <n>` line in the ask (or an answer) binds, as a `Tier:` line does:
