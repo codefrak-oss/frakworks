@@ -34,7 +34,7 @@ class SmithRunProcessTest {
     @Autowired lateinit var management: ManagementService
     @Autowired lateinit var history: HistoryService
     @Autowired lateinit var sandbox: FakeSandbox
-    @Autowired lateinit var exits: SmithExitNotifier
+    @Autowired lateinit var exits: SandboxExitNotifier
     @Autowired lateinit var accounts: com.codefrak.engine.accounts.AiAccounts
     @Autowired lateinit var usages: com.codefrak.engine.accounts.AccountUsages
     @Autowired lateinit var intakes: com.codefrak.engine.intake.IntakeController

@@ -7,5 +7,5 @@ plugins {
 }
 
 dependencies {
-    api(project(":engine-smith"))
+    api(project(":engine-smith-api"))
 }

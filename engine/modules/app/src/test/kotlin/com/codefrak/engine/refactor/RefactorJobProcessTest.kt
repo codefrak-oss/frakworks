@@ -21,7 +21,7 @@ import com.codefrak.engine.repos.TargetRepos
 import com.codefrak.engine.runAllJobs
 import com.codefrak.engine.smith.BRIEF_FILE
 import com.codefrak.engine.smith.Brief
-import com.codefrak.engine.smith.SmithExitNotifier
+import com.codefrak.engine.smith.SandboxExitNotifier
 import com.codefrak.engine.smith.ensureTestAccount
 import com.codefrak.engine.workitems.FakeTickets
 import com.codefrak.engine.workitems.NewWorkItem
@@ -82,7 +82,7 @@ class RefactorJobProcessTest {
     @Autowired lateinit var runtime: RuntimeService
     @Autowired lateinit var history: HistoryService
     @Autowired lateinit var management: ManagementService
-    @Autowired lateinit var exits: SmithExitNotifier
+    @Autowired lateinit var exits: SandboxExitNotifier
     @Autowired lateinit var sandbox: ScriptedSandbox
     @Autowired lateinit var github: TicketRecorder
     @Autowired lateinit var tickets: FakeTickets

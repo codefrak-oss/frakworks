@@ -15,6 +15,4 @@ dependencies {
     api(project(":engine-flow-doctor"))
     api(project(":engine-flow-friction"))
     api(project(":engine-flow-proposal"))
-    // EngineMetricsTest: FakeSandbox, SmithSpec, SmithTelemetry.
-    testImplementation(testFixtures(project(":engine-smith")))
 }

@@ -72,7 +72,7 @@ class TicketTimelineProjectionTest {
     @Autowired lateinit var engine: FrakworksEngine
     @Autowired lateinit var runtime: RuntimeService
     @Autowired lateinit var management: ManagementService
-    @Autowired lateinit var exits: com.codefrak.engine.smith.SmithExitNotifier
+    @Autowired lateinit var exits: com.codefrak.engine.smith.SandboxExitNotifier
     @Autowired lateinit var starter: FlowStarter
     @Autowired lateinit var sandbox: ScriptedSandbox
     @Autowired lateinit var accounts: AiAccounts
