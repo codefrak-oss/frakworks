@@ -21,11 +21,6 @@ class WorkResultReader(
     private val workListeners: List<WorkResultListener>, private val splitRules: SplitDraftRules?,
     private val git: GitPush?, private val pulls: GitHubPulls?,
 ) {
-    companion object {
-        /** The start of the refusal past [Vars.CI_NOT_MINE_MAX] declining rounds: `IncidentRetrier`'s `rerunCi` retry matches it. */
-        const val CI_NOT_MINE_CAP = "declined the engine check's failure as not this change's"
-    }
-
     private val log = LoggerFactory.getLogger(WorkResultReader::class.java)
 
     /** What the ticket's `smith/issue-<n>` branch has over the default branch on the remote, or null (none, or no git). */

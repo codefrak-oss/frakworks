@@ -18,3 +18,11 @@ fun DelegateExecution.tier(): Int? = (getVariable(Vars.TIER) as? Number)?.toInt(
 fun RuntimeService.repoOf(instanceId: String): String? = getVariable(instanceId, Vars.REPO) as? String
 /** [instanceId]'s flow's issue, if it has one. */
 fun RuntimeService.issueOf(instanceId: String): Long? = (getVariable(instanceId, Vars.ISSUE) as? Number)?.toLong()
+
+/** The root flow a `smith-run` is called by (the ticket's flow), for the `session` frame's `instance`; the run itself when it is the root. */
+fun rootOf(execution: DelegateExecution): String =
+    (execution as? org.operaton.bpm.engine.impl.persistence.entity.ExecutionEntity)?.rootProcessInstanceId ?: execution.processInstanceId
+
+/** The process instance that called this one (a run's `reusable-smith-run` wrapper); null for a root, or outside the engine's execution. */
+fun wrapperOf(execution: DelegateExecution): String? =
+    (execution as? org.operaton.bpm.engine.impl.persistence.entity.ExecutionEntity)?.processInstance?.superExecution?.processInstanceId

@@ -11,18 +11,10 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 
-/** One row of `engine.smith_session`: a run whose stdout the engine stores. */
-data class SmithSession(
-    val runId: String, val repo: String, val issue: Long?, val mode: String, val model: String,
-    val startedAt: OffsetDateTime, val endedAt: OffsetDateTime?,
-)
-
 /**
- * A live Smith's session in the engine's own database (engine/README.md,
- * "Summarize: a live run summarized"): `engine.smith_session` and
- * `engine.smith_session_line`. [SmithTelemetry]'s follow of the sandbox's
- * stdout hands every line to [offer] while the run goes on, so the table has
- * the session as it happens, not only after `collect result`.
+ * [SmithSessions] in the engine's own database: `engine.smith_session` and `engine.smith_session_line`.
+ * [SmithTelemetry]'s follow of the sandbox's stdout hands every line to [offer] while the run goes on, so the table
+ * has the session as it happens, not only after `collect result`.
  *
  * Like the VictoriaLogs shipper, nothing here may touch a run: [offer] only
  * queues, a virtual thread of the run's own writes in batches, outside any
@@ -30,39 +22,39 @@ data class SmithSession(
  * lines with one WARN per streak.
  */
 @Component
-class SmithSessions(private val template: JdbcTemplate) {
-    private val log = LoggerFactory.getLogger(SmithSessions::class.java)
+class StoredSmithSessions(private val template: JdbcTemplate) : SmithSessions {
+    private val log = LoggerFactory.getLogger(StoredSmithSessions::class.java)
     private val jdbc = JdbcClient.create(template)
     private val writers = ConcurrentHashMap<String, Writer>()
     /** Each live run's [LiveTally], from the lines [offer] receives; dropped by [forget] at `collect result`. */
     private val tallies = ConcurrentHashMap<String, LiveTally>()
 
     /** A run is live: record it and start its writer. A run resumed after a restart keeps its row and numbers on. */
-    fun open(labels: RunLabels) {
+    override fun open(labels: RunLabels) {
         tallies.putIfAbsent(labels.runId, LiveTally())
         val writer = Writer(labels)
         writer.start(writers.put(labels.runId, writer))
     }
 
     /** One stdout line of a live run, in the order read, uncut for its tally. Never blocks or throws; a run not [open] drops it. */
-    fun offer(runId: String, line: String) {
+    override fun offer(runId: String, line: String) {
         val writer = writers[runId] ?: return
         runCatching { tallies[runId]?.feed(line) }
         writer.offer(line)
     }
 
     /** The run is over: its writer stores what it holds, then sets `ended_at`. Returns at once; idempotent. Its tally stays until [forget]. */
-    fun close(runId: String) { writers[runId]?.finish() }
+    override fun close(runId: String) { writers[runId]?.finish() }
 
     /** This instance stops following the run (the lease moved): its writer stores what it holds and leaves `ended_at` unset, and its tally goes. */
-    fun detach(runId: String) { writers[runId]?.finish(end = false); tallies.remove(runId) }
+    override fun detach(runId: String) { writers[runId]?.finish(end = false); tallies.remove(runId) }
 
     /**
      * A running run's turns and tokens so far ([LiveTally]); null for a run with no session. A tally
      * not in memory (the engine restarted) is rebuilt once from the stored lines, where a line stored
      * cut no longer counts; on a replica that does not follow the run, from the stored lines on each call.
      */
-    fun live(runId: String): LiveFigures? {
+    override fun live(runId: String): LiveFigures? {
         val tally = tallies[runId] ?: when {
             session(runId) == null -> return null
             // Followed on another replica (the lease holder): read from what it stored, every time, never cached here.
@@ -74,9 +66,9 @@ class SmithSessions(private val template: JdbcTemplate) {
     }
 
     /** `collect result` set the run's own cost and turns: its tally is no longer read. */
-    fun forget(runId: String) { tallies.remove(runId) }
+    override fun forget(runId: String) { tallies.remove(runId) }
 
-    fun session(runId: String): SmithSession? =
+    override fun session(runId: String): SmithSession? =
         jdbc.sql("SELECT run_id, repo, issue, mode, model, started_at, ended_at FROM engine.smith_session WHERE run_id = :r")
             .param("r", runId).query { rs, _ ->
                 SmithSession(rs.getString(1), rs.getString(2), rs.getObject(3, Long::class.javaObjectType), rs.getString(4), rs.getString(5),
@@ -88,7 +80,7 @@ class SmithSessions(private val template: JdbcTemplate) {
      * replica answers the same, not only the one that follows the run (#1716). With `mode`, only a run of that mode
      * (`review` for the review prediction, #1746).
      */
-    fun running(repo: String, issue: Long, mode: String? = null): SmithSession? =
+    override fun running(repo: String, issue: Long, mode: String?): SmithSession? =
         jdbc.sql("""SELECT run_id, repo, issue, mode, model, started_at, ended_at FROM engine.smith_session
             WHERE lower(repo) = lower(:repo) AND issue = :i AND ended_at IS NULL${if (mode == null) "" else " AND mode = :m"}
             ORDER BY started_at DESC LIMIT 1""")
@@ -98,15 +90,15 @@ class SmithSessions(private val template: JdbcTemplate) {
             }.optional().orElse(null)
 
     /** Every stored line of the run, oldest first. */
-    fun lines(runId: String): List<String> =
+    override fun lines(runId: String): List<String> =
         jdbc.sql("SELECT line FROM engine.smith_session_line WHERE run_id = :r ORDER BY seq")
             .param("r", runId).query(String::class.java).list().filterNotNull()
 
     /** [SessionDigest.digest] of what is stored for `runId`. */
-    fun digest(runId: String, maxChars: Int = SessionDigest.DIGEST_CHARS): String = SessionDigest.digest(lines(runId), maxChars)
+    override fun digest(runId: String, maxChars: Int): String = SessionDigest.digest(lines(runId), maxChars)
 
     /** The last [turns] steps of [SessionDigest.digest]'s, whole, for what a run is doing now (the summarize endpoint's "most recent turns"). */
-    fun recent(runId: String, turns: Int = SessionDigest.RECENT_TURNS): String = SessionDigest.recent(lines(runId), turns)
+    override fun recent(runId: String, turns: Int): String = SessionDigest.recent(lines(runId), turns)
 
     /**
      * One run's writer, on a virtual thread of its own: `open` inserts the session row (or reopens

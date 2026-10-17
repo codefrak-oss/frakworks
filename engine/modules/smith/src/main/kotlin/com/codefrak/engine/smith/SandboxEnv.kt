@@ -3,14 +3,6 @@ package com.codefrak.engine.smith
 import com.codefrak.engine.accounts.AiAccounts
 import com.codefrak.engine.accounts.credentialEnv
 
-/** The container label carrying the run id (`SmithSpec.runId`): what a `die` event is correlated by. */
-const val RUN_LABEL = "frakworks.smith.run"
-/** The labels carrying the run's ticket: what [callerAt] reports as a caller's issue and repo. */
-const val ISSUE_LABEL = "frakworks.smith.issue"
-const val REPO_LABEL = "frakworks.smith.repo"
-/** The label carrying a mode `job` run's job id, on a sandbox with no [ISSUE_LABEL]. */
-const val JOB_LABEL = "frakworks.smith.job"
-
 /** A sandbox's labels: the run and repo always, the issue when the run has one, the job id when it is a job run. */
 fun sandboxLabels(spec: SmithSpec): Map<String, String> = buildMap {
     put(RUN_LABEL, spec.runId); put(REPO_LABEL, spec.repo)

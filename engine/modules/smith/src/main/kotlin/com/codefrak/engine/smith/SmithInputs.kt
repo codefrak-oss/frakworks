@@ -3,14 +3,6 @@ package com.codefrak.engine.smith
 import com.codefrak.engine.tier.TierRow
 import org.operaton.bpm.engine.delegate.DelegateExecution
 
-/** The root flow a `smith-run` is called by (the ticket's flow), for the `session` frame's `instance`; the run itself when it is the root. */
-internal fun rootOf(execution: DelegateExecution): String =
-    (execution as? org.operaton.bpm.engine.impl.persistence.entity.ExecutionEntity)?.rootProcessInstanceId ?: execution.processInstanceId
-
-/** The process instance that called this one (a run's `reusable-smith-run` wrapper); null for a root, or outside the engine's execution. */
-internal fun wrapperOf(execution: DelegateExecution): String? =
-    (execution as? org.operaton.bpm.engine.impl.persistence.entity.ExecutionEntity)?.processInstance?.superExecution?.processInstanceId
-
 /**
  * What a run gets in /work/in: the brief (for a refine, the ask's snapshot and the tier map), and for a security
  * review the round's bundle, which `open/update pr` has already pushed (the engine check runs first:

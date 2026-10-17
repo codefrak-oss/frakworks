@@ -51,6 +51,14 @@ data class SmithCaller(val runId: String, val issue: Long?, val repo: String?, v
     companion object
 }
 
+/** The container label (a pod's annotation) carrying the run id (`SmithSpec.runId`): what a `die` event is correlated by. */
+const val RUN_LABEL = "frakworks.smith.run"
+/** The labels carrying the run's ticket: what a caller's issue and repo are read from. */
+const val ISSUE_LABEL = "frakworks.smith.issue"
+const val REPO_LABEL = "frakworks.smith.repo"
+/** The label carrying a mode `job` run's job id, on a sandbox with no [ISSUE_LABEL]. */
+const val JOB_LABEL = "frakworks.smith.job"
+
 /** A [SmithCaller] from [labels] (container labels or pod annotations), or null without [RUN_LABEL]. */
 fun SmithCaller.Companion.of(labels: Map<String, String>): SmithCaller? {
     val runId = labels[RUN_LABEL] ?: return null

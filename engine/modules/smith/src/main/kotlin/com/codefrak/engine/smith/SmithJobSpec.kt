@@ -13,9 +13,6 @@ import io.fabric8.kubernetes.api.model.batch.v1.Job
 import io.fabric8.kubernetes.api.model.batch.v1.JobBuilder
 import java.time.Duration
 
-/** The Smith image's user, as [tarOf] owns the inputs. */
-const val SMITH_UID = 65533L
-
 /**
  * A run's Job name: `smith-<issue>-<run8>` as Docker names its container, so the sweep's [runIdPrefix] holds,
  * or `smith-job-<jobId>-<run8>` with the job id cut to a DNS label's characters and the whole to 52 (its pods
@@ -37,9 +34,6 @@ fun envSecret(job: String, env: List<String>, spec: SmithSpec): Secret =
         .withType("Opaque")
         .withStringData<String, String>(env.associate { it.substringBefore('=') to it.substringAfter('=') })
         .build()
-
-/** The PriorityClass of every Smith pod (deploy/k8s/base/smith.yaml): the lowest, so Smiths are evicted before the engine and Postgres. */
-const val SMITH_PRIORITY_CLASS = "frakworks-smith"
 
 /**
  * The Job for a Smith run: one pod, never retried (`backoffLimit 0`, restart `Never`), killed past
