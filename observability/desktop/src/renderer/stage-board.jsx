@@ -10,7 +10,7 @@
 // so the pane's width decides, not the window's. A card whose ticket has a
 // Smith running (isSmithRunning, from the row's own fields: no request per
 // card) carries a stripe sweeping along its bottom edge.
-import { STAGE_SEGMENTS, HOLDS, stateOf, childrenSummary, TicketAge } from "./issues.jsx";
+import { STAGE_SEGMENTS, HOLDS, stateOf, childrenSummary, TicketAge, ProgressBar, progressOf } from "./issues.jsx";
 
 export const STAGE_COLUMNS = [
   { id: "intake", label: "Intake" },
@@ -65,6 +65,12 @@ const holdOf = (row) => {
   return null;
 };
 
+/** A running row's bar has something to show: merged parts, or the open stage's estimate. */
+const hasEstimate = (row, now) => {
+  const p = progressOf(row, now || undefined);
+  return !!(p && (p.estimateMs != null || (row.children || []).some((c) => c.state !== "dropped")));
+};
+
 const Card = ({ row, onOpenTicket, showRepo, now }) => {
   const state = stateOf(row);
   const running = isSmithRunning(row);
@@ -90,7 +96,9 @@ const Card = ({ row, onOpenTicket, showRepo, now }) => {
       </div>
       {childrenSummary(row) && <div className="sbParts muted">{childrenSummary(row)}</div>}
       <div className="sbState muted">{state.text}</div>
-      {running && <span className="sbSweep" aria-hidden="true" />}
+      {running && (hasEstimate(row, now)
+        ? <ProgressBar issue={row} now={now} className="sbProgress" />
+        : <span className="sbSweep" aria-hidden="true" />)}
     </a>
   );
 };
