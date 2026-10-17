@@ -203,6 +203,45 @@ const TicketFrame = ({ doc, full }) => (
  * can resize (drag its bottom edge), and a control that opens it over the
  * whole window, closed with its button or Escape.
  */
+/**
+ * Escape closes a full-window page. Keydown in the sandboxed frame never
+ * reaches this window, so when the frame takes focus (a click in the deck
+ * blurs the window) focus comes back to the overlay's Close button, where
+ * Escape is heard again. Answers the unbind.
+ */
+export const bindPitchEscape = (win, close) => {
+  const onKey = (e) => { if (e.key === "Escape") close(); };
+  const onBlur = () => win.setTimeout(() => {
+    const doc = win.document;
+    const a = doc && doc.activeElement;
+    if (!(a && a.tagName === "IFRAME" && a.closest && a.closest(".pitchOverlay"))) return;
+    const btn = doc.querySelector(".pitchOverlay .pitchClose");
+    if (btn && btn.focus) btn.focus();
+  }, 0);
+  win.addEventListener("keydown", onKey);
+  win.addEventListener("blur", onBlur);
+  return () => { win.removeEventListener("keydown", onKey); win.removeEventListener("blur", onBlur); };
+};
+
+export const usePitchEscape = (full, close) => useEffect(() => {
+  if (!full || typeof window === "undefined") return undefined;
+  const unbind = bindPitchEscape(window, close);
+  const btn = window.document && window.document.querySelector(".pitchOverlay .pitchClose");
+  if (btn && btn.focus) btn.focus();
+  return unbind;
+}, [full]);
+
+/** The full-window page alone, over the whole window, closed with its button or Escape. */
+export const PitchOverlay = ({ doc, title, onClose }) => (
+  <div className="pitchOverlay" role="dialog" aria-label="Pitch">
+    <div className="pitchOverlayBar">
+      <span>{title}</span>
+      <button className="pitchClose" title="Close (Esc)" onClick={() => onClose && onClose()}>Close ✕</button>
+    </div>
+    <TicketFrame doc={doc} full />
+  </div>
+);
+
 export const TicketPitchView = ({ html, round = null, full, onOpen, onClose, open = true, onFlip, heading = null }) => {
   if (!html) return null;
   const doc = darkPitch(html);
@@ -215,15 +254,7 @@ export const TicketPitchView = ({ html, round = null, full, onOpen, onClose, ope
                 onClick={(e) => { e.stopPropagation(); if (onOpen) onOpen(); }}>Full window ⤢</button>
       </h2>
       {open && <div className="pitchBox"><TicketFrame doc={doc} /></div>}
-      {full && (
-        <div className="pitchOverlay" role="dialog" aria-label="Pitch">
-          <div className="pitchOverlayBar">
-            <span>{heading || pitchHeading(round)}</span>
-            <button className="pitchClose" title="Close (Esc)" onClick={() => onClose && onClose()}>Close ✕</button>
-          </div>
-          <TicketFrame doc={doc} full />
-        </div>
-      )}
+      {full && <PitchOverlay doc={doc} title={heading || pitchHeading(round)} onClose={onClose} />}
     </>
   );
 };
@@ -244,12 +275,7 @@ export const TicketPitch = ({ repo, issue, fleet = typeof window !== "undefined"
     loadPitch({ repo, number: Number(issue), fleet }).then((r) => { if (live) { setHtml(pitchHtmlOf(r)); setRound(pitchRoundOf(r)); } });
     return () => { live = false; };
   }, [repo, issue]);
-  useEffect(() => {
-    if (!full) return undefined;
-    const onKey = (e) => { if (e.key === "Escape") setFull(false); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [full]);
+  usePitchEscape(full, () => setFull(false));
   return <TicketPitchView html={html} round={round} full={full} onOpen={() => setFull(true)} onClose={() => setFull(false)}
                           open={open} onFlip={() => setOpen((o) => !o)} />;
 };
