@@ -10,8 +10,9 @@ const fs = require("node:fs");
 const path = require("node:path");
 const React = require("react");
 const { renderToStaticMarkup } = require("react-dom/server");
+const { NewIntakeForm } = require("../dist/issues.cjs");
 const { listWorkItems, readWorkItem, replyToWorkItem, importIssue, probeImport, sourceBadge, fenceEntries, viewItem } = require("../src/work-items");
-const { loadAllRepos, ImportButton, ImportDialog, WorkItemDetail, itemRows, closedRows, withExtra, Tickets } = require("../dist/work-items.cjs");
+const { loadAllRepos, importGate, ImportForm, WorkItemDetail, itemRows, closedRows, withExtra, Tickets } = require("../dist/work-items.cjs");
 
 const items = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "fixture-work-items.json"), "utf8"));
 const env = { ENGINE_URL: "http://engine.test" };
@@ -81,15 +82,19 @@ test("import: 404 is unavailable, 403 an error with the engine's text", async ()
   assert.match(no.error, /403.*not a trusted login/);
 });
 
-test("the Import button is disabled with a tooltip while the import API answers 404", async () => {
+const composer = (gate, mode = "ask") => renderToStaticMarkup(React.createElement(NewIntakeForm, { open: true, ask: "", tiers: [], target: "a/b", mode,
+  importGate: gate, importForm: () => React.createElement(ImportForm, { repo: "a/b", repos: ["a/b"] }) }));
+
+test("New intake's Import from GitHub option is disabled with a tooltip while the import API answers 404", async () => {
   const gone = await probeImport({ env, fetch: fake(404, "") });
   assert.equal(gone.available, false);
-  const html = renderToStaticMarkup(React.createElement(ImportButton, { importable: gone }));
-  assert.match(html, /disabled=""/);
-  assert.match(html, /title="this engine has no import API yet/);
+  const html = composer(importGate(gone));
+  assert.match(html, /<label title="this engine has no import API yet[^"]*"><input type="radio" disabled="" name="newIntakeMode" value="import"\/>/);
+  assert.match(html, /newIntakeText/, "the ask form stays");
+  assert.doesNotMatch(composer(importGate(gone), "import"), /issue number/, "a gated import never shows its form");
   const there = await probeImport({ env, fetch: fake(400, { message: "repo is required" }) });
   assert.equal(there.available, true);
-  assert.doesNotMatch(renderToStaticMarkup(React.createElement(ImportButton, { importable: there })), /disabled/);
+  assert.doesNotMatch(composer(importGate(there)), /disabled="" name="newIntakeMode" value="import"/);
   assert.equal((await probeImport({ env, fetch: fake(403, "") })).reason, "only a trusted login can import an issue");
 });
 
@@ -142,33 +147,27 @@ test("Tickets: an item with no ticket yet is listed (blocked, ready, an ask), do
   assert.equal(withExtra({ error: "x" }, closed).error, "x");
 });
 
-test("Tickets: the pane is named Tickets, with Show completed (off) and Import from GitHub on its toolbar, repos grouped", () => {
+test("Tickets: the pane is named Tickets, with Show completed (off) and New intake but no Import button on its toolbar, repos grouped", () => {
   const board = { issues: [{ repo: "a/b", number: 1, title: "Open one", url: "u1" }, { repo: "acme/ops", number: 3, title: "Ops", url: "u3" }], failures: [] };
   const html = renderToStaticMarkup(React.createElement(Tickets, { result: board, repos: ["a/b", "acme/ops"] }));
   assert.match(html, /<h1>Tickets · 2<\/h1>/);
   assert.match(html, /<input type="checkbox"\/>Show completed/);
-  assert.match(html, /Import from GitHub/);
+  assert.match(html, /New intake/);
+  assert.doesNotMatch(html, /Import from GitHub|wiImport|uoBackdrop/);
   assert.match(html, /<h2>a\/b<\/h2>/);
   assert.match(html, /<h2>acme\/ops<\/h2>/);
-  const dialog = renderToStaticMarkup(React.createElement(ImportDialog, { repo: null, repos: ["a/b", "c/d"] }));
-  assert.match(dialog, /<option value="c\/d">c\/d<\/option>/);
+  const form = renderToStaticMarkup(React.createElement(ImportForm, { repo: null, repos: ["a/b", "c/d"] }));
+  assert.match(form, /<option value="c\/d">c\/d<\/option>/);
 });
 
-test("Import from GitHub opens in the themed modal, closed until clicked", () => {
-  const html = renderToStaticMarkup(React.createElement(ImportDialog, { repo: "a/b", repos: ["a/b"] }));
-  assert.match(html, /class="uoBackdrop" role="dialog" aria-modal="true" aria-label="Import from GitHub"/);
-  assert.match(html, /class="uoPanel wiImportPanel"/);
+test("New intake in Import from GitHub mode shows the import form in place of the ask", () => {
+  const html = composer({ ok: true, why: "Import a GitHub issue as a work item" }, "import");
+  assert.match(html, /<input type="radio" name="newIntakeMode" checked="" value="import"\/>/);
   assert.match(html, /Import an issue of <b>a\/b<\/b>/);
   assert.match(html, /<input class="acInput" type="number" min="1" aria-label="issue number"/);
-  assert.match(html, /<button type="button" class="acBtn primary" disabled="">Import<\/button>/);
-  assert.match(html, /<button type="button" class="acBtn">Cancel<\/button>/);
-  const board = { issues: [], failures: [] };
-  assert.doesNotMatch(renderToStaticMarkup(React.createElement(Tickets, { result: board, repos: ["a/b"] })), /uoBackdrop/);
-});
-
-test("the Import button takes the toolbar's newIntakeBtn look, disabled with the reason as its title", () => {
-  const html = renderToStaticMarkup(React.createElement(ImportButton, { importable: { available: false, reason: "no import API" } }));
-  assert.match(html, /class="newIntakeBtn wiImport"/);
-  assert.match(html, /disabled=""/);
-  assert.match(html, /title="no import API"/);
+  assert.match(html, /<button type="button" class="askSend" disabled="">Import<\/button>/);
+  assert.match(html, /<button type="button" class="newIntakeCancel">Cancel<\/button>/);
+  assert.doesNotMatch(html, /newIntakeText/);
+  const plain = renderToStaticMarkup(React.createElement(NewIntakeForm, { open: true, ask: "", tiers: [], target: "a/b" }));
+  assert.doesNotMatch(plain, /newIntakeMode/, "no import mode without an import form");
 });

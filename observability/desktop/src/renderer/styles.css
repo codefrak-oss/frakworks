@@ -1340,8 +1340,7 @@ ul.ecProse { padding-left: 18px; }
   .fleet-root .erPanel .acBand.danger, .fleet-root .erPanel .acProblem { color: #cf222e; }
   .fleet-root .erPanel .acFormula { background: #f6f8fa; color: #24292e; }
   .fleet-root .erPanel .acInput { background: #ffffff; color: var(--surface); border-color: #d0d4da; }
-  .fleet-root .wiImportPanel .acInput { background: #ffffff; color: var(--surface); border-color: #d0d4da; }
-  .fleet-root .wiImportPanel .acBtn:not(.primary) { color: var(--surface); background: rgba(0,0,0,0.04); border-color: rgba(0,0,0,0.2); }
+  .fleet-root .wiImportForm .acInput { background: #ffffff; color: var(--surface); border-color: #d0d4da; }
   .fleet-root .erPanel .acBtn:not(.primary) { color: var(--surface); background: rgba(0,0,0,0.04); border-color: rgba(0,0,0,0.2); }
   .fleet-root .erPanel .acBtn.danger { color: #cf222e; border-color: rgba(207,34,46,0.45); }
   .uoNotes { color: #424a53; }
@@ -1404,10 +1403,8 @@ ul.ecProse { padding-left: 18px; }
 }
 .fleet-root.jobs .jbForm { margin-top: 16px; display: flex; flex-direction: column; gap: 6px; max-width: 720px; }
 .uoPanel.jbPanel { width: min(760px, 94vw); }
-/* Tickets > Import from GitHub's modal (work-items.jsx ImportDialog). */
-.uoPanel.wiImportPanel { width: min(460px, 92vw); }
-.wiImportPanel .wiImportForm { display: flex; flex-direction: column; gap: 8px; }
-.wiImportPanel .wiImportButtons { display: flex; gap: 8px; }
+/* New intake's Import from GitHub mode (work-items.jsx ImportForm). */
+.wiImportForm { display: flex; flex-direction: column; gap: 8px; }
 .fleet-root.jobs .jbPanel .jbForm { margin-top: 0; max-width: none; }
 .fleet-root.jobs .jbRegister { margin-top: 16px; }
 .fleet-root.jobs .jbRowFields { display: flex; flex-wrap: wrap; gap: 8px; }
