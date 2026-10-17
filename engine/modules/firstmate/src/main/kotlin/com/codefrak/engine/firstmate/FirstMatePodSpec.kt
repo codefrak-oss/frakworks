@@ -27,7 +27,8 @@ const val FIRST_MATE_SESSION_LABEL = "frakworks.codefrak.com/first-mate-session"
 const val FIRST_MATE_MCP_DIR = "/etc/firstmate"
 /**
  * Every session pod's working folder, the same in every pod a session gets, so the Claude session file a freeze saves
- * is where `claude --resume` looks for it in the next pod ([claudeSessionPath]). An emptyDir.
+ * is where `claude --resume` looks for it in the next pod ([claudeSessionPath]). An emptyDir, into which `fm-relay` copies
+ * the init container's clone of the session's repo ([FIRST_MATE_CLONE]) before claude starts.
  */
 const val FIRST_MATE_CWD = "/work/repo"
 /** Where `fm-relay` spools claude's stdout lines the engine has not yet accepted: an emptyDir, kept across a relay restart in the pod. */
@@ -36,6 +37,12 @@ const val FIRST_MATE_SPOOL = "/var/spool/fm-relay"
 const val FIRST_MATE_TOKEN_KEY = "fm-token"
 /** The Secret key, and the file in [FIRST_MATE_MCP_DIR], of the session's lineage (engine/README.md, "Lineage"); `FM_LINEAGE_FILE` names it. */
 const val FIRST_MATE_LINEAGE_KEY = "lineage.json"
+/** The Secret key of the repo's Smith token: `FM_GIT_TOKEN` of the [FIRST_MATE_CLONE_CONTAINER] alone, never the main container's. */
+const val FIRST_MATE_GIT_TOKEN_KEY = "git-token"
+/** The init container that clones the session's repo into [FIRST_MATE_CLONE] (`fm-relay --clone`), the only one with the git token. */
+const val FIRST_MATE_CLONE_CONTAINER = "clone"
+/** Where the init container's clone is (an emptyDir); the relay copies it into [FIRST_MATE_CWD] when that has no `.git`. */
+const val FIRST_MATE_CLONE = "/work/clone"
 
 /** Claude Code's projects folder name for [cwd]: every character but a letter or digit becomes `-` (`/work/repo` is `-work-repo`). */
 fun claudeProjectDir(cwd: String): String = cwd.replace(Regex("[^A-Za-z0-9]"), "-")
@@ -90,9 +97,11 @@ fun firstMateCommand(argv: List<String>): List<String> = listOf("fm-relay", "--"
 
 /**
  * The session's Secret: `mcp.json` (the `--mcp-config`, with the session's token in it), under [credentialEnv] the AI
- * account's token, and under [FIRST_MATE_TOKEN_KEY] the pod's own `first-mate-pod` [podToken]. None is ever in the pod's spec.
+ * account's token, under [FIRST_MATE_TOKEN_KEY] the pod's own `first-mate-pod` [podToken], and under
+ * [FIRST_MATE_GIT_TOKEN_KEY] the repo's [gitToken] when it has one. None is ever in the pod's spec.
  */
-fun firstMateSecret(name: String, session: FirstMateSession, mcp: FirstMateMcp, credentialEnv: String?, credential: String?, podToken: String): Secret =
+fun firstMateSecret(name: String, session: FirstMateSession, mcp: FirstMateMcp, credentialEnv: String?, credential: String?, podToken: String,
+                    gitToken: String? = null): Secret =
     SecretBuilder().withNewMetadata().withName(name).withNamespace(FIRST_MATE_NAMESPACE)
         .withLabels<String, String>(mapOf(FIRST_MATE_SESSION_LABEL to session.id)).endMetadata()
         .withType("Opaque")
@@ -100,6 +109,7 @@ fun firstMateSecret(name: String, session: FirstMateSession, mcp: FirstMateMcp, 
             put("mcp.json", jacksonObjectMapper().writeValueAsString(mapOf("mcpServers" to mcp.servers)))
             if (credentialEnv != null && credential != null) put(credentialEnv, credential)
             put(FIRST_MATE_TOKEN_KEY, podToken)
+            gitToken?.let { put(FIRST_MATE_GIT_TOKEN_KEY, it) }
             session.lineage?.let { put(FIRST_MATE_LINEAGE_KEY, it) }
         })
         .build()
@@ -111,12 +121,15 @@ fun firstMateSecret(name: String, session: FirstMateSession, mcp: FirstMateMcp, 
  * and CPU limits and requests. Its container runs [command] (`fm-relay`, [firstMateCommand]) with the relay's env:
  * [engineUrl], the session id, the pod token from the Secret, the spool [FIRST_MATE_SPOOL] (an emptyDir) and, for a
  * [resume], `FM_RESUME`, and with a lineage `FM_LINEAGE_FILE`, its read-only file beside `mcp.json`. The engine never attaches, so stdin stays closed. Restart `Never`, so a crashed first mate ends
- * rather than loops. Its working folder is [FIRST_MATE_CWD], an emptyDir. A pure function so a test asserts on it.
+ * rather than loops. Its working folder is [FIRST_MATE_CWD], an emptyDir the relay copies the session's repo into (`FM_REPO`) from
+ * [FIRST_MATE_CLONE], cloned there by the init container [FIRST_MATE_CLONE_CONTAINER] (`fm-relay --clone`), which alone gets,
+ * with [gitToken], `FM_GIT_TOKEN` from the Secret's [FIRST_MATE_GIT_TOKEN_KEY]: claude, in the main container, can never
+ * read the token. A pure function so a test asserts on it.
  */
 fun firstMatePod(
     name: String, session: FirstMateSession, image: String, command: List<String>, secret: String, credentialEnv: String?,
     memoryBytes: Long, cpus: Double, memoryRequestBytes: Long = memoryBytes, cpuRequest: Double = cpus,
-    engineUrl: String = "", resume: Boolean = false,
+    engineUrl: String = "", resume: Boolean = false, gitToken: Boolean = false,
 ): Pod {
     val labels = mapOf(FIRST_MATE_SESSION_LABEL to session.id)
     val locked = SecurityContextBuilder().withAllowPrivilegeEscalation(false).withPrivileged(false)
@@ -131,7 +144,10 @@ fun firstMatePod(
     val env = listOfNotNull(credentialEnv?.let { fromSecret(it, it) },
         plain("FM_ENGINE_URL", engineUrl), plain("FM_SESSION_ID", session.id), fromSecret("FM_TOKEN", FIRST_MATE_TOKEN_KEY),
         plain("FM_SPOOL", FIRST_MATE_SPOOL), if (resume) plain("FM_RESUME", "1") else null,
-        session.lineage?.let { plain("FM_LINEAGE_FILE", "$FIRST_MATE_MCP_DIR/$FIRST_MATE_LINEAGE_KEY") })
+        session.lineage?.let { plain("FM_LINEAGE_FILE", "$FIRST_MATE_MCP_DIR/$FIRST_MATE_LINEAGE_KEY") },
+        plain("FM_REPO", session.repo), plain("FM_CLONE", FIRST_MATE_CLONE))
+    val cloneEnv = listOfNotNull(plain("FM_REPO", session.repo), if (gitToken) fromSecret("FM_GIT_TOKEN", FIRST_MATE_GIT_TOKEN_KEY) else null)
+    val cloneMount = VolumeMountBuilder().withName("clone").withMountPath(FIRST_MATE_CLONE).build()
     return PodBuilder()
         .withNewMetadata().withName(name).withNamespace(FIRST_MATE_NAMESPACE).withLabels<String, String>(labels)
             .withAnnotations<String, String>(mapOf("frakworks.codefrak.com/repo" to session.repo, "frakworks.codefrak.com/login" to session.login))
@@ -145,6 +161,14 @@ fun firstMatePod(
                 .withRunAsNonRoot(true).withRunAsUser(SMITH_UID).withRunAsGroup(SMITH_UID).withFsGroup(SMITH_UID)
                 .withNewSeccompProfile().withType("RuntimeDefault").endSeccompProfile()
             .endSecurityContext()
+            .addNewInitContainer()
+                .withName(FIRST_MATE_CLONE_CONTAINER).withImage(image).withImagePullPolicy(if (refreshable(image)) "Always" else "IfNotPresent")
+                .withCommand("fm-relay", "--clone", FIRST_MATE_CLONE)
+                .withEnv(cloneEnv)
+                .withSecurityContext(locked)
+                .withResources(resources)
+                .withVolumeMounts(cloneMount)
+            .endInitContainer()
             .addNewContainer()
                 .withName(FIRST_MATE_CONTAINER).withImage(image).withImagePullPolicy(if (refreshable(image)) "Always" else "IfNotPresent")
                 .withCommand(command)
@@ -155,14 +179,15 @@ fun firstMatePod(
                 .withResources(resources)
                 .withVolumeMounts(VolumeMountBuilder().withName("mcp").withMountPath(FIRST_MATE_MCP_DIR).withReadOnly(true).build(),
                     VolumeMountBuilder().withName("work").withMountPath(FIRST_MATE_CWD).build(),
-                    VolumeMountBuilder().withName("spool").withMountPath(FIRST_MATE_SPOOL).build())
+                    VolumeMountBuilder().withName("spool").withMountPath(FIRST_MATE_SPOOL).build(), cloneMount)
             .endContainer()
             .withVolumes(VolumeBuilder().withName("mcp").withNewSecret().withSecretName(secret)
                 .addNewItem().withKey("mcp.json").withPath("mcp.json").endItem()
                 .apply { if (session.lineage != null) addNewItem().withKey(FIRST_MATE_LINEAGE_KEY).withPath(FIRST_MATE_LINEAGE_KEY).endItem() }
                 .endSecret().build(),
                 VolumeBuilder().withName("work").withNewEmptyDir().endEmptyDir().build(),
-                VolumeBuilder().withName("spool").withNewEmptyDir().endEmptyDir().build())
+                VolumeBuilder().withName("spool").withNewEmptyDir().endEmptyDir().build(),
+                VolumeBuilder().withName("clone").withNewEmptyDir().endEmptyDir().build())
         .endSpec()
         .build()
 }

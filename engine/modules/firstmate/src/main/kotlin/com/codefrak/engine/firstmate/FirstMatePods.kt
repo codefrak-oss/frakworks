@@ -6,6 +6,7 @@ import com.codefrak.engine.accounts.providerOf
 import com.codefrak.engine.events.EngineEvent
 import com.codefrak.engine.events.EngineEvents
 import com.codefrak.engine.repos.EngineTokens
+import com.codefrak.engine.repos.TargetRepos
 import com.codefrak.engine.smith.InCluster
 import com.codefrak.engine.smith.SmithHosting
 import com.codefrak.engine.smith.SmithHostingSettings
@@ -58,6 +59,8 @@ class KubernetesFirstMateSessionPods(
     private val mintToken: (FirstMateSession) -> String,
     /** Revokes every `first-mate-pod` token of the session id. */
     private val revokeTokens: (String) -> Unit,
+    /** The repo's Smith token for the pod's clone (`FM_GIT_TOKEN`), or null when it has none (a public repo still clones). */
+    private val gitToken: (String) -> String? = { null },
     private val prompt: FirstMatePrompt = FirstMatePrompt.load(),
     private val resumingEvery: Duration = Duration.ofSeconds(2),
 ) : FirstMateSessionPods {
@@ -104,10 +107,12 @@ class KubernetesFirstMateSessionPods(
             policies.resource(FirstMateEgress.policy(name, session.id, holes)).create()
             log.info("first-mate session {} egress opened: {}", session.id, holes.joinToString { "${it.name} ${it.ip}:${it.port}" })
         }
-        k.secrets().inNamespace(FIRST_MATE_NAMESPACE).resource(firstMateSecret(name, session, mcp.rebasedOn(s.engineUrl), a.env, a.token, token)).create()
+        val git = runCatching { gitToken(session.repo) }.onFailure { log.warn("first-mate session {}: no git token for {}: {}", session.id, session.repo, it.message) }.getOrNull()
+        k.secrets().inNamespace(FIRST_MATE_NAMESPACE).resource(firstMateSecret(name, session, mcp.rebasedOn(s.engineUrl), a.env, a.token, token, git)).create()
         k.pods().inNamespace(FIRST_MATE_NAMESPACE).resource(firstMatePod(name, session, s.image,
             firstMateCommand(firstMateArgv(a.model, a.effort, prompt, lineage = session.lineage != null)),
-            name, a.env, memoryBytes, cpus, s.memoryRequestBytes, s.cpuRequest, engineUrl = s.engineUrl, resume = restore != null)).create()
+            name, a.env, memoryBytes, cpus, s.memoryRequestBytes, s.cpuRequest, engineUrl = s.engineUrl, resume = restore != null,
+            gitToken = git != null)).create()
         log.info("first-mate session {} pod {}/{} (epoch {}) created on {} {} (tier {}) for @{}{}", session.id, FIRST_MATE_NAMESPACE, name, epoch, a.model,
             a.effort, session.tier ?: "default", session.login, if (restore != null) " (resuming)" else "")
         if (restore != null) resuming(session, epoch)
@@ -158,7 +163,8 @@ class KubernetesFirstMateSessionPods(
  * The [KubernetesFirstMateSessionPods] bean: the cluster as [com.codefrak.engine.smith.KubernetesSandbox] reaches it (the
  * pod's ServiceAccount, else the kubeconfig), the Smith image and requests from the hosting settings, the Smith limits
  * (`engine.smith.memory-bytes`, `engine.smith.cpus`), the account a Smith at the session's tier (else
- * `engine.firstmate.tier`) gets, and [EngineTokens] for the pods' `first-mate-pod` tokens.
+ * `engine.firstmate.tier`) gets, [EngineTokens] for the pods' `first-mate-pod` tokens, and the repo's Smith token
+ * ([TargetRepos.smithToken], a Smith's `GH_TOKEN`) for the pod's clone.
  */
 @Component
 class FirstMateSessionPodsBean @Autowired constructor(
@@ -168,7 +174,7 @@ class FirstMateSessionPodsBean @Autowired constructor(
     @Value("\${engine.smith.image-pull-timeout:PT5M}") startTimeout: Duration,
     @Value("\${engine.firstmate.tier:8}") tier: Int,
     hosting: SmithHosting, inCluster: InCluster, tiers: TierTable, accounts: AiAccounts,
-    sessions: FirstMateSessions, events: EngineEvents, tokens: EngineTokens,
+    sessions: FirstMateSessions, events: EngineEvents, tokens: EngineTokens, repos: TargetRepos,
 ) : FirstMateSessionPods by KubernetesFirstMateSessionPods(
     client = lazy { KubernetesClientBuilder().withConfig(kubernetesConfig(inCluster.inPod(), File(kubeconfig))).build() },
     clusterConfigured = { inCluster.inPod() || File(kubeconfig).isFile },
@@ -182,4 +188,5 @@ class FirstMateSessionPodsBean @Autowired constructor(
     sessions = sessions, events = events, memoryBytes = memoryBytes, cpus = cpus, startTimeout = startTimeout,
     mintToken = { s -> tokens.mint(s.login, "first-mate pod ${s.id}", null, "engine", EngineTokens.FIRST_MATE_POD, s.id).token },
     revokeTokens = { id -> tokens.revokeForSession(id) },
+    gitToken = { repo -> repos.smithToken(repo) },
 )
