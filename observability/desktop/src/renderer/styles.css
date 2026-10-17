@@ -1480,12 +1480,15 @@ ul.ecProse { padding-left: 18px; }
 .fleet-root .palDots { display: flex; gap: 8px; font-size: 11px; margin-top: 4px; }
 
 /* The chat's repo chip in First mate's header (#2343); amber with none chosen. */
-.fmChatRepoRow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+.fmChatRepoRow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 4px;
+  text-transform: none; letter-spacing: normal; font-weight: normal; font-size: 12px; }
 .fmNewConversationRepo { opacity: 0.8; }
 .fmChatRepo { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; padding: 1px 6px;
-  border: 1px solid var(--border, #555); border-radius: 10px; margin: 2px 0; }
+  border: 1px solid var(--border, #555); border-radius: 10px; margin: 2px 0;
+  flex-wrap: wrap; max-width: 100%; box-sizing: border-box; }
+.fmChatRepoLabel { white-space: nowrap; text-transform: none; letter-spacing: normal; color: var(--muted); font-size: 12px; font-weight: normal; }
 .fmChatRepoNone { border-color: #d9a400; color: #d9a400; }
-.fmChatRepoSticky { margin-left: 6px; padding: 0 6px; border-radius: 8px; font-size: 11px; background: rgba(217, 164, 0, 0.18); color: #d9a400; }
+.fmChatRepoSticky { text-transform: none; letter-spacing: normal; margin-left: 6px; padding: 0 6px; border-radius: 8px; font-size: 11px; font-weight: 600; line-height: 16px; white-space: nowrap; background: rgba(217, 164, 0, 0.18); color: #d9a400; }
 .fmChatRepoSelect { background: transparent; color: inherit; border: none; font: inherit; }
 
 /* The HITLP task view (hitlp-task.jsx): decision first, the story below. */
