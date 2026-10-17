@@ -58,12 +58,18 @@ data class PlanQuestion(
             return buildString {
                 append(intro(if (asked.size == 1) "one thing" else "${asked.size} things")).append("\n\n")
                 summary?.trim()?.takeIf { it.isNotEmpty() }?.let { append("The plan:\n\n").append(it).append("\n\n") }
+                // One part per question, each its own heading, options a labeled list, blank lines between (bots/smith.md, "Laying out a design question").
                 asked.forEachIndexed { i, q ->
-                    append("${i + 1}. **${q.question.trim()}** (confidence ${"%.1f".format(q.confidence)}, impact ${q.impact}). ")
-                    append("Without an answer it would assume: ${q.assumption!!.trim()}\n")
+                    append("### ${i + 1}. ${q.question.trim()}\n\n")
+                    q.options.orEmpty().takeIf { it.isNotEmpty() }?.let { opts ->
+                        opts.forEach { append("- **${oneLine(it.id)}**: ${oneLine(it.label)}\n") }
+                        append("\n")
+                    }
+                    append("Without an answer it would assume: ${q.assumption!!.trim()}\n\n")
+                    append("_Confidence ${"%.1f".format(q.confidence)}, impact ${q.impact}._\n\n")
                 }
                 val options = asked.singleOrNull()?.options.orEmpty()
-                append("\n```ask\nkind: ${if (options.isEmpty()) "text" else "choice"}\nquestion: ")
+                append("```ask\nkind: ${if (options.isEmpty()) "text" else "choice"}\nquestion: ")
                 append(if (asked.size == 1) oneLine(asked.single().question) else "Answer the ${asked.size} $noun questions above")
                 if (options.isNotEmpty()) {
                     append("\noptions:")

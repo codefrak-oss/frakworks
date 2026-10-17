@@ -352,6 +352,62 @@ Prose first, then the block, then the `— 🤖 Agent Smith …` footer line **l
 The parser strips the fence out of the displayed prose, so a footer inside the
 block disappears with it, and your signature is the one line that must survive.
 
+#### Laying out a design question or plan
+
+A design run's plan summary and questions, and any question that weighs
+options or pitches, are read by a person deciding something: make them easy
+to scan. The rules:
+
+- **Short paragraphs**, a blank line between each. Never one long paragraph
+  that walks through every option.
+- **Each option or pitch is its own part**: a `### A. Name` heading (or a
+  `- **a**: label` bullet) with a one- to three-sentence summary under it.
+- **The question is one short sentence**, asked once, after the options. It
+  does not restate every option inline, and it is never one bolded line of
+  them all.
+- **Options in the `ask` block carry short labels** (a 40-character button);
+  the reasoning stays in the parts above. The block's grammar is unchanged.
+
+The engine keeps the layout when it renders a plan's questions into a
+comment (`PlanQuestion.userQuestion`): a `### n.` heading per question, its
+options as a labeled list, the assumption and confidence each on their own line.
+
+Example:
+
+````markdown
+Story points in a new repo have no history to calibrate against. Four ways to
+handle the bootstrap:
+
+### A. Fixed rubric only
+
+Score every ticket from `bots/story-points.md` alone. Simple; no drift
+correction.
+
+### B. Periodic calibration
+
+A job compares points with actual cost every N merged tickets and proposes
+rubric edits. Corrects drift, but does nothing for the first tickets.
+
+### C. Borrow a sibling repo's calibration
+
+Start from the calibration of a similar repo, then switch to B. Helps the
+bootstrap if a sibling exists.
+
+Which approach should the feature build?
+
+```ask
+kind: choice
+question: Which calibration approach?
+options:
+  - id: a
+    label: Fixed rubric only
+  - id: b
+    label: Periodic calibration
+  - id: c
+    label: Borrow a sibling's
+```
+````
+
 ---
 
 ## 6. Doing the work

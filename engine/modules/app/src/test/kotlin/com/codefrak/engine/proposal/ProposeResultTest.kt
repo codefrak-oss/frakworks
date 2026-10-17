@@ -108,7 +108,7 @@ class ProposeResultTest {
     fun `an important question makes a drafted result ask`() {
         assertEquals(null, drafted(questions = """[{"question":"Which?","assumption":"A","confidence":0.9,"impact":"low"}]""").userQuestion())
         val asked = drafted(questions = """[{"question":"Which?","assumption":"A","confidence":0.4,"impact":"low"}]""").userQuestion()!!
-        assertTrue(asked.startsWith("The draft is ready") && "**Which?**" in asked && asked.endsWith("```ask\nkind: text\nquestion: Which?\n```"), asked)
+        assertTrue(asked.startsWith("The draft is ready") && "### 1. Which?" in asked && asked.endsWith("```ask\nkind: text\nquestion: Which?\n```"), asked)
     }
 
     // readResult itself, on a stand-in execution: the git fake answers what the bundle changes.
