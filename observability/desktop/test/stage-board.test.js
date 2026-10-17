@@ -51,12 +51,12 @@ test("a Smith runs when the flow is live and not holding", () => {
   assert.equal(isSmithRunning({ kind: "chore" }), false);
 });
 
-test("the board draws a column per stage from the fixture: a running card sweeps, a holding one does not", () => {
+test("the board draws a column per stage from the fixture: a running card with an estimate shows its bar, a holding one does not", () => {
   const html = renderToStaticMarkup(React.createElement(StageBoard, { issues: board.issues, onOpenTicket: () => {} }));
   for (const c of STAGE_COLUMNS) assert.match(html, new RegExp(`sbCol sb-${c.id}`));
   const cards = html.split('<a class="sbCard').slice(1);
   const card = (n) => cards.find((c) => c.includes(`>#${n}<`));
-  assert.match(card(64), /^ sbRunning/); assert.match(card(64), /sbSweep/);
+  assert.match(card(64), /^ sbRunning/); assert.match(card(64), /role="progressbar"/); assert.doesNotMatch(card(64), /sbSweep/);
   assert.doesNotMatch(card(60), /sbSweep/); assert.match(card(60), /sbHold/);
   assert.doesNotMatch(card(65), /sbSweep/);
   const cols = groupByColumn(board.issues);
@@ -77,4 +77,20 @@ test("the Tickets pane shows the board under the Board toggle", () => {
   assert.match(html, /sbBoard/); assert.match(html, /checked="" value="board"/);
   const table = renderToStaticMarkup(React.createElement(Issues, { result: board, onOpenTicket: () => {} }));
   assert.doesNotMatch(table, /sbBoard/); assert.match(table, /<table/);
+});
+
+test("a running card shows the progress bar with an estimate, the sweep without, neither when not running (#100111)", () => {
+  const at = Date.parse("2026-10-17T12:00:00Z");
+  const flow = { flow: "chore", stage: "call-do-work", ended: false, incident: null, outcome: "started", instance: "i" };
+  const draw = (r) => renderToStaticMarkup(React.createElement(StageBoard, { issues: [r], now: at }));
+  const est = draw(row("chore", "call-do-work", { flow: { ...flow, stageStartedAt: "2026-10-17T11:50:00Z", stageEstimateMs: 1200000 } }));
+  assert.match(est, /sbRunning/);
+  assert.match(est, /role="progressbar"[^>]*aria-valuenow="\d+"/);
+  assert.doesNotMatch(est, /sbSweep/);
+  const none = draw(row("chore", "call-do-work", { flow }));
+  assert.match(none, /sbRunning/);
+  assert.match(none, /sbSweep/);
+  assert.doesNotMatch(none, /progressbar/);
+  const idle = draw(row("chore", "call-do-work", { flow: { ...flow, ended: true, stageEstimateMs: 1200000, stageStartedAt: "2026-10-17T11:50:00Z" } }));
+  assert.doesNotMatch(idle, /sbSweep|progressbar/);
 });

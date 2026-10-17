@@ -1643,6 +1643,9 @@ ul.ecProse { padding-left: 18px; }
   .fleet-root .sbHead { pointer-events: auto; cursor: pointer; list-style: disclosure-closed; }
   .fleet-root .sbCol[open] > .sbHead { list-style: disclosure-open; }
 }
+/* A running card with an estimate: the Issues list's bar (progressOf: the open
+   stage's elapsed time against its estimate) in place of the sweep. */
+.fleet-root .isProgress.sbProgress { margin-top: 5px; height: 3px; border-radius: 2px; }
 /* No motion: a static accent stripe along the bottom edge instead. */
 @media (prefers-reduced-motion: reduce) {
   .fleet-root .sbSweep { animation: none; width: 100%; background: var(--sb-accent); }
