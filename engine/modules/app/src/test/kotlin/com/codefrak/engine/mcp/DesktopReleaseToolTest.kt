@@ -67,7 +67,7 @@ class DesktopReleaseToolTest {
 
     private fun call(args: Map<String, Any?>, caller: McpCaller = mate) = mcp.call(DesktopReleaseTool.NAME, args, caller)
     private fun body(r: McpToolResult): Map<*, *> { assertFalse(r.isError, r.text); return engineJson.readValue(r.text, Map::class.java) }
-    private fun error(r: McpToolResult): String { assertTrue(r.isError, r.text); return r.text }
+    private fun error(r: McpToolResult): String { assertTrue(r.isError, r.text); return engineJson.readValue(r.text, Map::class.java)["error"] as String }
 
     @Test
     fun `listed to First mate and a Smith`() {
