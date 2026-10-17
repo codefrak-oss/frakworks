@@ -803,7 +803,7 @@ The build is signed with the user's Apple Development identity, which
 Squirrel.Mac needs for a match with the running app and Gatekeeper does not
 trust: the first launch of a build on a Mac is a right-click → Open, updates
 after that are Squirrel's and not re-checked. The feed is plain HTTP on
-purpose (the proposal says why). Versions are `0.1.<CI run number>`, so the
+purpose (the proposal says why). Versions are `0.2.<CI run number>` (0.1 was the private repo's; run numbers restarted at 1 with the public repo on 2026-10-17, so the minor went up to keep the feed newer than every installed 0.1.x), so the
 checkout's `0.1.0` is always the oldest.
 
 ## Deployment values: `registry`, `release_feed`, `logs_url` and `metrics_url`

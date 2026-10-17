@@ -1,7 +1,7 @@
 // app-update.js — the packaged app's version and its self-update, the
 // counterpart of src/app-version.js for a build that does not run out of a
 // checkout. A packaged app (`app.isPackaged`) has no HEAD to compare: its
-// version is `package.json`'s, stamped by CI (0.1.<run number>), and "newer
+// version is `package.json`'s, stamped by CI (0.2.<run number>), and "newer
 // code exists" means the feed's `latest-mac.yml` names a higher one.
 //
 // The feed is electron-updater's generic provider: a static directory over
