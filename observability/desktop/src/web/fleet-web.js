@@ -228,6 +228,7 @@ function createWebFleet({ storage, prefs, persist, win = null, stream = null, fi
     summarize: (owner, repoName, n) => engineData.summarizeTicket(String(owner), String(repoName), Number(n)),
     ticketDetail: (owner, repoName, n) => engineData.fetchTicketDetail(String(owner), String(repoName), Number(n)),
     ticketPitch: (owner, repoName, n) => engineData.fetchTicketPitch(String(owner), String(repoName), Number(n)),
+    designDeck: (owner, repoName, n) => engineData.fetchDesignDeck(String(owner), String(repoName), Number(n)),
     proposals: async () => { const repo = await currentRepo(); return engineData.fetchProposals(repo ? { repo } : {}); },
     proposalPage: (owner, repoName, slug) => engineData.fetchProposalPage(String(owner), String(repoName), String(slug)),
     repoTree: (owner, repoName) => engineData.fetchRepoTree(String(owner), String(repoName)),

@@ -89,6 +89,11 @@ object Vars {
     const val CHILD_MODE = "childMode"
     /** A feature's design Smith's plan (`Plan`), as JSON bytes: in every later brief. */
     const val PLAN = "plan"
+    /**
+     * The `DesignResult` whose important questions a confirm-mode feature put to the user, as JSON bytes: what
+     * `GET /ticket/{owner}/{repo}/{n}/design-deck` renders (`DesignDeck`). Never set in auto mode.
+     */
+    const val DESIGN_DECK = "designDeck"
     /** A feature's acceptance (`AcceptResult`), as bytes: the accept Smith's, or the user's answer before #583. */
     const val ACCEPTANCE = "acceptance"
     /** A split feature's state (`SplitState`), as JSON bytes: the drafts left and the children filed. */

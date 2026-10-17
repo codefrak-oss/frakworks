@@ -1041,6 +1041,22 @@ async function fetchChanges(repo, from, to, opts = {}) {
  * The engine answers 404 for a ticket that is not a proposal or has no PR.
  * Resolves to { pitch } or { error }; never rejects.
  */
+/**
+ * A confirm-mode feature's design proposal as a dark slide deck (#100114),
+ * `GET /ticket/<owner>/<repo>/<n>/design-deck`. Resolves to { html } or
+ * { error }; never rejects. A 404 is a ticket with no confirm design.
+ */
+async function fetchDesignDeck(owner, repo, n, opts = {}) {
+  if (typeof owner !== "string" || !REPO_PART.test(owner)) return { error: `not a repo owner: ${JSON.stringify(owner)}` };
+  if (typeof repo !== "string" || !REPO_PART.test(repo)) return { error: `not a repo name: ${JSON.stringify(repo)}` };
+  const num = typeof n === "string" && /^\d+$/.test(n) ? Number(n) : n;
+  if (!Number.isInteger(num) || num <= 0) return { error: `not a ticket number: ${JSON.stringify(n)}` };
+  const r = await getJson(`/ticket/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${num}/design-deck`, opts);
+  if (r.error) return / 404 /.test(r.error) ? { error: `no design deck on ${owner}/${repo}#${num}`, none: true } : { error: r.error };
+  const html = r.value && r.value.html;
+  return typeof html === "string" && html.trim() ? { html } : { error: `engine's design deck of ${owner}/${repo}#${num} has no \`html\`` };
+}
+
 async function fetchTicketPitch(owner, repo, n, opts = {}) {
   if (typeof owner !== "string" || !REPO_PART.test(owner)) return { error: `not a repo owner: ${JSON.stringify(owner)}` };
   if (typeof repo !== "string" || !REPO_PART.test(repo)) return { error: `not a repo name: ${JSON.stringify(repo)}` };
@@ -2090,7 +2106,7 @@ async function revokeToken(id, opts = {}) {
   return r.error ? { error: r.error } : { ok: true };
 }
 
-module.exports = { fetchRetrying, RETRY_DELAY_MS, fetchPublicUrl, mintPhoneToken, fetchTokens, revokeToken, PAGE_ENV, setBearer, authHeaders, SIGN_IN_PROMPT, fetchWhoAmI, teachJudge, fetchRepoMcpServers, saveRepoMcpServer, deleteRepoMcpServer, testRepoMcpServer, fetchRepoMcpConfig, trustSystemCAs, fetchActiveBuilds, fetchIssues, fetchFlow, INSTANCE_ID, MAX_VARIABLE_CHARS, fetchAccounts, pickAccount, fetchRefinerTier, setRefinerTier, fetchSmithHosting, setSmithHosting, SMITH_HOSTINGS, fetchFirstMateHosting, setFirstMateHosting, FIRST_MATE_HOSTINGS, startFirstMateSession, sendFirstMateMessage, endFirstMateSession, fetchFirstMateTranscript, fetchFrakpanelTiles, setFrakpanelTiles, fetchTiers, fetchTierAccounts, setTier, fetchSecurityTier, setSecurityTier, fetchCheckTier, setCheckTier, accountAction, MAX_EMAIL_CHARS, sendJson, ACCOUNT_NAME, PROVIDERS, getJson, engineUrl, DEFAULT_ENGINE_URL, DEFAULT_TIMEOUT_SECS,
+module.exports = { fetchDesignDeck, fetchRetrying, RETRY_DELAY_MS, fetchPublicUrl, mintPhoneToken, fetchTokens, revokeToken, PAGE_ENV, setBearer, authHeaders, SIGN_IN_PROMPT, fetchWhoAmI, teachJudge, fetchRepoMcpServers, saveRepoMcpServer, deleteRepoMcpServer, testRepoMcpServer, fetchRepoMcpConfig, trustSystemCAs, fetchActiveBuilds, fetchIssues, fetchFlow, INSTANCE_ID, MAX_VARIABLE_CHARS, fetchAccounts, pickAccount, fetchRefinerTier, setRefinerTier, fetchSmithHosting, setSmithHosting, SMITH_HOSTINGS, fetchFirstMateHosting, setFirstMateHosting, FIRST_MATE_HOSTINGS, startFirstMateSession, sendFirstMateMessage, endFirstMateSession, fetchFirstMateTranscript, fetchFrakpanelTiles, setFrakpanelTiles, fetchTiers, fetchTierAccounts, setTier, fetchSecurityTier, setSecurityTier, fetchCheckTier, setCheckTier, accountAction, MAX_EMAIL_CHARS, sendJson, ACCOUNT_NAME, PROVIDERS, getJson, engineUrl, DEFAULT_ENGINE_URL, DEFAULT_TIMEOUT_SECS,
   fetchProcessInstances, fetchProcessTree, fetchProcessXml, ISSUE_URL, DEFINITION_ID, retryIncident, cancelFlow, GITHUB_LOGIN,
   fetchIncidentFixes, fetchDoctorHistory, fetchDoctorRuns, fetchDoctorBugs, fetchConsumption, CONSUMPTION_WINDOWS, fetchCiRuns, ISO_INSTANT, startIncidentFix, startIncidentPropose, uploadAttachment,
   submitIntake, MAX_ASK_CHARS, fetchLineage,

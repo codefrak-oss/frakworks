@@ -140,6 +140,31 @@ Not built: staged work as separate runs (the plan's stages order one work
 run), and the `incident` kind, which has no flow (a `proposal` and a
 `research` have their own: "Proposal", "Research").
 
+### The design deck
+
+A confirm-mode design whose plan goes to the user is also shown as a dark,
+slide-like HTML presentation (#100114). The engine templates it; the Smith
+writes nothing new. When `post the smith's question` posts a design run's
+plan (not a design `ask`), it keeps that `DesignResult` as the flow variable
+`designDeck` and adds one line to the comment pointing at the desktop. The
+comment's text and its ask block are otherwise unchanged: they stay the
+readable fallback on GitHub and the answer path, and the answer resumes the
+flow as before. Auto mode never posts the plan, so it never sets `designDeck`.
+
+`GET /ticket/{owner}/{repo}/{n}/design-deck` answers `{html}`:
+`DesignDeck.render` of the newest feature flow's `designDeck` on the ticket,
+running or ended; 404 for a ticket without one or a repo that is not a target.
+The page has a title slide (the summary, its inline `<svg>` mockups as
+figures), then Files, Stages, Tests and Acceptance, then one slide per
+important question with its impact badge, a confidence meter, the assumption
+and the options. Every text is HTML-escaped; only the `<svg>` mockups are
+carried over, stripped of scripts, event handlers, `foreignObject` and
+non-fragment links. The page has no script and loads nothing, and passes
+`PitchRules`. The desktop draws it in the pitch frame (`src/pitch-frame.js`:
+sandboxed srcdoc, its own CSP, no network): as the ticket detail's
+**Proposal** section, and through **Open presentation** on the decision card,
+which shows only when the ticket has a deck.
+
 ## Split features
 
 Decided with the user 2026-09-25 ("tickets that make tickets"), after three

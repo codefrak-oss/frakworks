@@ -203,22 +203,22 @@ const TicketFrame = ({ doc, full }) => (
  * can resize (drag its bottom edge), and a control that opens it over the
  * whole window, closed with its button or Escape.
  */
-export const TicketPitchView = ({ html, round = null, full, onOpen, onClose, open = true, onFlip }) => {
+export const TicketPitchView = ({ html, round = null, full, onOpen, onClose, open = true, onFlip, heading = null }) => {
   if (!html) return null;
   const doc = darkPitch(html);
   return (
     <>
       <h2 className="pitchHead tdFold" onClick={() => onFlip && onFlip()} title={foldTitle(open)}>
         <FoldArrow open={open} />
-        {pitchHeading(round)}
-        <button className="pitchOpen" title="Open the pitch over the whole window"
+        {heading || pitchHeading(round)}
+        <button className="pitchOpen" title="Open it over the whole window"
                 onClick={(e) => { e.stopPropagation(); if (onOpen) onOpen(); }}>Full window ⤢</button>
       </h2>
       {open && <div className="pitchBox"><TicketFrame doc={doc} /></div>}
       {full && (
         <div className="pitchOverlay" role="dialog" aria-label="Pitch">
           <div className="pitchOverlayBar">
-            <span>{pitchHeading(round)}</span>
+            <span>{heading || pitchHeading(round)}</span>
             <button className="pitchClose" title="Close (Esc)" onClick={() => onClose && onClose()}>Close ✕</button>
           </div>
           <TicketFrame doc={doc} full />

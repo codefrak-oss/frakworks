@@ -62,7 +62,7 @@ const { fetchNeeds, fetchHitlpTasks, fetchHitlpTask } = require("./needs-you");
 const { createHitlpSurface, FILE: HITLP_SURFACE_FILE } = require("./hitlp-surface");
 const repoSelection = require("./repo-selection");
 const { fetchTicketTree, fetchDoneTickets } = require("./ticket-tree");
-const { trustSystemCAs, fetchIssues, fetchFlow, fetchAccounts, fetchTierAccounts, pickAccount, fetchRefinerTier, fetchSmithHosting, fetchFirstMateHosting, fetchFrakpanelTiles, fetchSecurityTier, fetchCheckTier, accountAction, engineUrl, fetchProcessInstances, fetchProcessTree, fetchProcessXml, retryIncident, cancelFlow, fetchIncidentFixes, fetchDoctorHistory, fetchDoctorRuns, fetchDoctorBugs, fetchConsumption, fetchCiRuns, startIncidentFix, startIncidentPropose, teachJudge, uploadAttachment, submitIntake, fetchTicketTimeline, summarizeTicket, predictReview, fetchTicketDetail, fetchChanges, fetchTicketPitch, fetchProposals, fetchProposalPage, fetchRepoTree, fetchRepoFile, fetchJevCalls, fetchJevCall, fetchJevSummary, fetchSshVerdicts, fetchFrictionSummary, fetchFrictionNotes, fetchFrictionGroups, frictionPullOut, frictionNotTwoThings, frictionMerge, frictionFix, fetchRepoRows, requestSetupCheck, repoAction, fetchEngineAccess, engineAccessAction, fetchRepoNames, fetchSavedChats, fetchSavedChat, saveChat, deleteSavedChat, fetchJobs, registerJob, executeJob, deleteJob, fetchRefactorConfig, saveRefactorConfig, fetchJobRuns, fetchActiveBuilds, fetchRepoMcpServers, saveRepoMcpServer, deleteRepoMcpServer, testRepoMcpServer, fetchRepoMcpConfig, fetchLineage } = require("./engine-data");
+const { trustSystemCAs, fetchIssues, fetchFlow, fetchAccounts, fetchTierAccounts, pickAccount, fetchRefinerTier, fetchSmithHosting, fetchFirstMateHosting, fetchFrakpanelTiles, fetchSecurityTier, fetchCheckTier, accountAction, engineUrl, fetchProcessInstances, fetchProcessTree, fetchProcessXml, retryIncident, cancelFlow, fetchIncidentFixes, fetchDoctorHistory, fetchDoctorRuns, fetchDoctorBugs, fetchConsumption, fetchCiRuns, startIncidentFix, startIncidentPropose, teachJudge, uploadAttachment, submitIntake, fetchTicketTimeline, summarizeTicket, predictReview, fetchTicketDetail, fetchChanges, fetchTicketPitch, fetchDesignDeck, fetchProposals, fetchProposalPage, fetchRepoTree, fetchRepoFile, fetchJevCalls, fetchJevCall, fetchJevSummary, fetchSshVerdicts, fetchFrictionSummary, fetchFrictionNotes, fetchFrictionGroups, frictionPullOut, frictionNotTwoThings, frictionMerge, frictionFix, fetchRepoRows, requestSetupCheck, repoAction, fetchEngineAccess, engineAccessAction, fetchRepoNames, fetchSavedChats, fetchSavedChat, saveChat, deleteSavedChat, fetchJobs, registerJob, executeJob, deleteJob, fetchRefactorConfig, saveRefactorConfig, fetchJobRuns, fetchActiveBuilds, fetchRepoMcpServers, saveRepoMcpServer, deleteRepoMcpServer, testRepoMcpServer, fetchRepoMcpConfig, fetchLineage } = require("./engine-data");
 const { probeStdio } = require("./mcp-stdio-probe");
 const { savedChatView, resumability } = require("./saved-chats");
 const claudeCode = require("./claude-code-sessions");
@@ -551,6 +551,14 @@ ipcMain.handle("engine:ticket", async (_e, owner, repo, n) => {
 ipcMain.handle("engine:ticket-pitch", async (_e, owner, repo, n) => {
   const r = await fetchTicketPitch(owner, repo, n);
   console.log(`[engine] ticket pitch ${owner}/${repo}#${n}: ${r.error ? `error: ${r.error}` : `${r.pitch.kind} ${r.pitch.path}`}`);
+  return r;
+});
+
+// A confirm-mode feature's design deck (src/renderer/design-deck.jsx, #100114):
+// GET /ticket/{owner}/{repo}/{n}/design-deck (src/engine-data.js fetchDesignDeck). Read-only.
+ipcMain.handle("engine:design-deck", async (_e, owner, repo, n) => {
+  const r = await fetchDesignDeck(owner, repo, n);
+  if (r.error && !r.none) console.log(`[engine] design deck ${owner}/${repo}#${n}: error: ${r.error}`);
   return r;
 });
 

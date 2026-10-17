@@ -21,6 +21,7 @@ import { TeachButtons } from "./judge-teach.jsx";
 import { buttonsFor, pressOf, surfaceDecide, sourceText, lineageAddsNothing, Countdown } from "./needs-you.jsx";
 import { scriptOf, headlineOf, oddsOf, leanOf, initialsOf, clockOf, leftShare } from "../hitlp-task.js";
 import { SNOOZES, HINT, headerText, keyAction } from "../hitlp-popup.js";
+import { DesignDeckLink } from "./design-deck.jsx";
 
 const Bell = () => (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
@@ -221,6 +222,7 @@ export const HitlpTask = ({ row, now = null, initialError = null, decide = null,
           ? <div className="htWhy"><span className="htMuted">Why, as {sender || "the sender"} states it:</span><div className="htMd" dangerouslySetInnerHTML={{ __html: whyHtml }} /></div>
           : <p className="htWhy"><span className="htMuted">Why, as {sender || "the sender"} states it:</span> {row.why}</p>)}
         {summary && summary !== row.why && <p className="htContext">{summary}</p>}
+        {row.repo && row.ticket != null && <DesignDeckLink repo={row.repo} number={row.ticket} />}
       </div>
 
       {script && !head.code && <ScriptBox script={script} />}

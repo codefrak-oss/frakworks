@@ -3,6 +3,7 @@ package com.codefrak.engine.feature
 import com.codefrak.engine.TestTokens
 import com.codefrak.engine.ProcessFakes
 import com.codefrak.engine.finished
+import com.codefrak.engine.smith.Vars
 import com.codefrak.engine.brief
 import com.codefrak.engine.camunda.IncidentController
 import com.codefrak.engine.camunda.RetryRequest
@@ -152,6 +153,7 @@ class FeatureProcessTest {
         val closing = github.commentsOn(31).last()
         assertTrue("Merged #7" in closing && "Accepted: Both hold." in closing && "- [x] The strip is on every screen: ran the app" in closing, closing)
         assertNull(questions.pending(feature.id), "auto mode asked nothing")
+        assertNull(history.createHistoricVariableInstanceQuery().processInstanceId(feature.id).variableName(Vars.DESIGN_DECK).singleResult(), "auto mode keeps no design deck")
     }
 
     @Autowired lateinit var mcpServers: com.codefrak.engine.repos.RepoMcpServers
@@ -307,6 +309,9 @@ class FeatureProcessTest {
         assertTrue("**Which model?** (confidence 0.4, impact high)" in pending.question && "assume: fable low" in pending.question, pending.question)
         assertTrue("```ask\nkind: text\nquestion: Which model?\n```" in pending.question, pending.question)
         assertTrue(github.commentsOn(33).last().let { "The design Smith has a question (1)" in it && "Decide it on " in it })
+        // The plan is kept for the design deck, and the comment points at it (#100114).
+        assertNotNull(runtime.getVariable(feature.id, Vars.DESIGN_DECK))
+        assertTrue("Open presentation" in github.commentsOn(33).last())
         val summary = "The plan:\n\nA third fixed pane, drawn:\n\n<svg viewBox=\"0 0 40 10\"><rect width=\"40\" height=\"10\"/></svg>"
         assertTrue(summary in pending.question, pending.question)
         assertTrue(summary in github.commentsOn(33).last(), github.commentsOn(33).last())
