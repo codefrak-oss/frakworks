@@ -150,7 +150,7 @@ class RepoMcpServerControllerTest {
 
     @Test
     fun `without ENGINE_SECRETS_KEY a write that sets a secret is 503`() {
-        val unkeyed = RepoMcpServers(jdbc, SecretsKey(""), repos)
+        val unkeyed = StoredRepoMcpServers(jdbc, SecretsKey(""), repos)
         val e = assertThrows<ResponseStatusException> {
             unkeyed.put(repo, "docs", mapOf("kind" to "http", "audience" to "first-mate", "url" to "https://x.example.com", "headers" to mapOf("A" to mapOf("value" to "v", "secret" to true))), null)
         }

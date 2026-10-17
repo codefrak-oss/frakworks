@@ -66,7 +66,7 @@ class LayerRuleTest {
 /** The layer rule as an ArchUnit rule, with the class-to-module mapping passed in so the tests can place fixtures. */
 object LayerRule {
     /** The layers, lowest first; every flow module is the one layer `flows`. `hitlp` is the HITLP requester (#2484: no server). */
-    val LAYERS = listOf("common", "github", "events", "accounts", "jev", "smith", "incidents", "hitlp", "firstmate", "flows", "plugins", "api", "app")
+    val LAYERS = listOf("common", "github-api", "github", "events", "accounts", "jev", "smith", "incidents", "hitlp", "firstmate", "flows", "plugins", "api", "app")
     val FLOWS = listOf("flow-intake", "flow-feature", "flow-delivery", "flow-doctor", "flow-friction", "flow-proposal")
     val MODULES = LAYERS.filter { it != "flows" } + FLOWS
 

@@ -16,7 +16,7 @@ import kotlin.test.assertTrue
 
 /**
  * Tickets are store work items (#100031, engine/docs/work-items.md): over the compiled classes, no class depends on the
- * GitHub issue client ([GitHubIssueApi]) but the github module's own (found by load path, [LayerRule.moduleOf]) and
+ * GitHub issue client ([GitHubIssueApi]) but the github module's own and the contract's (github-api, where the interface and its default methods live; both found by load path, [LayerRule.moduleOf]) and
  * `GitHubWorkItemSource`, which imports an issue as an item and publishes an item's opt-in copy.
  */
 class GitHubIssuesGuardTest {
@@ -44,7 +44,7 @@ object GitHubIssuesGuard {
     private val ALLOWED = listOf("com.codefrak.engine.workitems.GitHubWorkItemSource")
 
     private fun allowed(javaClass: JavaClass, moduleOf: (JavaClass) -> String?): Boolean =
-        moduleOf(javaClass) == "github" || ALLOWED.any { javaClass.name == it || javaClass.name.startsWith("$it$") }
+        moduleOf(javaClass) in setOf("github", "github-api") || ALLOWED.any { javaClass.name == it || javaClass.name.startsWith("$it$") }
 
     fun rule(moduleOf: (JavaClass) -> String?): ArchRule = classes().should(object : ArchCondition<JavaClass>("not use GitHubIssueApi outside the github module and GitHubWorkItemSource") {
         override fun check(item: JavaClass, events: ConditionEvents) {

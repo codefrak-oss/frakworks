@@ -3,21 +3,18 @@ package com.codefrak.engine.github
 import com.codefrak.engine.promLabel
 import org.springframework.http.HttpRequest
 import org.springframework.http.client.ClientHttpRequestExecution
-import org.springframework.http.client.ClientHttpRequestInterceptor
 import org.springframework.http.client.ClientHttpResponse
 import org.springframework.stereotype.Component
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.LongAdder
 
 /**
- * Counts the engine's GitHub REST calls and keeps GitHub's rate-limit headers (engine/README.md, "GitHub calls and
- * the rate limit"): every call through [RestGitHub], [com.codefrak.engine.ci.RestCheckRuns] and [RestRepoSetupGitHub]
- * passes this interceptor. Rendered on `GET /metrics` as `frak_github_requests_total{caller,endpoint,status}` and
+ * [GitHubCallMeter] rendered on `GET /metrics` as `frak_github_requests_total{caller,endpoint,status}` and
  * `frak_github_ratelimit_{remaining,limit,reset_seconds}{repo,resource}`, so the budget each part of the engine
- * spends, and what is left of it, is a Grafana query. Git's own fetches and pushes are not REST calls and are not here.
+ * spends, and what is left of it, is a Grafana query.
  */
 @Component
-class GitHubCallMeter : ClientHttpRequestInterceptor {
+class PrometheusGitHubCallMeter : GitHubCallMeter {
     private data class Call(val caller: String, val endpoint: String, val status: String)
     private data class Budget(val remaining: Long, val limit: Long, val reset: Long)
 
@@ -44,8 +41,7 @@ class GitHubCallMeter : ClientHttpRequestInterceptor {
     private fun count(caller: String, endpoint: String, status: String) =
         calls.computeIfAbsent(Call(caller, endpoint, status)) { LongAdder() }.increment()
 
-    /** The Prometheus text of both families; empty before the first call. */
-    fun render(): String = buildString {
+    override fun render(): String = buildString {
         if (calls.isNotEmpty()) {
             append("# HELP frak_github_requests_total GitHub REST calls the engine made, by the engine class that made it, endpoint and status.\n")
             append("# TYPE frak_github_requests_total counter\n")
@@ -72,7 +68,7 @@ class GitHubCallMeter : ClientHttpRequestInterceptor {
     }
 
     companion object {
-        private val HTTP_LAYER = setOf("com.codefrak.engine.github.GitHubCallMeter", "com.codefrak.engine.github.RestGitHub",
+        private val HTTP_LAYER = setOf("com.codefrak.engine.github.PrometheusGitHubCallMeter", "com.codefrak.engine.github.RestGitHub",
             "com.codefrak.engine.github.RestRepoSetupGitHub", "com.codefrak.engine.ci.RestCheckRuns")
 
         /** The first engine class on the stack above the GitHub clients: who spent the call. */

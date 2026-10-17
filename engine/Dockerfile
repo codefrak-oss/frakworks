@@ -22,6 +22,7 @@ COPY settings.gradle.kts build.gradle.kts gradle.properties ./
 COPY --from=root sdk/ /sdk/
 # The engine modules' build files (settings.gradle.kts includes modules/*), so the dependency layer resolves them too.
 COPY modules/common/build.gradle.kts ./modules/common/
+COPY modules/github-api/build.gradle.kts ./modules/github-api/
 COPY modules/github/build.gradle.kts ./modules/github/
 COPY modules/events/build.gradle.kts ./modules/events/
 COPY modules/accounts/build.gradle.kts ./modules/accounts/

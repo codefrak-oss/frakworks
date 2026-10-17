@@ -9,7 +9,7 @@ code, only what the modules share (the plugin versions, the toolchain, the Sprin
 `com.codefrak.engine.*` packages its code had, so a package can span modules, and component scanning from
 `EngineApplication`, bean names and BPMN delegate expressions are unchanged.
 
-**The layer rule.** The modules form layers, lowest first: `common`, `github`, `events`, `accounts`, `jev`, `smith`,
+**The layer rule.** The modules form layers, lowest first: `common`, `github-api`, `github`, `events`, `accounts`, `jev`, `smith`,
 `incidents`, `hitlp`, `firstmate` (layers 0-2 below), the flow modules (one layer), `plugins`, `api`, `app`. A module uses its own classes
 and those of lower layers only, never an upper layer's, and a flow module never uses another flow module's: what two
 flows share is a contract in a lower layer. Gradle holds it (each build file names only lower modules), and two tests
@@ -34,10 +34,11 @@ every test runs from `engine/`.
 | Module | Holds | Depends on |
 |---|---|---|
 | `engine-common` | `BadRequest`, `errorResponse`, `refuseUnknownFields` and `loginOf` (shared by the controllers that otherwise each defined their own), `Utc`, `Since`, `Apart`, `EngineJson`, `EngineSetting`, `SecretsKey`, and `CallerIdentity` with `CallerRefusal` (is a request from a Smith sandbox; `SandboxCallers` answers it from the `SmithSandbox`), and the request attributes the bearer filter sets (`TOKEN_LOGIN_ATTRIBUTE`, `TOKEN_ID_ATTRIBUTE`, `SMITH_AT_ADDRESS_ATTRIBUTE`) and `actingLogin`, the login a request acts as: the bearer token's ("Tokens") | Spring web and JDBC |
-| `engine-github` | `github/**`, the target repo registry (`TargetRepos`), the interfaces it implements (`ci.RepoCiChecks`, `ci.CiCheck`, `webhook.WebhookSecrets`), `SetupReport` and `board.targetRepo` | common |
-| `engine-events` | `EngineEvent`, `EngineEvents`, `FlowEvents`, `FlowEventsPlugin`, `GET /events`, and the payload types their frames carry (`BoardIssue` and what it holds, `BoardRows`); `FlowIssues` and `IssueBoard` are `engine-api`'s, behind `FlowIssueLookup` and `BoardRows` | github |
+| `engine-github-api` | The GitHub contract, and nothing that talks to GitHub or the database: the interfaces (`IssueDetails`, `GitHubIssueApi`, `GitHubPulls`, `GitPush`, `RepoContents`, `RepoSetupGitHub`, `GitHubCompare`, `RepoTokens`, `TokenIdentity`, `RepoPermissions`, `SmithTokens`, `GitHubCallMeter`, `DeploymentPatterns`, `workitems.Tickets`, the registry `repos.TargetRepos` with `ci.RepoCiChecks` and `webhook.WebhookSecrets`, `repos.RepoMcpServers`, `repos.RepoDocs`, `intake.AnswerAttachments`), their value types (`IssueSnapshot`, `Blocker`, `TicketDetail`, `TargetRepo`, `WorkItem`, `SetupReport`, `McpServerConfig`, ...), the pure helpers (`issueUrl`, `splitRepo`, `TokenScopes`, `DocsOnly`, `DeploymentValueScan`, `board.targetRepo`) and `FakeTickets` (`src/testFixtures`). Every module above programs against this module alone | common |
+| `engine-github` | The implementations of `engine-github-api`: the GitHub clients (`RestGitHub`, `RestGitHubPulls`, `CliGitPush`, `RestRepoContents`, `RestRepoSetupGitHub`, `RestGitHubCompare`), `GitHubTokenIdentity`, `CachedRepoPermissions`, `CheckedSmithTokens`, `PrometheusGitHubCallMeter`, `StoredRepoTokens`, and the stores `StoredTargetRepos`, `StoredRepoMcpServers`, `StoredRepoDocs`, `StoredAnswerAttachments`, `StoredDeploymentPatterns`. Only `engine-app` depends on it (the beans reach the context by component scanning, the packages being the same), so a change here rebuilds and retests this module and the app, no module in between | github-api |
+| `engine-events` | `EngineEvent`, `EngineEvents`, `FlowEvents`, `FlowEventsPlugin`, `GET /events`, and the payload types their frames carry (`BoardIssue` and what it holds, `BoardRows`); `FlowIssues` and `IssueBoard` are `engine-api`'s, behind `FlowIssueLookup` and `BoardRows` | github-api |
 | `engine-accounts` | `accounts/**` and `tier/**`; `GET /accounts`'s live runs come from `RunningModels` (`SmithTelemetry`) | events |
-| `engine-jev` | `jev/**` and `summarize/**`; the live runs a summary reads come from `LiveRunSessions` (`SmithLiveRunSessions`) | accounts, github |
+| `engine-jev` | `jev/**` and `summarize/**`; the live runs a summary reads come from `LiveRunSessions` (`SmithLiveRunSessions`) | accounts, github-api |
 | `engine-smith` | `smith/**` (the sandboxes, the Smith delegates, `read result`), `webhook/**`, and the flow-tracking half of `repos/**` (`RunningFlows`, `RootProcessInstance`, `HandledIssues`, `DeferredIssues`, `Access`); `TargetRepoController` and `RepoSetup*` are `engine-api`'s | jev |
 | `engine-incidents` | `camunda/**` (incidents, their fixes, flows and timelines) `doctor.DoctorVars`, and the intake links `IntakeRefs` and `IntakeTickets` | smith |
 | `engine-hitlp` | `hitlp/**` ("The HITLP requester"): the engine as a HITLP requester (`HitlpServerSettings`, `HitlpRequester`, `HitlpFiling`, `HitlpTaskStream`, `HitlpPoller`, `HitlpRequests`), the vendored spec/schemas (`resources/hitlp/**`), and the judge's escalation, teach and SSH-verdict readers; it serves no HITLP (#2484) | smith |
@@ -50,7 +51,7 @@ every test runs from `engine/`.
 | `engine-flow-proposal` | `proposal/**` and `research/**` | layers 0-2 |
 | `engine-plugins` | `jobs/**` (custom jobs, plugin jars and flows, the job controller), `sdk/**` (the engine's side of the SDK), `refactor.RefactorConfigs` and its controller, and `bpmn.FlowRules` (the diagram checks, for the engine's flows and a plugin's) | every flow module, `:sdk` |
 | `engine-api` | `board/**` (the Issues board, needs, pitches), `mcp/**` (the engine-served MCP servers), `firstmate/**`, `frakpanel/**`, `TargetRepoController`, `EngineAccessController` and `RepoSetup*` in `repos`, `intake.IntakeController`, `events.FlowIssues`, and the root controllers (`HealthController`, `VersionController`, `EchoController`, `ProcessTestController`) | plugins |
-| `engine-app` | `EngineApplication`, `ProcessMigrator`, `UnknownEngineProperties`, the root delegates (`HelloDelegate`, `NoopDelegate`, `NotBuiltListener`), the Kotlin Flyway migrations (`db.migration`), and every resource: `src/main/resources` (`bpmn/`, `db/migration`, `frakpanel/`, `application.properties`, `META-INF`), the Modeler drafts in `engine/bpmn` (a resource directory of the module, deployed as they are), `smith/schemas` and `bots/refactor-values.md`. Its tests are the ones that need the whole application ("Where tests live", below) | api |
+| `engine-app` | `EngineApplication`, `ProcessMigrator`, `UnknownEngineProperties`, the root delegates (`HelloDelegate`, `NoopDelegate`, `NotBuiltListener`), the Kotlin Flyway migrations (`db.migration`), and every resource: `src/main/resources` (`bpmn/`, `db/migration`, `frakpanel/`, `application.properties`, `META-INF`), the Modeler drafts in `engine/bpmn` (a resource directory of the module, deployed as they are), `smith/schemas` and `bots/refactor-values.md`. Its tests are the ones that need the whole application ("Where tests live", below) | api, github |
 
 Every package, by the modules that hold it (a package in several modules is split by class, as the table above says):
 
@@ -58,38 +59,47 @@ Every package, by the modules that hold it (a package in several modules is spli
 |---|---|
 | (root) | common, api, app |
 | `accounts` | common (`SecretsKey`), accounts |
-| `board` | github, events, smith, api |
+| `board` | github-api, events, smith, api |
 | `bpmn` | plugins |
 | `bug` | flow-feature |
 | `camunda` | events, incidents |
 | `chore` | smith, flow-delivery |
-| `ci` | github, flow-delivery |
+| `ci` | github-api, flow-delivery |
 | `doctor` | smith, incidents, flow-doctor |
 | `events` | events, api (`FlowIssues`) |
 | `feature` | smith, flow-feature |
 | `firstmate` | api |
 | `frakpanel` | api |
 | `friction` | smith, flow-friction |
-| `github` | github |
+| `github` | github-api (the contract), github (the clients) |
 | `hitlp` | hitlp |
-| `intake` | events, smith, incidents, flow-intake, api (`IntakeController`) |
+| `intake` | github-api (`AnswerAttachments`), github (`StoredAnswerAttachments`), events, smith, incidents, flow-intake, api (`IntakeController`) |
 | `jev` | jev |
 | `jobs` | smith (`JOB_OUTCOME`, `JobCreators`), plugins |
 | `mcp` | api |
 | `proposal` | smith, flow-proposal |
 | `refactor` | flow-delivery, plugins (`RefactorConfigs`) |
-| `repos` | github, smith, api |
+| `repos` | github-api, github (the stores), smith, api |
 | `research` | smith, flow-proposal |
 | `sdk` | plugins |
 | `smith` | accounts, smith |
 | `summarize` | jev |
 | `tier` | accounts |
 | `trigger` | smith, flow-delivery |
-| `webhook` | github, smith |
+| `webhook` | github-api, smith |
+| `workitems` | github-api (`Tickets`, `WorkItem`, `TicketReads`; `FakeTickets` in its test fixtures), api (`WorkItemStore`, `WorkItemTickets`, `GitHubWorkItemSource`) |
 | `db.migration` (not under `com.codefrak.engine`) | app |
 
-`SecretsKey` is in `engine-common`, not `engine-accounts`, so `TargetRepos` can encrypt tokens without
-`engine-github` depending on `engine-accounts` (which depends on `engine-events`, which depends on `engine-github`).
+`SecretsKey` is in `engine-common`, not `engine-accounts`, so `StoredTargetRepos` can encrypt tokens without
+`engine-github` depending on `engine-accounts` (which depends on `engine-events`, which depends on `engine-github-api`).
+
+`engine-github-api` and `engine-github` are one package tree cut in two (the contract and its implementations), so that a
+change to a GitHub client or a store does not recompile and retest every module above `github`: those depend on the
+contract alone, and `engine-app`, the one module that depends on `engine-github`, puts the implementations on the
+classpath. A consumer that needs a new operation adds it to the interface in `engine-github-api` and implements it in
+`engine-github`; a consumer never depends on `engine-github` itself (`EngineModulesTest` and `LayerRuleTest` hold the
+layers, `engine-github-api` just below `engine-github`). `FakeTickets` is `engine-github-api`'s test fixture
+(`testImplementation(testFixtures(project(":engine-github-api")))`).
 
 `JevAgreement` (`GET /jev/summary`'s `judged` and `agreed`, "Jev decisions") is a bean over every
 `JevAgreementRule` bean: each use case's package registers the rule that reads its outcomes (`CiTriageAgreement`,

@@ -1,13 +1,11 @@
 package com.codefrak.engine.github
 
-import com.codefrak.engine.repos.TargetRepos
-import org.springframework.stereotype.Component
-
 /**
  * Which GitHub token acts on a repo (engine/README.md, "Each repo's token"): the repo's own,
  * sealed on its `engine.target_repo` row, and no other. Every GitHub client asks here per call,
  * so a token set through `PUT /repos/{o}/{n}/token` is used at once, and a Smith sandbox gets
  * its ticket's repo's token and no other. A repo without one has no token: nothing stands in.
+ * The engine's is `StoredRepoTokens` (engine-github), over the target repo registry.
  */
 fun interface RepoTokens {
     /** The repo's token, or null when it has none. */
@@ -26,12 +24,6 @@ fun interface RepoTokens {
      */
     fun forSmith(repo: String): String = resolveSmith(repo)
         ?: throw IllegalStateException("no Smith token for $repo: PUT /repos/$repo/smith-token")
-}
-
-@Component
-class StoredRepoTokens(private val repos: TargetRepos) : RepoTokens {
-    override fun resolve(repo: String): String? = repos.token(repo)
-    override fun resolveSmith(repo: String): String? = repos.smithToken(repo)
 }
 
 /** The repo's owner and name, split from `owner/name`. */

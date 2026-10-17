@@ -11,5 +11,5 @@ dependencies {
     // HitlpFiling and HitlpAnswerer: every ask wait is filed as a HITLP task and continues from its decision record (#2462).
     implementation(project(":engine-hitlp"))
     // FakeTickets: the in-memory Tickets the delegates' ticket decisions are tested on (#100037).
-    testImplementation(testFixtures(project(":engine-github")))
+    testImplementation(testFixtures(project(":engine-github-api")))
 }

@@ -6,12 +6,12 @@ import com.codefrak.engine.events.EngineEvents
 import com.codefrak.engine.events.EventRecorder
 import com.codefrak.engine.github.FakeIssueDetails
 import com.codefrak.engine.github.FakeRepoSetupGitHub
-import com.codefrak.engine.github.SmithTokens
+import com.codefrak.engine.github.CheckedSmithTokens
 import com.codefrak.engine.github.ReadFakes
-import com.codefrak.engine.github.RepoPermissions
+import com.codefrak.engine.github.CachedRepoPermissions
 import com.codefrak.engine.github.RepoSettings
 import com.codefrak.engine.github.RepoTokens
-import com.codefrak.engine.github.TokenIdentity
+import com.codefrak.engine.github.GitHubTokenIdentity
 import com.codefrak.engine.mcp.FrakworksMcp
 import com.codefrak.engine.mcp.McpCaller
 import com.codefrak.engine.mcp.McpToolResult
@@ -132,7 +132,7 @@ class TargetRepoControllerTest {
             permissions[repo to "fleet-bot"] = "write"
             permissions[repo to "lundmatt1"] = "admin"
         }
-        val withPermissions = TargetRepoController(repos, running, secrets, github, sandbox, costs, bus, RepoPermissions(details, TokenIdentity(details, tokens)))
+        val withPermissions = TargetRepoController(repos, running, secrets, github, sandbox, costs, bus, CachedRepoPermissions(details, GitHubTokenIdentity(details, tokens)))
         try {
             val plain = withPermissions.list().associateBy { it.fullName }
             assertEquals("write", plain[repo]!!.tokenPermission)
@@ -204,9 +204,9 @@ class TargetRepoControllerTest {
                 jsonPath("$[?(@.fullName == '$repo')].hasSmithToken") { value(true) }
                 jsonPath("$[?(@.fullName == '$repo')].smithToken") { doesNotExist() }
             }
-            assertEquals("github_pat_smith", SmithTokens(tokens, github).forRun(repo))
+            assertEquals("github_pat_smith", CheckedSmithTokens(tokens, github).forRun(repo))
             github.badTokens += "github_pat_smith"
-            assertFailsWith<IllegalStateException>("unreadable since it was set: refused before the run") { SmithTokens(tokens, github).forRun(repo) }
+            assertFailsWith<IllegalStateException>("unreadable since it was set: refused before the run") { CheckedSmithTokens(tokens, github).forRun(repo) }
             github.badTokens -= "github_pat_smith"
 
             mvc.delete("/repos/$repo/smith-token").andExpect { status { isNoContent() } }

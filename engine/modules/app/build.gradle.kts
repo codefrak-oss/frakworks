@@ -12,6 +12,10 @@ plugins {
 
 dependencies {
     implementation(project(":engine-api"))
+    // The GitHub clients and the stores behind engine-github-api's contract: every other module programs against the
+    // contract alone, and the one application puts the implementations on the classpath (component scanning finds
+    // them, their packages being the same). Its tests construct a few of them (StoredRepoMcpServers, GitHubTokenIdentity).
+    implementation(project(":engine-github"))
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
     implementation("tools.jackson.module:jackson-module-kotlin")
     implementation("org.jetbrains.kotlin:kotlin-reflect")

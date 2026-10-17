@@ -11,7 +11,7 @@ import kotlin.test.assertTrue
 
 /** [GitHubCallMeter]: each call counted by caller, endpoint and status; the rate-limit headers kept per repo. */
 class GitHubCallMeterTest {
-    private val meter = GitHubCallMeter()
+    private val meter = PrometheusGitHubCallMeter()
 
     private fun call(method: HttpMethod, path: String, status: HttpStatus, remaining: String? = "4990") {
         val request = MockClientHttpRequest(method, URI("https://api.github.com$path"))
@@ -27,12 +27,12 @@ class GitHubCallMeterTest {
 
     @Test
     fun `endpoints drop the repo and number the ids and shas`() {
-        assertEquals("GET /issues/:n/comments", GitHubCallMeter.endpoint("GET", "/repos/acme/tickets/issues/42/comments"))
+        assertEquals("GET /issues/:n/comments", PrometheusGitHubCallMeter.endpoint("GET", "/repos/acme/tickets/issues/42/comments"))
         assertEquals("GET /commits/:sha/check-runs",
-            GitHubCallMeter.endpoint("GET", "/repos/acme/tickets/commits/0123456789abcdef0123456789abcdef01234567/check-runs"))
-        assertEquals("GET /user", GitHubCallMeter.endpoint("GET", "/user"))
-        assertEquals("acme/tickets", GitHubCallMeter.repoOf("/repos/acme/tickets/pulls/7"))
-        assertEquals("-", GitHubCallMeter.repoOf("/user"))
+            PrometheusGitHubCallMeter.endpoint("GET", "/repos/acme/tickets/commits/0123456789abcdef0123456789abcdef01234567/check-runs"))
+        assertEquals("GET /user", PrometheusGitHubCallMeter.endpoint("GET", "/user"))
+        assertEquals("acme/tickets", PrometheusGitHubCallMeter.repoOf("/repos/acme/tickets/pulls/7"))
+        assertEquals("-", PrometheusGitHubCallMeter.repoOf("/user"))
     }
 
     @Test

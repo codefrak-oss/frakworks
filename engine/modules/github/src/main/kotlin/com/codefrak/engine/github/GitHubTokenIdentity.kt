@@ -10,33 +10,25 @@ import java.util.Base64
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * Whose token acts on a repo, and what it may do: `GET /user` per token (engine/README.md,
- * "Each repo's token"), held in memory only, keyed by a digest of the token so a replaced token
- * is a new lookup and no token is kept here. Null when the repo has no token or GitHub would
- * not say, and the engine starts either way.
+ * [TokenIdentity] from `GET /user` per token (engine/README.md, "Each repo's token"), held in memory only, keyed by
+ * a digest of the token so a replaced token is a new lookup and no token is kept here. Null when the repo has no
+ * token or GitHub would not say, and the engine starts either way.
  *
  * The same call's `X-OAuth-Scopes` header gives the token's classic [scopes] (engine/README.md,
  * "The token's scopes"): logged, warned about when `workflow` is missing, and null
  * (unknown) for a fine-grained token, which sends no header, or when the call fails.
  */
 @Component
-class TokenIdentity(private val details: IssueDetails, private val tokens: RepoTokens, private val repos: TargetRepos? = null) {
-    private val log = LoggerFactory.getLogger(TokenIdentity::class.java)
+class GitHubTokenIdentity(private val details: IssueDetails, private val tokens: RepoTokens, private val repos: TargetRepos? = null) : TokenIdentity {
+    private val log = LoggerFactory.getLogger(GitHubTokenIdentity::class.java)
 
     private val users = ConcurrentHashMap<String, TokenUser>()
 
-    /** The login of the token that acts on `repo`, or null when it has none or GitHub would not say. */
-    fun login(repo: String): String? = user(repo)?.login
+    override fun login(repo: String): String? = user(repo)?.login
 
-    /** The classic scopes of the token that acts on `repo`, or null when unknown. */
-    fun scopes(repo: String): Set<String>? = user(repo)?.scopes
+    override fun scopes(repo: String): Set<String>? = user(repo)?.scopes
 
-    /**
-     * Who a commit on `repo` is by: its token's account ([TokenUser.commitIdentity]), so a commit, its push
-     * and its PR are one identity on GitHub. Nothing stands in when the repo has no token or GitHub would
-     * not say who it is: the commit is not made.
-     */
-    fun commitIdentity(repo: String): CommitIdentity = user(repo)?.commitIdentity
+    override fun commitIdentity(repo: String): CommitIdentity = user(repo)?.commitIdentity
         ?: throw IllegalStateException("cannot commit on $repo: GitHub would not say who its token is (GET /user), or it has none")
 
     /** One `GET /user` per distinct token; a failed call is not remembered, so the next ask tries again. */
