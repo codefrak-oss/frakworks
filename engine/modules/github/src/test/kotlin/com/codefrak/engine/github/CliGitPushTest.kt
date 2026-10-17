@@ -309,4 +309,34 @@ class CliGitPushTest {
         assertEquals("", git(remote, "branch", "--list", "smith/issue-5"), "nothing was pushed")
         root.deleteRecursively()
     }
+
+    @Test
+    fun `a push whose commits add a line a deployment pattern matches is refused naming file and line, never the pattern or line`() {
+        remote.mkdirs(); git(remote, "init", "--quiet", "--bare")
+        val seed = File(root, "seed").apply { mkdirs() }
+        git(seed, "init", "--quiet"); File(seed, "README.md").writeText("hi\n")
+        git(seed, "add", "."); git(seed, "commit", "--quiet", "-m", "seed")
+        git(seed, "push", "--quiet", "file://${remote.absolutePath}", "HEAD:main")
+        var rules: DeploymentRules? = DeploymentRules("# ours\nchang[e]d\n", "")
+        val gated = CliGitPush(tokens, TokenIdentity(FakeIssueDetails(), tokens), gitUrl = "file://${root.absolutePath}", patterns = { rules })
+
+        val refused = assertThrows<IllegalStateException> { gated.push("acme/widgets", "smith/issue-5", smithRound("main", "conf/a.txt"), "main") }.message!!
+        assertTrue(refused.startsWith(GitPush.UNAPPLIABLE) && "conf/a.txt:1 (commit " in refused, refused)
+        assertTrue("chang" !in refused, "neither the pattern nor the line: $refused")
+        assertTrue(run(remote, "rev-parse", "--verify", "--quiet", "smith/issue-5") != 0, "nothing pushed")
+
+        rules = DeploymentRules("chang[e]d", "changed")
+        gated.push("acme/widgets", "smith/issue-5", smithRound("main", "conf/a.txt"), "main")
+        rules = null
+        gated.push("acme/widgets", "smith/issue-5", smithRound("smith/issue-5", "conf/b.txt"), "main")
+    }
+
+    private fun run(dir: File, vararg args: String): Int = ProcessBuilder(listOf("git") + args).directory(dir).start().waitFor()
+
+    @Test
+    fun `the scan reads line numbers per hunk and skips removed lines, comments and blank patterns`() {
+        val log = "\u0000commit abc\n\ndiff --git a/x b/x\n--- a/x\n+++ b/x\n@@ -1 +1,2 @@\n-old hit\n+fine\n+a hit\n@@ -9,0 +20 @@\n+hit again\n"
+        val hits = DeploymentValueScan.scan(log, DeploymentRules("\n# hit\nhit\n", "hit again"))
+        assertEquals(listOf(DeploymentHit("abc", "x", 2)), hits)
+    }
 }
