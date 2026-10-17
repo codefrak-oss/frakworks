@@ -220,14 +220,6 @@ const snap = (over = {}) => ({
   filed: [], turns_since_filed: 0, unfiled_hint: false, ...over,
 });
 
-test("ModelBar draws no Override control and no Clear button (#1751)", () => {
-  const { ModelBar } = require("../dist/first-mate.cjs");
-  const html = draw(React.createElement(ModelBar, { tier: { tier: 5, model: "opus", effort: "medium", source: "standing" } }));
-  assert.doesNotMatch(html, /Override/);
-  assert.doesNotMatch(html, /fmModelClear/);
-  assert.match(html, /Opus medium/);
-});
-
 test("the strip draws exactly one new-conversation button, no rename input and no pin control", () => {
   const html = draw(React.createElement(FirstMate, {
     snapshot: snap({ history: [{ role: "user", text: "hi", at: 1 }, { role: "assistant", text: "hello", at: 2 }] }),

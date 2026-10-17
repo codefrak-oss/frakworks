@@ -12,7 +12,7 @@ const { EventEmitter } = require("node:events");
 const { PassThrough } = require("node:stream");
 
 const {
-  FirstMateManager, REMOTE_NOTICE, REMOTE_MODE_LINE, REMOTE_CANCEL_ROW, REMOTE_EXPIRED_ROW,
+  FirstMateManager, REMOTE_CANCEL_ROW, REMOTE_EXPIRED_ROW,
 } = require("../src/first-mate");
 const { RemoteSession, splitContent } = require("../src/first-mate-remote");
 const {
@@ -136,7 +136,7 @@ test("with hosting kubernetes a new conversation POSTs /first-mate/sessions on t
   assert.equal(msgs.length, 2);
   assert.notEqual(msgs[0].body.clientId, msgs[1].body.clientId);
   assert.equal(eng.of("/settings/first-mate-hosting").length, 1);
-  assert.equal(m.snapshot().notice, REMOTE_NOTICE);
+  assert.equal(m.snapshot().notice, null);
   m.stop();
   assert.deepEqual(events.subscribed, []);
   assert.equal(eng.of("/first-mate/sessions/s1", "DELETE").length, 0);
@@ -295,7 +295,7 @@ test("resuming frames show resuming… until the first assistant frame; a pod-st
   assert.equal(snap.remoteState, "resuming…");
   assert.equal(snap.remote_detail, "ContainerCreating");
   assert.ok(!snap.history.some((h) => /ContainerCreating/.test(h.text)));
-  assert.equal(snap.mode_line, REMOTE_MODE_LINE);
+  assert.equal(snap.mode_line, undefined);
   await reply(eng, events, "s1", "back", 1);
   assert.equal(m.snapshot().remoteState, null);
   assert.equal((await turn).text, "back");

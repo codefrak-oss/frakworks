@@ -262,42 +262,10 @@ export const FileCard = ({ file, fileBusy, fileError, onFile, tierDraft, onTierD
 // main's `{ tier, model, effort, source }` for the next turn (source
 // "standing" or "fallback"); the renderer only ever sends a tier number back.
 
-/** `{ model: "opus", effort: "medium" }` -> "Opus medium". */
-export const modelLabel = (tier) => {
-  if (!tier || !tier.model) return tier && tier.tier ? `tier ${tier.tier}` : "";
-  const m = String(tier.model);
-  return `${m.charAt(0).toUpperCase()}${m.slice(1)}${tier.effort ? ` ${tier.effort}` : ""}`;
-};
-
-/** The strip's model line: what runs next, nothing clickable. */
-export const ModelBar = ({ tier }) => (
-  <div className="fmModel">
-    <div className="fmModelLine">
-      <span className="fmModelName" title={tier && tier.tier ? `tier ${tier.tier}` : undefined}>
-        {modelLabel(tier) || "model…"}
-        {tier && tier.source === "fallback" ? " · Fable-limit fallback" : ""}
-      </span>
-    </div>
-  </div>
-);
-
-/** The model line, read-only: what runs next, nothing clickable. */
-export const ModelStatic = ({ tier }) => (
-  <div className="fmModel">
-    <div className="fmModelLine">
-      <span className="fmModelName" title={tier && tier.tier ? `tier ${tier.tier}` : undefined}>
-        {modelLabel(tier) || "model…"}
-        {tier && tier.source === "fallback" ? " · Fable-limit fallback" : ""}
-      </span>
-    </div>
-  </div>
-);
-
 // The History control (#265): the list and the read-only conversation view
 // are panels that replace the transcript area in place — same header, same
 // fixed width/position — never full-screen or a modal. Neither branch draws
-// an input, a send button, a File card or (for the conversation view) the
-// ModelBar; the list keeps a non-interactive model display (ModelStatic).
+// an input, a send button or a File card.
 const HistoryList = ({ historyList, onSelectConversation, onCloseHistory }) => (
   <>
     <button className="fmHistoryClose" onClick={onCloseHistory}>Close</button>
@@ -366,13 +334,6 @@ export const newConversationRepoText = (selection) =>
   selection && selection.repo ? ` · in ${selection.repo}` : " · no repo yet";
 export const NEW_CONVERSATION_TITLE =
   "Starts a new chat in the repo switcher's repo (none in All repos); change it afterwards with \"This chat's repo\"";
-// The note beside the chip when the switcher shows another repo than this
-// chat's: the switcher applies to new chats only. Null when they agree.
-export const chatRepoMismatchNote = (chatRepo, selection) => {
-  const sw = selection ? (selection.repo || null) : undefined;
-  if (sw === undefined || sw === (chatRepo || null)) return null;
-  return `(switcher: ${sw || "All repos"} — applies to new chats only)`;
-};
 export const ChatRepoChip = ({ chatRepo, repos, onSetRepo, disabled }) => {
   const list = [...new Set([...(repos || []), ...(chatRepo ? [chatRepo] : [])])];
   return (
@@ -583,9 +544,6 @@ export const FirstMate = ({ snapshot, font, onOpenTicket, onOpenFile, draft, onD
         <div className="fmChatRepoRow">
           <ChatRepoChip chatRepo={s.chat_repo || null} repos={selection && selection.repos}
                         onSetRepo={onSetChatRepo} disabled={busy} />
-          {chatRepoMismatchNote(s.chat_repo, selection) ? (
-            <span className="fmChatRepoMismatch">{chatRepoMismatchNote(s.chat_repo, selection)}</span>
-          ) : null}
         </div>
       ) : null}
     </div>
@@ -606,7 +564,6 @@ export const FirstMate = ({ snapshot, font, onOpenTicket, onOpenFile, draft, onD
       <aside className="firstMate" style={term.style}>
         {face}
         {header}
-        {s.tier ? <ModelStatic tier={s.tier} /> : null}
         <HistoryList historyList={historyList} onSelectConversation={onSelectConversation} onCloseHistory={onCloseHistory} />
       </aside>
     );
@@ -615,8 +572,6 @@ export const FirstMate = ({ snapshot, font, onOpenTicket, onOpenFile, draft, onD
     <aside className="firstMate" style={term.style}>
       {face}
       {makeHeader(false)}
-      {s.tier ? <ModelBar tier={s.tier} /> : null}
-      {s.mode_line ? <div className="fmModeLine">{s.chat_repo ? `${s.chat_repo}: ` : ""}{s.mode_line}</div> : null}
       {s.remoteState ? <div className="fmRemoteState" title={s.remote_detail || undefined}>{s.remoteState}</div> : null}
       {s.tier_notice ? <div className="fmNotice fmTierNotice">{s.tier_notice}</div> : null}
       {s.account_notice ? <div className="fmNotice fmAccountNotice">{s.account_notice}</div> : null}

@@ -179,9 +179,6 @@ const ITERM_POD_SEED_HEAD = "[Handed off from First mate in the frakworks deskto
 const ITERM_ROW = "Handed off to Claude Code in iTerm2.";
 // A conversation in a session pod (#2521, #2523): each desktop-only feature's
 // behaviour there is observability/desktop/README.md's "First mate" table.
-const REMOTE_NOTICE = "Running in a pod on the cluster: the checkout in AGENT_ARMY_REPO_DIR and this machine's clones are not used; the engine gives the prompt's fresh code";
-// The strip's repo line for one (#2523).
-const REMOTE_MODE_LINE = "runs in a pod on the cluster";
 const REMOTE_TIER_NOTE = "applies to the next conversation";
 const REMOTE_CANCEL_ROW = "Cancelled here: the pod finishes the turn on its own, and its answer is not shown.";
 const REMOTE_EXPIRED_ROW = "The session pod expired (404): a new session starts in this strip with the next message.";
@@ -506,13 +503,12 @@ class FirstMateManager extends EventEmitter {
       runtime: this.session.runtime || null,
       // A pod's conversation (#2523): the repo line, the `resuming…` state
       // while the engine thaws a frozen session, and its pod-status detail.
-      mode_line: this._remote() ? REMOTE_MODE_LINE : null,
       remoteState: rt.remoteState || null,
       remote_detail: rt.remoteDetail || null,
       running: Boolean(rt.child && rt.child.alive),
       busy: rt.busy,
       recovery: rt.recovery,
-      notice: rt.notice || this.repoMismatch() || (this._remote() ? REMOTE_NOTICE : null),
+      notice: rt.notice || this.repoMismatch(),
       repo_mismatch: this.repoMismatch(),
       streaming: rt.streaming,
       history: this.session.history.slice(-FIRST_MATE_HISTORY_LIMIT),
@@ -1562,7 +1558,7 @@ class FirstMateManager extends EventEmitter {
 }
 
 module.exports = {
-  REMOTE_MODE_LINE, REMOTE_TIER_NOTE, REMOTE_CANCEL_ROW, REMOTE_EXPIRED_ROW,
-  FirstMateManager, REMOTE_NOTICE, UNFILED_TURN_HINT, FILED_WATCH_MS, APP_REPO, filedRowText, repoLine, kickStarterRepo, itermSeed,
+  REMOTE_TIER_NOTE, REMOTE_CANCEL_ROW, REMOTE_EXPIRED_ROW,
+  FirstMateManager, UNFILED_TURN_HINT, FILED_WATCH_MS, APP_REPO, filedRowText, repoLine, kickStarterRepo, itermSeed,
   ITERM_SEED_HEAD, ITERM_POD_SEED_HEAD, ITERM_ROW, ITERM_BUSY, ITERM_EMPTY,
 };
