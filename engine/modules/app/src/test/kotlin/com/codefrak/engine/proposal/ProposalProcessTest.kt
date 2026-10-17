@@ -62,7 +62,7 @@ class ProposalProcessTest {
     @Autowired lateinit var history: HistoryService
     @Autowired lateinit var handled: HandledIssues
     @Autowired lateinit var management: ManagementService
-    @Autowired lateinit var exits: com.codefrak.engine.smith.SmithExitNotifier
+    @Autowired lateinit var exits: com.codefrak.engine.smith.SandboxExitNotifier
     @Autowired lateinit var github: TicketRecorder
     @Autowired lateinit var pulls: FakeGitHubPulls
     @Autowired lateinit var git: FakeGitPush

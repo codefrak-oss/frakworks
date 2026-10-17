@@ -175,7 +175,7 @@ class IntakeProcessTest {
     @Autowired lateinit var accounts: AiAccounts
     @Autowired lateinit var history: HistoryService
     @Autowired lateinit var management: ManagementService
-    @Autowired lateinit var exits: com.codefrak.engine.smith.SmithExitNotifier
+    @Autowired lateinit var exits: com.codefrak.engine.smith.SandboxExitNotifier
     @Autowired lateinit var tasks: TaskService
     @Autowired lateinit var github: TicketRecorder
     @Autowired lateinit var sandbox: RefiningSandbox

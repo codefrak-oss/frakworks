@@ -112,9 +112,9 @@ class SmithSessionsTest {
 
     @Test
     fun `an over-long line is stored cut, with a marker`() {
-        val long = "x".repeat(SmithSessions.MAX_LINE + 10)
-        assertEquals(SmithSessions.MAX_LINE + " …[cut: 10 more chars]".length, SmithSessions.cut(long).length)
-        assertTrue(SmithSessions.cut(long).endsWith("[cut: 10 more chars]"))
-        assertEquals("short", SmithSessions.cut("short"))
+        val long = "x".repeat(StoredSmithSessions.MAX_LINE + 10)
+        assertEquals(StoredSmithSessions.MAX_LINE + " …[cut: 10 more chars]".length, StoredSmithSessions.cut(long).length)
+        assertTrue(StoredSmithSessions.cut(long).endsWith("[cut: 10 more chars]"))
+        assertEquals("short", StoredSmithSessions.cut("short"))
     }
 }

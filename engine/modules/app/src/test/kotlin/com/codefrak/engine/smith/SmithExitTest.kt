@@ -27,7 +27,7 @@ class SmithExitTest {
 
     @Autowired lateinit var runtime: RuntimeService
     @Autowired lateinit var management: ManagementService
-    @Autowired lateinit var exits: SmithExitNotifier
+    @Autowired lateinit var exits: SandboxExitNotifier
 
     private fun start(issue: Long) = runtime.startProcessInstanceByKey("smith-run", mapOf(
         Vars.REPO to "acme/widgets", Vars.ISSUE to issue, Vars.MODEL to "claude-sonnet-5",

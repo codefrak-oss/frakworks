@@ -14,7 +14,7 @@ import com.codefrak.engine.repos.TargetRepos
 import com.codefrak.engine.smith.Brief
 import com.codefrak.engine.smith.SMITH_EXITED_MESSAGE
 import com.codefrak.engine.smith.SandboxExit
-import com.codefrak.engine.smith.SmithExitNotifier
+import com.codefrak.engine.smith.SandboxExitNotifier
 import com.codefrak.engine.smith.Vars
 import com.codefrak.engine.smith.ensureTestAccount
 import com.codefrak.engine.smith.dropTestAccount
@@ -66,7 +66,7 @@ class DoctorProcessTest {
     @Autowired lateinit var management: ManagementService
     @Autowired lateinit var repository: org.operaton.bpm.engine.RepositoryService
     @Autowired lateinit var accounts: AiAccounts
-    @Autowired lateinit var exits: SmithExitNotifier
+    @Autowired lateinit var exits: SandboxExitNotifier
     @Autowired lateinit var sandbox: ScriptedSandbox
     @Autowired lateinit var access: Access
     @Autowired lateinit var targetRepos: TargetRepos

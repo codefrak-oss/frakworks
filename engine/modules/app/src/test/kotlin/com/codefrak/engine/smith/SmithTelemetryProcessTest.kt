@@ -33,7 +33,7 @@ class SmithTelemetryProcessTest {
     @Autowired lateinit var management: ManagementService
     @Autowired lateinit var history: HistoryService
     @Autowired lateinit var sandbox: FakeSandbox
-    @Autowired lateinit var exits: SmithExitNotifier
+    @Autowired lateinit var exits: SandboxExitNotifier
     @Autowired lateinit var telemetry: SmithTelemetry
     @Autowired lateinit var metrics: SmithMetricsController
     @Autowired lateinit var host: com.codefrak.engine.lease.InstanceId
@@ -102,7 +102,7 @@ class SmithTelemetryProcessTest {
         telemetry.handOff()
         assertTrue(!sandbox.followers.containsKey("container-93"), "the old holder no longer follows it")
         assertTrue(!telemetry.isActive(instance.id))
-        Thread.sleep(SmithSessions.POLL_MILLIS * 3)
+        Thread.sleep(StoredSmithSessions.POLL_MILLIS * 3)
         assertEquals(null, sessions.session(instance.id)!!.endedAt, "the session stays open for the new holder")
 
         resume.atStartup()

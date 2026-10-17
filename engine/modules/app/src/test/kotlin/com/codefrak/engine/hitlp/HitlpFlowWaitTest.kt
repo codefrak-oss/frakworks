@@ -19,7 +19,7 @@ import com.codefrak.engine.repos.Access
 import com.codefrak.engine.repos.TargetRepos
 import com.codefrak.engine.runAllJobs
 import com.codefrak.engine.smith.BRIEF_FILE
-import com.codefrak.engine.smith.SmithExitNotifier
+import com.codefrak.engine.smith.SandboxExitNotifier
 import com.codefrak.engine.smith.Vars
 import com.codefrak.engine.smith.dropTestAccount
 import com.codefrak.engine.smith.ensureTestAccount
@@ -92,7 +92,7 @@ class HitlpFlowWaitTest {
     @Autowired lateinit var history: HistoryService
     @Autowired lateinit var tasks: TaskService
     @Autowired lateinit var management: ManagementService
-    @Autowired lateinit var exits: SmithExitNotifier
+    @Autowired lateinit var exits: SandboxExitNotifier
     @Autowired lateinit var accounts: AiAccounts
     @Autowired lateinit var repos: TargetRepos
     @Autowired lateinit var access: Access
@@ -235,7 +235,7 @@ class HitlpTicketFlowWaitTest {
     @Autowired lateinit var history: HistoryService
     @Autowired lateinit var tasks: TaskService
     @Autowired lateinit var management: ManagementService
-    @Autowired lateinit var exits: SmithExitNotifier
+    @Autowired lateinit var exits: SandboxExitNotifier
     @Autowired lateinit var accounts: AiAccounts
     @Autowired lateinit var repos: TargetRepos
     @Autowired lateinit var access: Access
@@ -440,7 +440,7 @@ class HitlpTicketFlowWaitTest {
 class HitlpUnsetFlowWaitTest {
     @Autowired lateinit var runtime: RuntimeService
     @Autowired lateinit var management: ManagementService
-    @Autowired lateinit var exits: SmithExitNotifier
+    @Autowired lateinit var exits: SandboxExitNotifier
     @Autowired lateinit var accounts: AiAccounts
     @Autowired lateinit var repos: TargetRepos
     @Autowired lateinit var access: Access

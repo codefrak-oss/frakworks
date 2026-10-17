@@ -68,7 +68,16 @@ class JudgeTeachControllerTest {
         x.responseBody.use { it.write(bytes) }
     }
 
-    private val tokens = object : EngineTokens(jdbc) { override fun get(id: String) = tokenRows[id] }
+    private val tokens = object : EngineTokens {
+        override fun get(id: String) = tokenRows[id]
+        override fun mint(login: String, name: String, expiresInDays: Int?, createdBy: String?, purpose: String?, sessionId: String?) = TODO()
+        override fun resolve(token: String) = TODO()
+        override fun touch(id: String) = TODO()
+        override fun list() = tokenRows.values.toList()
+        override fun revoke(id: String) = TODO()
+        override fun revokeForSession(sessionId: String) = TODO()
+        override fun anyActive() = tokenRows.isNotEmpty()
+    }
     private val smithAddress = "10.42.0.9"
     private val sandbox = object : SmithSandbox by FakeSandbox() {
         override fun runAt(address: String) = if (address == smithAddress) SmithCaller("run-1", 7, "o/r") else null

@@ -1,5 +1,5 @@
 // engine-flow-feature (engine/README.md, "Engine modules"): `feature/**` and `bug/**`, the feature and bug flows. Depends on layers 0-2 alone and on no other
-// flow module: what it shares with one is a contract in engine-smith.
+// flow module: what it shares with one is a contract in engine-smith-api.
 plugins {
     kotlin("jvm")
     kotlin("plugin.spring")

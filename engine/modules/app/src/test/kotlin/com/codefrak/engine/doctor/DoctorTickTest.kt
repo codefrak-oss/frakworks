@@ -20,7 +20,7 @@ import com.codefrak.engine.mcp.DoctorReads
 import com.codefrak.engine.repos.Access
 import com.codefrak.engine.repos.TargetRepos
 import com.codefrak.engine.runAllJobs
-import com.codefrak.engine.smith.SmithExitNotifier
+import com.codefrak.engine.smith.SandboxExitNotifier
 import com.codefrak.engine.smith.Vars
 import com.codefrak.engine.smith.ensureTestAccount
 import com.codefrak.engine.smith.dropTestAccount
@@ -76,7 +76,7 @@ class DoctorTickTest {
     @Autowired lateinit var runtime: RuntimeService
     @Autowired lateinit var management: ManagementService
     @Autowired lateinit var accounts: AiAccounts
-    @Autowired lateinit var exits: SmithExitNotifier
+    @Autowired lateinit var exits: SandboxExitNotifier
     @Autowired lateinit var sandbox: ScriptedSandbox
     @Autowired lateinit var retrier: IncidentRetrier
     @Autowired lateinit var access: Access
