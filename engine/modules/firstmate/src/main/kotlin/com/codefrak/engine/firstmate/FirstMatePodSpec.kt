@@ -28,7 +28,7 @@ const val FIRST_MATE_MCP_DIR = "/etc/firstmate"
 /**
  * Every session pod's working folder, the same in every pod a session gets, so the Claude session file a freeze saves
  * is where `claude --resume` looks for it in the next pod ([claudeSessionPath]). An emptyDir, into which `fm-relay` copies
- * the init container's clone of the session's repo ([FIRST_MATE_CLONE]) before claude starts.
+ * the clone sidecar's clone of the session's repo ([FIRST_MATE_CLONE]) once it is done; claude never waits for it.
  */
 const val FIRST_MATE_CWD = "/work/repo"
 /** Where `fm-relay` spools claude's stdout lines the engine has not yet accepted: an emptyDir, kept across a relay restart in the pod. */
@@ -39,10 +39,17 @@ const val FIRST_MATE_TOKEN_KEY = "fm-token"
 const val FIRST_MATE_LINEAGE_KEY = "lineage.json"
 /** The Secret key of the repo's Smith token: `FM_GIT_TOKEN` of the [FIRST_MATE_CLONE_CONTAINER] alone, never the main container's. */
 const val FIRST_MATE_GIT_TOKEN_KEY = "git-token"
-/** The init container that clones the session's repo into [FIRST_MATE_CLONE] (`fm-relay --clone`), the only one with the git token. */
+/**
+ * The native sidecar (an init container with restart policy `Always`) that clones the session's repo into
+ * [FIRST_MATE_CLONE] in the background (`fm-relay --clone-sidecar`), the only container with the git token.
+ */
 const val FIRST_MATE_CLONE_CONTAINER = "clone"
-/** Where the init container's clone is (an emptyDir); the relay copies it into [FIRST_MATE_CWD] when that has no `.git`. */
+/** Where the sidecar's clone (`repo/`) and its `.done`/`.failed`/`.request` markers are (an emptyDir); the relay copies it into [FIRST_MATE_CWD] when that has no `.git`. */
 const val FIRST_MATE_CLONE = "/work/clone"
+
+/** The clone sidecar's requests (at most the pod's own): it idles once the clone is done. */
+const val CLONE_MEMORY_REQUEST = 128L * 1024 * 1024
+const val CLONE_CPU_REQUEST = 0.1
 
 /** Claude Code's projects folder name for [cwd]: every character but a letter or digit becomes `-` (`/work/repo` is `-work-repo`). */
 fun claudeProjectDir(cwd: String): String = cwd.replace(Regex("[^A-Za-z0-9]"), "-")
@@ -122,7 +129,8 @@ fun firstMateSecret(name: String, session: FirstMateSession, mcp: FirstMateMcp, 
  * [engineUrl], the session id, the pod token from the Secret, the spool [FIRST_MATE_SPOOL] (an emptyDir) and, for a
  * [resume], `FM_RESUME`, and with a lineage `FM_LINEAGE_FILE`, its read-only file beside `mcp.json`. The engine never attaches, so stdin stays closed. Restart `Never`, so a crashed first mate ends
  * rather than loops. Its working folder is [FIRST_MATE_CWD], an emptyDir the relay copies the session's repo into (`FM_REPO`) from
- * [FIRST_MATE_CLONE], cloned there by the init container [FIRST_MATE_CLONE_CONTAINER] (`fm-relay --clone`), which alone gets,
+ * [FIRST_MATE_CLONE], cloned there in the background by the native sidecar [FIRST_MATE_CLONE_CONTAINER] (`fm-relay --clone-sidecar`,
+ * small requests, the pod's limits), which alone gets,
  * with [gitToken], `FM_GIT_TOKEN` from the Secret's [FIRST_MATE_GIT_TOKEN_KEY]: claude, in the main container, can never
  * read the token. A pure function so a test asserts on it.
  */
@@ -137,6 +145,12 @@ fun firstMatePod(
     val resources = ResourceRequirementsBuilder()
         .withLimits<String, Quantity>(mapOf("memory" to Quantity(memoryBytes.toString()), "cpu" to Quantity(cpus.toString())))
         .withRequests<String, Quantity>(mapOf("memory" to Quantity(memoryRequestBytes.toString()), "cpu" to Quantity(cpuRequest.toString())))
+        .build()
+    // A sidecar's requests add to the pod's (an init container's did not): it asks for little and may burst to the limits.
+    val sidecarResources = ResourceRequirementsBuilder()
+        .withLimits<String, Quantity>(mapOf("memory" to Quantity(memoryBytes.toString()), "cpu" to Quantity(cpus.toString())))
+        .withRequests<String, Quantity>(mapOf("memory" to Quantity(minOf(memoryRequestBytes, CLONE_MEMORY_REQUEST).toString()),
+            "cpu" to Quantity(minOf(cpuRequest, CLONE_CPU_REQUEST).toString())))
         .build()
     fun fromSecret(env: String, key: String) =
         EnvVarBuilder().withName(env).withNewValueFrom().withNewSecretKeyRef().withName(secret).withKey(key).endSecretKeyRef().endValueFrom().build()
@@ -163,10 +177,11 @@ fun firstMatePod(
             .endSecurityContext()
             .addNewInitContainer()
                 .withName(FIRST_MATE_CLONE_CONTAINER).withImage(image).withImagePullPolicy(if (refreshable(image)) "Always" else "IfNotPresent")
-                .withCommand("fm-relay", "--clone", FIRST_MATE_CLONE)
+                .withRestartPolicy("Always")
+                .withCommand("fm-relay", "--clone-sidecar", FIRST_MATE_CLONE)
                 .withEnv(cloneEnv)
                 .withSecurityContext(locked)
-                .withResources(resources)
+                .withResources(sidecarResources)
                 .withVolumeMounts(cloneMount)
             .endInitContainer()
             .addNewContainer()

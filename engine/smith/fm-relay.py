@@ -19,15 +19,20 @@ so any replica serves the session.
   posts `status exited` and stays up, so the engine can exec the snapshot before it deletes the pod.
 - Resume (`FM_RESUME` set): before claude starts, the relay GETs `snapshot`, writes the Claude session file under
   `$HOME/.claude/projects/` and unpacks the folder into its cwd, and adds `--resume <claude id>` to claude's argv.
-- Clone (`fm-relay --clone <dir>`, the pod's init container, the only one given `FM_GIT_TOKEN`): clones `FM_REPO`'s
-  default branch from GitHub into dir, as a Smith's clone (`--depth 50`), the token answered by git-askpass, so it is
-  in no URL, no `.git/config` and so no snapshot. Always exits 0.
-- Checkout (`FM_REPO` set): before claude starts, a cwd with no `.git` (a new session, a dropped snapshot, or one that
-  held no checkout) gets a copy of the init container's clone in `FM_CLONE`. With none, claude starts anyway, its
-  appended prompt saying the code is unavailable.
+- Clone (`fm-relay --clone-sidecar <dir>`, the pod's native sidecar `clone`, the only container given `FM_GIT_TOKEN`):
+  clones `FM_REPO`'s default branch from GitHub into `<dir>/repo` in the background, as a Smith's clone (`--depth 50`),
+  the token answered by git-askpass, so it is in no URL, no `.git/config` and so no snapshot; then writes `<dir>/.done`
+  or `<dir>/.failed` (the error) and watches for `<dir>/.request` (written by `checkout_repo` with retry) to clone again.
+  `fm-relay --clone <dir>` clones once and exits 0.
+- Checkout (`FM_REPO` set): claude never waits for the clone. A cwd with a `.git` (a resumed checkout) is kept. Else,
+  when the clone is already done it is copied in before claude starts; while it is pending claude starts with a note
+  in its appended prompt, and a watcher copies the clone in once `.done` appears and writes First mate a system note
+  (ready, or failed with the error).
+- `fm-relay --mcp-checkout`: a stdio MCP server, the `checkout` server of the pod's `--mcp-config`, with one tool,
+  `checkout_repo` (status pending/ready/failed, `wait` seconds, `retry`).
 
 Environment: FM_ENGINE_URL, FM_SESSION_ID, FM_TOKEN (the session's first-mate-pod token), FM_SPOOL, FM_RESUME,
-FM_REPO, FM_CLONE, FM_GIT_TOKEN (--clone only), FM_POLL_WAIT (seconds, default 25). Python standard library only, as meter-proxy.py.
+FM_REPO, FM_CLONE, FM_GIT_TOKEN (the clone sidecar only), FM_POLL_WAIT (seconds, default 25). Python standard library only, as meter-proxy.py.
 """
 
 import base64
@@ -194,8 +199,13 @@ def restore(engine, argv, home):
 
 GIT_URL = "https://github.com"
 ASKPASS = "/usr/local/bin/git-askpass"
-CODE_UNAVAILABLE = ("System note: the code of {repo} could not be cloned into {cwd} when this pod started, so it is "
-                    "unavailable in this session; say so if asked about the code rather than guessing.")
+CODE_UNAVAILABLE = ("System note: the code of {repo} could not be cloned into {cwd} ({error}), so it is unavailable "
+                    "for now; say so if asked about the code rather than guessing. The checkout_repo tool with retry "
+                    "true clones it again.")
+CODE_PENDING = ("System note: the code of {repo} is being cloned into {cwd} in the background. Until a system note "
+                "says it is ready, call the checkout_repo tool (wait up to 120 seconds) before reading the code.")
+CODE_READY = "System note: the code of {repo} is now checked out in {cwd}. No reply is needed."
+DONE, FAILED, REQUEST = ".done", ".failed", ".request"
 
 
 def git_env(token):
@@ -207,31 +217,79 @@ def git_env(token):
     return env
 
 
-def clone(repo, dest, token, git_url=GIT_URL):
-    """`fm-relay --clone <dest>`, the pod's init container: clones repo's default branch into the empty dest; whether it
-    did. The init container alone holds the token, so claude (in the main container) can never read it."""
+def write_marker(path, text):
+    tmp = path + ".tmp"
+    with open(tmp, "w") as f:
+        f.write(text)
+    os.replace(tmp, path)
+
+
+def clone(repo, base, token, git_url=GIT_URL):
+    """Clones repo's default branch into `<base>/repo` (afresh), then writes `<base>/.done` or `<base>/.failed` with the
+    error; whether it did. Only the clone sidecar holds the token, so claude (in the main container) can never read it."""
     url = f"{git_url.rstrip('/')}/{repo}"
+    dest = os.path.join(base, "repo")
+    for m in (DONE, FAILED):
+        try:
+            os.remove(os.path.join(base, m))
+        except OSError:
+            pass
     try:
-        os.makedirs(dest, exist_ok=True)
+        os.makedirs(base, exist_ok=True)
+        shutil.rmtree(dest, ignore_errors=True)
         r = subprocess.run(["git", "clone", "--quiet", "--depth", "50", url, dest], env=git_env(token),
                            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, timeout=600)
         if r.returncode != 0:
-            log(f"git clone of {repo} failed ({r.returncode}): {r.stderr.decode('utf-8', 'replace').strip()[-500:]}")
-            return False
-        log(f"cloned {repo} into {dest}")
-        return True
+            error = f"git clone failed ({r.returncode}): {r.stderr.decode('utf-8', 'replace').strip()[-500:]}"
+        else:
+            log(f"cloned {repo} into {dest}")
+            write_marker(os.path.join(base, DONE), "")
+            return True
     except (OSError, subprocess.SubprocessError) as e:
-        log(f"git clone of {repo} failed: {e}")
-        return False
+        error = f"git clone failed: {e}"
+    log(f"{repo}: {error}")
+    try:
+        write_marker(os.path.join(base, FAILED), error)
+    except OSError:
+        pass
+    return False
 
 
-def checkout(cwd, src):
-    """Gives cwd the init container's clone in src unless it already has a `.git`; whether cwd holds a checkout. Into a
-    folder that already has files (a snapshot without a checkout) only the clone's `.git` is copied in, then the
-    tracked files not already there are written."""
+def clone_sidecar(repo, base, token, git_url=GIT_URL, tick=1.0, once=False):
+    """`fm-relay --clone-sidecar <base>`: clones at once, then clones again each time `<base>/.request` appears."""
+    clone(repo, base, token, git_url)
+    while not once:
+        req = os.path.join(base, REQUEST)
+        if os.path.exists(req):
+            try:
+                os.remove(req)
+            except OSError:
+                pass
+            clone(repo, base, token, git_url)
+        time.sleep(tick)
+
+
+def clone_state(base):
+    """("ready", None), ("failed", error) or ("pending", None) for the clone in base."""
+    if base and os.path.exists(os.path.join(base, DONE)):
+        return "ready", None
+    if base and os.path.exists(os.path.join(base, FAILED)):
+        try:
+            with open(os.path.join(base, FAILED)) as f:
+                return "failed", f.read().strip() or "unknown error"
+        except OSError:
+            return "failed", "unknown error"
+    return "pending", None
+
+
+def checkout(cwd, base):
+    """Gives cwd the sidecar's clone in `<base>/repo` unless it already has a `.git`; whether cwd holds a checkout. Into
+    a folder that already has files (a snapshot without a checkout, or files claude wrote) only the clone's `.git` is
+    copied in, then the tracked files not already there are written."""
     if os.path.isdir(os.path.join(cwd, ".git")):
         return True
-    if not src or not os.path.isdir(os.path.join(src, ".git")):
+    src = os.path.join(base, "repo") if base else None
+    if not src or clone_state(base)[0] != "ready" or not os.path.isdir(os.path.join(src, ".git")):
         return False
     try:
         os.makedirs(cwd, exist_ok=True)
@@ -247,9 +305,8 @@ def checkout(cwd, src):
         return False
 
 
-def note_unavailable(argv, repo, cwd):
-    """argv with the code-unavailable note at the end of its --append-system-prompt (added when there is none)."""
-    note = CODE_UNAVAILABLE.format(repo=repo, cwd=cwd)
+def append_note(argv, note):
+    """argv with note at the end of its --append-system-prompt (added when there is none)."""
     argv = list(argv)
     if "--append-system-prompt" in argv:
         i = argv.index("--append-system-prompt") + 1
@@ -257,6 +314,68 @@ def note_unavailable(argv, repo, cwd):
     else:
         argv += ["--append-system-prompt", note]
     return argv
+
+
+def checkout_tool(cwd, base, wait=0, retry=False, tick=0.5):
+    """The checkout_repo tool's answer: the clone's state after an optional retry and a wait of up to wait seconds."""
+    if retry and not os.path.isdir(os.path.join(cwd, ".git")) and clone_state(base)[0] != "pending":
+        write_marker(os.path.join(base, REQUEST), "")
+        for m in (DONE, FAILED):  # the sidecar removes them too; drop them now so the answer is pending at once
+            try:
+                os.remove(os.path.join(base, m))
+            except OSError:
+                pass
+    deadline = time.time() + max(0, min(float(wait or 0), 300))
+    while True:
+        if os.path.isdir(os.path.join(cwd, ".git")):
+            return f"ready: the code is checked out in {cwd}."
+        state, error = clone_state(base)
+        if state == "failed":
+            return f"failed: {error}. Call checkout_repo with retry true to clone again."
+        if state == "ready" and os.path.isdir(os.path.join(cwd, ".git")):
+            return f"ready: the code is checked out in {cwd}."
+        if time.time() >= deadline:
+            return ("ready: the clone is done and is being copied into " + cwd + "; call again in a moment.") if state == "ready" \
+                else "pending: the clone is still running; call again with wait to wait for it."
+        time.sleep(tick)
+
+
+CHECKOUT_TOOL = {
+    "name": "checkout_repo",
+    "description": "The state of this session's checkout of its repo in the working folder: ready, pending (being cloned "
+                   "in the background) or failed. Call it before reading the code until a system note says it is ready.",
+    "inputSchema": {"type": "object", "properties": {
+        "wait": {"type": "number", "description": "Seconds to wait for a pending clone (at most 300)."},
+        "retry": {"type": "boolean", "description": "Clone again after a failure."}}},
+}
+
+
+def mcp_checkout(cwd, base, rin=sys.stdin, rout=sys.stdout):
+    """`fm-relay --mcp-checkout`: a stdio MCP server (newline-delimited JSON-RPC) with the checkout_repo tool."""
+    for raw in rin:
+        try:
+            m = json.loads(raw)
+        except ValueError:
+            continue
+        if "id" not in m:
+            continue  # a notification
+        method, params = m.get("method"), m.get("params") or {}
+        if method == "initialize":
+            result = {"protocolVersion": params.get("protocolVersion", "2025-06-18"), "capabilities": {"tools": {}},
+                      "serverInfo": {"name": "checkout", "version": "1"}}
+        elif method == "tools/list":
+            result = {"tools": [CHECKOUT_TOOL]}
+        elif method == "tools/call" and params.get("name") == "checkout_repo":
+            a = params.get("arguments") or {}
+            result = {"content": [{"type": "text", "text": checkout_tool(cwd, base, a.get("wait", 0), bool(a.get("retry")))}]}
+        elif method == "ping":
+            result = {}
+        else:
+            rout.write(json.dumps({"jsonrpc": "2.0", "id": m["id"], "error": {"code": -32601, "message": f"no method {method}"}}) + "\n")
+            rout.flush()
+            continue
+        rout.write(json.dumps({"jsonrpc": "2.0", "id": m["id"], "result": result}) + "\n")
+        rout.flush()
 
 
 class Relay:
@@ -268,6 +387,34 @@ class Relay:
         self.freezing = threading.Event()
         self.child = None
         self.stdout_done = threading.Event()
+        self.stdin_lock = threading.Lock()
+        self.watch = None  # (repo, cwd, base) while the clone is pending
+
+    def note(self, text):
+        """Writes a system note to claude as a user line; whether claude took it."""
+        try:
+            with self.stdin_lock:
+                self.child.stdin.write(user_line(user_content({"text": text})).encode())
+                self.child.stdin.flush()
+            return True
+        except (OSError, ValueError):
+            return False
+
+    def watcher(self, tick=1.0):
+        """Copies the sidecar's clone into cwd once it is done and tells claude; tells claude of each failure."""
+        repo, cwd, base = self.watch
+        told = clone_state(base)[1]  # a failure at start is in the appended prompt already
+        while self.child.poll() is None and not self.freezing.is_set():
+            state, error = clone_state(base)
+            if state == "ready" and checkout(cwd, base):
+                self.note(CODE_READY.format(repo=repo, cwd=cwd))
+                return
+            if state == "failed" and told != error:
+                told = error
+                self.note(CODE_UNAVAILABLE.format(repo=repo, cwd=cwd, error=error))
+            elif state == "pending":
+                told = None
+            time.sleep(tick)
 
     def inbox(self):
         _, ack = self.engine.call("POST", "/inbox/ack", {"seq": 0})
@@ -293,8 +440,9 @@ class Relay:
                 content = user_content(body) if isinstance(body, dict) and (body.get("text") is not None or body.get("images")) else None
                 if content is not None:
                     try:
-                        self.child.stdin.write(user_line(content).encode())
-                        self.child.stdin.flush()
+                        with self.stdin_lock:
+                            self.child.stdin.write(user_line(content).encode())
+                            self.child.stdin.flush()
                     except (OSError, ValueError):
                         return  # claude is gone
                 self.engine.call("POST", "/inbox/ack", {"seq": seq})
@@ -328,6 +476,8 @@ class Relay:
         threads = [threading.Thread(target=f, daemon=True) for f in (self.stdout, self.sender, self.inbox)]
         for t in threads:
             t.start()
+        if self.watch:
+            threading.Thread(target=self.watcher, daemon=True).start()
         code = self.child.wait()
         threads[0].join()
         threads[1].join()
@@ -337,27 +487,38 @@ class Relay:
 
 
 def main(args):
-    if args[:1] == ["--clone"] and len(args) == 2:
-        env = os.environ
+    env = os.environ
+    if args[:1] in (["--clone"], ["--clone-sidecar"]) and len(args) == 2:
         if env.get("FM_REPO"):
-            clone(env["FM_REPO"], args[1], env.get("FM_GIT_TOKEN"), env.get("FM_GIT_URL", GIT_URL))
+            clone_sidecar(env["FM_REPO"], args[1], env.get("FM_GIT_TOKEN"), env.get("FM_GIT_URL", GIT_URL), once=args[0] == "--clone")
+        elif args[0] == "--clone-sidecar":
+            while True:  # nothing to clone; a sidecar that exits is restarted
+                time.sleep(3600)
         return 0  # a failed clone never keeps the session from starting: the relay notes it
+    if args == ["--mcp-checkout"]:
+        mcp_checkout(os.getcwd(), env.get("FM_CLONE"))
+        return 0
     if args and args[0] == "--":
         args = args[1:]
     if not args:
         log("usage: fm-relay -- <claude argv>")
         return 2
-    env = os.environ
     engine = Engine(env["FM_ENGINE_URL"], env["FM_SESSION_ID"], env["FM_TOKEN"])
     spool = Spool(env.get("FM_SPOOL", "/var/spool/fm-relay"))
     if env.get("FM_RESUME"):
         args = restore(engine, args, env.get("HOME", os.path.expanduser("~")))
-    repo = env.get("FM_REPO")
+    repo, watch = env.get("FM_REPO"), None
     if repo:
-        cwd = os.getcwd()
-        if not checkout(cwd, env.get("FM_CLONE")):
-            args = note_unavailable(args, repo, cwd)
+        cwd, base = os.getcwd(), env.get("FM_CLONE")
+        if not checkout(cwd, base):
+            state, error = clone_state(base)
+            if state == "failed":
+                args = append_note(args, CODE_UNAVAILABLE.format(repo=repo, cwd=cwd, error=error))
+            else:
+                args = append_note(args, CODE_PENDING.format(repo=repo, cwd=cwd))
+            watch = (repo, cwd, base)
     relay = Relay(engine, spool, args, int(env.get("FM_POLL_WAIT", "25")))
+    relay.watch = watch
     code = relay.run()
     if relay.freezing.is_set():
         # The engine execs the snapshot into this container, then deletes the pod: stay up until then.

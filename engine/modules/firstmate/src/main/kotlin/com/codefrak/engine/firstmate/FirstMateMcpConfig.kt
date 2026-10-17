@@ -43,6 +43,10 @@ class FirstMateMcpConfig(private val repoServers: RepoMcpServers) {
         /** The engine's own servers, at `<engine>/mcp/<name>`. */
         val ENGINE_SERVERS = listOf("frakworks", "frakworks-engine-diagnostics")
 
+        /** The pod's own checkout server: `fm-relay --mcp-checkout`, whose `checkout_repo` tool reports (and retries) the background clone. */
+        const val CHECKOUT_SERVER = "checkout"
+        val CHECKOUT_ENTRY: Map<String, Any?> = linkedMapOf("type" to "stdio", "command" to "fm-relay", "args" to listOf("--mcp-checkout"))
+
         /** Whether [url]'s host is loopback, `localhost` or a `*.local` name ([localMcpUrl], shared with a Smith's `SmithMcpServers`). */
         fun local(url: String?): Boolean = localMcpUrl(url)
 
@@ -58,9 +62,10 @@ class FirstMateMcpConfig(private val repoServers: RepoMcpServers) {
             val servers = linkedMapOf<String, Map<String, Any?>>()
             for (name in ENGINE_SERVERS)
                 servers[name] = linkedMapOf("type" to "http", "url" to "$base/mcp/$name", "headers" to mapOf("Authorization" to "Bearer $token"))
+            servers[CHECKOUT_SERVER] = CHECKOUT_ENTRY
             val dropped = mutableListOf<DroppedMcpServer>()
             for (s in repo) when {
-                s.name in servers -> dropped += DroppedMcpServer(s.name, "the engine's own server's name")
+                s.name in servers -> dropped += DroppedMcpServer(s.name, if (s.name == CHECKOUT_SERVER) "the pod's own server's name" else "the engine's own server's name")
                 s.kind == McpServerKind.STDIO && !runs(s.command.orEmpty()) -> dropped += DroppedMcpServer(s.name, "${s.command} is not in the image")
                 s.kind != McpServerKind.STDIO && local(s.url) -> dropped += DroppedMcpServer(s.name, "${s.url} is a local address")
                 else -> servers[s.name] = s.entry()

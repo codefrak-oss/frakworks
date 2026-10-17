@@ -151,24 +151,39 @@ own and no pod starts.
   file is always `~/.claude/projects/-work-repo/<claude id>.jsonl` (Claude's
   projects folder for a cwd: every character but a letter or digit becomes
   `-`).
-- **Checkout.** The pod's init container (`clone`, `fm-relay --clone
-  /work/clone`) clones the session's repo (`FM_REPO`) default branch
-  (`--depth 50`, from GitHub over the pod's public egress) into the `clone`
-  emptyDir. It alone gets `FM_GIT_TOKEN`, when the repo has a Smith token,
-  from the session's Secret (key `git-token`; `TargetRepos.smithToken`, a
-  Smith's `GH_TOKEN`): the main container has no such env and no mount of the
-  key, so claude can never read the token, not even from the relay's
-  `/proc/<pid>/environ`. The token reaches git through `git-askpass` alone,
-  never a URL, so it is in no `.git/config` and no snapshot tar. The init
-  container always exits 0. Before claude starts, after any resume restore,
-  the relay copies `/work/clone` (`FM_CLONE`) into `/work/repo` unless it
-  already holds a `.git`: so a new session, a resume whose folder was dropped
-  (`workdir_dropped`) and one whose snapshot held no checkout all get the
-  code, and a resumed checkout is kept as it was. Into a folder that already
+- **Checkout.** claude never waits for the clone (#100113, design:
+  `docs/proposals/first-mate-checkout.md`). The pod's `clone` container is a
+  native sidecar (an init container with `restartPolicy: Always`, `fm-relay
+  --clone-sidecar /work/clone`, small requests, the pod's limits): it clones
+  the session's repo (`FM_REPO`) default branch (`--depth 50`, from GitHub
+  over the pod's public egress) into `/work/clone/repo` in the background,
+  then writes `/work/clone/.done`, or `.failed` with git's error, and stays
+  up watching for `/work/clone/.request` to clone again. It alone gets
+  `FM_GIT_TOKEN`, when the repo has a Smith token, from the session's Secret
+  (key `git-token`; `TargetRepos.smithToken`, a Smith's `GH_TOKEN`): the main
+  container has no such env and no mount of the key, so claude can never
+  read the token, not even from the relay's `/proc/<pid>/environ`. The token
+  reaches git through `git-askpass` alone, never a URL, so it is in no
+  `.git/config` and no snapshot tar. After any resume restore, a
+  `/work/repo` that already holds a `.git` is kept as it was and nothing more
+  happens. Otherwise (a new session, a resume whose folder was dropped
+  (`workdir_dropped`), or one whose snapshot held no checkout) the relay
+  copies the clone in before claude starts when it is already done; when it
+  is pending, claude starts at once with a note at the end of its appended
+  prompt that the code is being cloned, and the relay's watcher copies the
+  clone into `/work/repo` once `.done` appears and writes claude a system
+  note that the code is ready. A failed clone does not stop the session: the
+  failure (with git's error) is in the appended prompt when it is known at
+  start, else written to claude as a system note. Into a folder that already
   has files only the clone's `.git` is copied in and the tracked files not
-  already there are written. A failed clone does not stop the session: claude
-  starts with a system note at the end of its appended prompt that the code
-  is unavailable.
+  already there are written.
+- **`checkout_repo`.** Every pod's `--mcp-config` has a `checkout` stdio
+  server (`fm-relay --mcp-checkout`, in the main container; it holds no
+  token) with one tool, `checkout_repo` (allowed in
+  `shared/first-mate-prompt.json`): it answers `ready`, `pending` or
+  `failed: <error>`, waits up to `wait` seconds (at most 300) for a pending
+  clone, and with `retry: true` after a failure writes `.request` so the
+  sidecar clones again. A repo server named `checkout` is dropped.
 - **Resume.** A message to a frozen session reopens it and starts a new pod
   with `FM_RESUME` set: its relay `GET`s the snapshot, writes the session file
   back to the same path, unpacks the folder into `/work/repo`, runs `claude …
