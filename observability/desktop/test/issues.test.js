@@ -518,9 +518,11 @@ test("a need with no repo or number is left out, and another need kind reads wit
 });
 
 test("a failed or missing needs read draws the board as before", () => {
-  const plain = render({ result: board });
-  assert.equal(render({ result: board, needs: [] }), plain);
-  assert.equal(render({ result: board, needs: undefined }), plain);
+  // One fixed clock: rendered ages tick between calls otherwise.
+  const now = Date.now();
+  const plain = render({ result: board, now });
+  assert.equal(render({ result: board, needs: [], now }), plain);
+  assert.equal(render({ result: board, needs: undefined, now }), plain);
   assert.doesNotMatch(plain, /awaiting acceptance/);
 });
 
