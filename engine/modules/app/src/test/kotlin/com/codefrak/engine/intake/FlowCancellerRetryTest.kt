@@ -100,7 +100,7 @@ class FlowCancellerRetryTest {
             try { method.invoke(runtime, *(args ?: emptyArray())) } catch (e: InvocationTargetException) { throw e.targetException }
         } as RuntimeService
         val canceller = FlowCanceller(service, history, tasks, questions, actors, sandbox, pulls, deferred, jevCalls, events,
-            doctorBugs, doctorRuns, hitlpAnswers, tickets)
+            doctorBugs, doctorRuns, hitlpAnswers, tickets, stopPauseMillis = 10)
     }
 
     private fun comments(issue: Long) = github.comments.count { it.first == "acme/tickets" && it.second == issue }

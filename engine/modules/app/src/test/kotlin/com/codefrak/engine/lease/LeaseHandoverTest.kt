@@ -30,7 +30,7 @@ class LeaseHandoverTest {
     }
 
     private class Context(template: JdbcTemplate, name: String) {
-        val lease = EngineLease(template, InstanceId(name), ApplicationEventPublisher { }).also { it.start(); it.atStartup() }
+        val lease = EngineLease(template, InstanceId(name), ApplicationEventPublisher { }, retry = Duration.ofMillis(100)).also { it.start(); it.atStartup() }
         val readiness = ReadinessController(template, lease, NoopEventRelay())
         val preStop = AwaitStandbyController(lease)
     }

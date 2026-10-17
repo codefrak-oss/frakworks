@@ -69,6 +69,7 @@ class EngineLease(
     private val template: JdbcTemplate,
     val instance: InstanceId,
     private val events: ApplicationEventPublisher,
+    private val retry: Duration = RETRY,
 ) : SmartLifecycle {
     private val log = LoggerFactory.getLogger(EngineLease::class.java)
 
@@ -119,9 +120,9 @@ class EngineLease(
         }
     }
 
-    /** The next attempt: a holder renews every [HEARTBEAT], a standby retries every [RETRY]. */
+    /** The next attempt: a holder renews every [HEARTBEAT], a standby retries every [retry] ([RETRY] by default). */
     private fun schedule(executor: ScheduledExecutorService) {
-        val delay = if (holding) HEARTBEAT else RETRY
+        val delay = if (holding) HEARTBEAT else retry
         runCatching {
             executor.schedule({ beat(); synchronized(this) { if (running && heartbeat === executor) schedule(executor) } },
                 delay.toMillis(), TimeUnit.MILLISECONDS)
