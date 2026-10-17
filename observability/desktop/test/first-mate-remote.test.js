@@ -387,3 +387,26 @@ test("a saved kubernetes chat records its runtime, and restoring it seeds a new 
   assert.ok(m.session.seed);
   m.stop();
 });
+// #100109: a turn that used a tool. claude's stdout carries a `user` tool_result line,
+// which the relay posts and RemoteSession forwards like the engine's echo.
+test("#100109: a tool_result line is not an echo: the turn after a tool call still ends and the pane returns to idle", async () => {
+  const eng = fakeEngine();
+  const events = fakeEvents();
+  const { m } = manager(eng, events);
+  const first = m.send("look something up");
+  await until(() => eng.of("/first-mate/sessions/s1/messages").length >= 1);
+  events.frame("s1", { type: "user", text: "echo" });
+  events.frame("s1", { type: "assistant", message: { content: [{ type: "tool_use", id: "t1", name: "Read", input: {} }] } });
+  events.frame("s1", { type: "user", message: { content: [{ type: "tool_result", tool_use_id: "t1", content: "ok" }] } });
+  events.frame("s1", { type: "assistant", message: { content: [{ type: "text", text: "Found it." }] } });
+  events.frame("s1", { type: "result", result: "Found it." });
+  assert.equal((await first).ok, true);
+  assert.equal(m.snapshot().busy, false);
+
+  m.send("thanks");
+  await reply(eng, events, "s1", "You're welcome.", 2);
+  await new Promise((r) => setTimeout(r, 50));
+  const snap = m.snapshot();
+  assert.equal(snap.busy, false, "the reply finished but the pane is still busy (Stop shown, input locked)");
+  m.stop();
+});
