@@ -1,11 +1,5 @@
 package com.codefrak.engine.smith
 
-import com.codefrak.engine.accounts.SecretsKey
-import org.slf4j.LoggerFactory
-import org.springframework.beans.factory.annotation.Value
-import org.springframework.jdbc.core.JdbcTemplate
-import org.springframework.jdbc.core.simple.JdbcClient
-import org.springframework.stereotype.Component
 import tools.jackson.module.kotlin.jacksonObjectMapper
 import tools.jackson.module.kotlin.readValue
 import java.math.BigInteger
@@ -21,9 +15,6 @@ import java.security.spec.ECGenParameterSpec
 import java.security.spec.ECParameterSpec
 import java.security.spec.ECPoint
 import java.security.spec.ECPublicKeySpec
-import java.security.spec.PKCS8EncodedKeySpec
-import java.sql.Timestamp
-import java.time.Duration
 import java.time.Instant
 import java.util.Base64
 
@@ -44,21 +35,14 @@ sealed interface RunTokenCheck {
  * docs/run-identity-token.md): an ES256 JWT, header `{alg: ES256, typ: frakworks-run+jwt, kid}`, claims `iss`
  * ([ISSUER]), `sub` (`run:<run id>`), `jti` (the run id), `aud` (the one MCP server URL it was minted for), `repo`,
  * `issue`, `mode`, `scope` ([SCOPE]), `iat` and `exp` (`iat` plus the run's longest life, `engine.smith.k8s.active-deadline`).
- * [SmithMcpServers] stamps one per http/sse server of the run as [HEADER]; nothing else carries it.
+ * `SmithMcpServers` stamps one per http/sse server of the run as [HEADER]; nothing else carries it.
  *
- * The keys are rows of `engine.run_token_key`, the private half sealed with `ENGINE_SECRETS_KEY` (no other store): the
- * newest unretired row signs, made on first use; [rotate] retires it and makes a new one, and a retired key stays in
- * [jwks] until every token it signed has expired. A token is live ([introspect]) only while it verifies, the run's
- * `engine.smith_session` row is open (`ended_at` unset) and the run is not in `engine.run_token_revoked`: that is the
- * revocation at run end; an offline verifier, with [jwks] alone, gets expiry only.
+ * The companion holds the token format (sign, verify, the JWK shapes), pure and offline. The keys and the revocations
+ * are `StoredRunTokens`' (engine-smith); every module above programs against this. A token is live ([introspect])
+ * only while it verifies, the run's `engine.smith_session` row is open (`ended_at` unset) and the run is not revoked:
+ * that is the revocation at run end; an offline verifier, with [jwks] alone, gets expiry only.
  */
-@Component
-class RunTokens(
-    template: JdbcTemplate,
-    private val secrets: SecretsKey,
-    @Value("\${engine.smith.k8s.active-deadline:PT24H}") private val lifetime: Duration,
-    private val now: () -> Instant = Instant::now,
-) {
+interface RunTokens {
     companion object {
         const val HEADER = "X-Frakworks-Run-Token"
         const val ISSUER = "frakworks-engine"
@@ -148,89 +132,27 @@ class RunTokens(
         }
     }
 
-    private val log = LoggerFactory.getLogger(RunTokens::class.java)
-    private val jdbc = JdbcClient.create(template)
-
-    private data class KeyRow(val kid: String, val jwk: Map<String, Any?>, val sealed: ByteArray, val retiredAt: Instant?)
-
-    private fun rows(): List<KeyRow> =
-        jdbc.sql("SELECT kid, public_jwk, private_key, retired_at FROM engine.run_token_key ORDER BY created_at DESC")
-            .query { rs, _ -> KeyRow(rs.getString(1), JSON.readValue(rs.getString(2)), rs.getBytes(3), rs.getTimestamp(4)?.toInstant()) }
-            .list()
-
-    /** The keys a verifier may still meet: the signing one and each retired one younger than a token's life. */
-    private fun published(): List<KeyRow> = rows().filter { it.retiredAt == null || it.retiredAt.plus(lifetime).isAfter(now()) }
-
-    private fun newKey(): String {
-        val pair = keyPair()
-        val pub = pair.public as ECPublicKey
-        val kid = thumbprint(pub)
-        jdbc.sql("INSERT INTO engine.run_token_key (kid, public_jwk, private_key, created_at) VALUES (:k, :j, :p, :t)")
-            .param("k", kid).param("j", JSON.writeValueAsString(jwk(pub, kid)))
-            .param("p", secrets.seal(b64.encodeToString(pair.private.encoded), kid)).param("t", Timestamp.from(now()))
-            .update()
-        log.info("run token key {} made", kid)
-        return kid
-    }
-
-    /** The signing key, made on first use. */
-    @Synchronized
-    private fun signing(): Pair<String, PrivateKey> {
-        val row = rows().firstOrNull { it.retiredAt == null } ?: run { newKey(); rows().first { it.retiredAt == null } }
-        val der = unb64.decode(secrets.open(row.sealed, row.kid))
-        return row.kid to KeyFactory.getInstance("EC").generatePrivate(PKCS8EncodedKeySpec(der))
-    }
-
     /** A token for [spec]'s run, for the server at [audience]. Throws without `ENGINE_SECRETS_KEY`. */
-    fun mint(spec: SmithSpec, audience: String): String {
-        val (kid, key) = signing()
-        val at = now()
-        return sign(key, kid, RunTokenClaims(spec.runId, spec.repo, spec.issue, spec.mode, audience, at, at.plus(lifetime)))
-    }
+    fun mint(spec: SmithSpec, audience: String): String
 
     /** `GET /.well-known/jwks.json`: `{keys: [...]}`, the signing key first. */
-    fun jwks(): Map<String, Any> = mapOf("keys" to published().map { it.jwk })
+    fun jwks(): Map<String, Any>
 
     /** [token]'s signature, claims and expiry checked against the published keys (not its run's liveness). */
-    fun verify(token: String, audience: String? = null): RunTokenCheck {
-        val keys = published().associate { it.kid to it.jwk }
-        return verify(token, { kid -> keys[kid]?.let(::publicKey) }, now(), audience)
-    }
+    fun verify(token: String, audience: String? = null): RunTokenCheck
 
     /**
      * RFC 7662's answer for [token]: `{active: false}` for a token that does not verify, whose run's session has ended
      * or never opened, or whose run was revoked; else `active: true` with the claims.
      */
-    fun introspect(token: String, audience: String? = null): Map<String, Any?> {
-        val c = (verify(token, audience) as? RunTokenCheck.Valid)?.claims ?: return mapOf("active" to false)
-        if (!live(c.runId)) return mapOf("active" to false)
-        return linkedMapOf("active" to true, "iss" to ISSUER, "sub" to "run:${c.runId}", "jti" to c.runId, "aud" to c.audience,
-            "repo" to c.repo, "issue" to c.issue, "mode" to c.mode, "scope" to SCOPE, "token_type" to TYPE,
-            "iat" to c.issuedAt.epochSecond, "exp" to c.expiresAt.epochSecond)
-    }
+    fun introspect(token: String, audience: String? = null): Map<String, Any?>
 
     /** Whether [runId]'s session is open and the run is not revoked. */
-    fun live(runId: String): Boolean {
-        val open = jdbc.sql("SELECT COUNT(*) FROM engine.smith_session WHERE run_id = :r AND ended_at IS NULL")
-            .param("r", runId).query(Long::class.java).single() > 0
-        val revoked = jdbc.sql("SELECT COUNT(*) FROM engine.run_token_revoked WHERE run_id = :r")
-            .param("r", runId).query(Long::class.java).single() > 0
-        return open && !revoked
-    }
+    fun live(runId: String): Boolean
 
     /** Every token of [runId] answers inactive from now on, whatever its session. Idempotent. */
-    fun revoke(runId: String) {
-        jdbc.sql("DELETE FROM engine.run_token_revoked WHERE run_id = :r").param("r", runId).update()
-        jdbc.sql("INSERT INTO engine.run_token_revoked (run_id, revoked_at) VALUES (:r, :t)")
-            .param("r", runId).param("t", Timestamp.from(now())).update()
-    }
+    fun revoke(runId: String)
 
     /** Retires the signing key and makes a new one; keys retired longer than a token's life ago are deleted. The new kid. */
-    @Synchronized
-    fun rotate(): String {
-        val at = Timestamp.from(now())
-        jdbc.sql("UPDATE engine.run_token_key SET retired_at = :t WHERE retired_at IS NULL").param("t", at).update()
-        jdbc.sql("DELETE FROM engine.run_token_key WHERE retired_at < :t").param("t", Timestamp.from(now().minus(lifetime))).update()
-        return newKey()
-    }
+    fun rotate(): String
 }

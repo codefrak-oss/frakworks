@@ -1,8 +1,7 @@
 package com.codefrak.engine.smith
 
 import io.fabric8.kubernetes.api.model.Pod
-import io.fabric8.kubernetes.client.Config
-import java.io.File
+
 
 /** The `DisruptionTarget` condition reasons that mean the cluster took the pod away, not that the Smith failed. */
 private val EVICTION_REASONS = setOf("EvictionByEvictionAPI", "PreemptionByScheduler", "PreemptionByKubeScheduler", "TerminationByKubelet")
@@ -30,9 +29,3 @@ internal fun smithStarted(pod: Pod) = smithStatus(pod)?.state?.let { it.running 
 
 internal fun smithRunning(pod: Pod) = smithStatus(pod)?.state?.running != null
 
-/**
- * The client's config: fabric8's in-cluster config (the pod's ServiceAccount token and CA, the API server from
- * `KUBERNETES_SERVICE_HOST`) in a pod, else the kubeconfig at [kubeconfig], read only then.
- */
-fun kubernetesConfig(inPod: Boolean, kubeconfig: File): Config =
-    if (inPod) Config.autoConfigure(null) else Config.fromKubeconfig(kubeconfig.readText())

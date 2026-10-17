@@ -6,10 +6,10 @@ import tools.jackson.module.kotlin.readValue
 /** The reading of a stored session into what a summary is made from: [SmithSessions]' stored lines, pure, no database. */
 object SessionDigest {
     /** What [digest] keeps by default: enough for a summary, well under the summarizer's context. */
-    const val DIGEST_CHARS = 24_000
+    const val DIGEST_CHARS = SmithSessions.DIGEST_CHARS
 
     /** How many of the last steps [recent] keeps: each is one assistant message, its text and tool calls. */
-    const val RECENT_TURNS = 3
+    const val RECENT_TURNS = SmithSessions.RECENT_TURNS
 
     /** The last `turns` of [digest]'s entries, never cut, oldest first. */
     fun recent(lines: List<String>, turns: Int): String = lines.mapNotNull(::entry).takeLast(turns).joinToString("\n")

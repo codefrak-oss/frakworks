@@ -27,6 +27,7 @@ COPY modules/github/build.gradle.kts ./modules/github/
 COPY modules/events/build.gradle.kts ./modules/events/
 COPY modules/accounts/build.gradle.kts ./modules/accounts/
 COPY modules/jev/build.gradle.kts ./modules/jev/
+COPY modules/smith-api/build.gradle.kts ./modules/smith-api/
 COPY modules/smith/build.gradle.kts ./modules/smith/
 COPY modules/incidents/build.gradle.kts ./modules/incidents/
 COPY modules/hitlp/build.gradle.kts ./modules/hitlp/
