@@ -27,7 +27,8 @@ const val FIRST_MATE_SESSION_LABEL = "frakworks.codefrak.com/first-mate-session"
 const val FIRST_MATE_MCP_DIR = "/etc/firstmate"
 /**
  * Every session pod's working folder, the same in every pod a session gets, so the Claude session file a freeze saves
- * is where `claude --resume` looks for it in the next pod ([claudeSessionPath]). An emptyDir.
+ * is where `claude --resume` looks for it in the next pod ([claudeSessionPath]). An emptyDir, into which `fm-relay` clones
+ * the session's repo before claude starts (`FM_REPO`).
  */
 const val FIRST_MATE_CWD = "/work/repo"
 /** Where `fm-relay` spools claude's stdout lines the engine has not yet accepted: an emptyDir, kept across a relay restart in the pod. */
@@ -36,6 +37,8 @@ const val FIRST_MATE_SPOOL = "/var/spool/fm-relay"
 const val FIRST_MATE_TOKEN_KEY = "fm-token"
 /** The Secret key, and the file in [FIRST_MATE_MCP_DIR], of the session's lineage (engine/README.md, "Lineage"); `FM_LINEAGE_FILE` names it. */
 const val FIRST_MATE_LINEAGE_KEY = "lineage.json"
+/** The Secret key of the repo's Smith token, the relay's `FM_GIT_TOKEN` for the clone into [FIRST_MATE_CWD]. */
+const val FIRST_MATE_GIT_TOKEN_KEY = "git-token"
 
 /** Claude Code's projects folder name for [cwd]: every character but a letter or digit becomes `-` (`/work/repo` is `-work-repo`). */
 fun claudeProjectDir(cwd: String): String = cwd.replace(Regex("[^A-Za-z0-9]"), "-")
@@ -90,9 +93,11 @@ fun firstMateCommand(argv: List<String>): List<String> = listOf("fm-relay", "--"
 
 /**
  * The session's Secret: `mcp.json` (the `--mcp-config`, with the session's token in it), under [credentialEnv] the AI
- * account's token, and under [FIRST_MATE_TOKEN_KEY] the pod's own `first-mate-pod` [podToken]. None is ever in the pod's spec.
+ * account's token, under [FIRST_MATE_TOKEN_KEY] the pod's own `first-mate-pod` [podToken], and under
+ * [FIRST_MATE_GIT_TOKEN_KEY] the repo's [gitToken] when it has one. None is ever in the pod's spec.
  */
-fun firstMateSecret(name: String, session: FirstMateSession, mcp: FirstMateMcp, credentialEnv: String?, credential: String?, podToken: String): Secret =
+fun firstMateSecret(name: String, session: FirstMateSession, mcp: FirstMateMcp, credentialEnv: String?, credential: String?, podToken: String,
+                    gitToken: String? = null): Secret =
     SecretBuilder().withNewMetadata().withName(name).withNamespace(FIRST_MATE_NAMESPACE)
         .withLabels<String, String>(mapOf(FIRST_MATE_SESSION_LABEL to session.id)).endMetadata()
         .withType("Opaque")
@@ -100,6 +105,7 @@ fun firstMateSecret(name: String, session: FirstMateSession, mcp: FirstMateMcp, 
             put("mcp.json", jacksonObjectMapper().writeValueAsString(mapOf("mcpServers" to mcp.servers)))
             if (credentialEnv != null && credential != null) put(credentialEnv, credential)
             put(FIRST_MATE_TOKEN_KEY, podToken)
+            gitToken?.let { put(FIRST_MATE_GIT_TOKEN_KEY, it) }
             session.lineage?.let { put(FIRST_MATE_LINEAGE_KEY, it) }
         })
         .build()
@@ -111,12 +117,13 @@ fun firstMateSecret(name: String, session: FirstMateSession, mcp: FirstMateMcp, 
  * and CPU limits and requests. Its container runs [command] (`fm-relay`, [firstMateCommand]) with the relay's env:
  * [engineUrl], the session id, the pod token from the Secret, the spool [FIRST_MATE_SPOOL] (an emptyDir) and, for a
  * [resume], `FM_RESUME`, and with a lineage `FM_LINEAGE_FILE`, its read-only file beside `mcp.json`. The engine never attaches, so stdin stays closed. Restart `Never`, so a crashed first mate ends
- * rather than loops. Its working folder is [FIRST_MATE_CWD], an emptyDir. A pure function so a test asserts on it.
+ * rather than loops. Its working folder is [FIRST_MATE_CWD], an emptyDir the relay clones the session's repo into: `FM_REPO`, and
+ * with [gitToken] `FM_GIT_TOKEN` from the Secret's [FIRST_MATE_GIT_TOKEN_KEY]. A pure function so a test asserts on it.
  */
 fun firstMatePod(
     name: String, session: FirstMateSession, image: String, command: List<String>, secret: String, credentialEnv: String?,
     memoryBytes: Long, cpus: Double, memoryRequestBytes: Long = memoryBytes, cpuRequest: Double = cpus,
-    engineUrl: String = "", resume: Boolean = false,
+    engineUrl: String = "", resume: Boolean = false, gitToken: Boolean = false,
 ): Pod {
     val labels = mapOf(FIRST_MATE_SESSION_LABEL to session.id)
     val locked = SecurityContextBuilder().withAllowPrivilegeEscalation(false).withPrivileged(false)
@@ -131,7 +138,8 @@ fun firstMatePod(
     val env = listOfNotNull(credentialEnv?.let { fromSecret(it, it) },
         plain("FM_ENGINE_URL", engineUrl), plain("FM_SESSION_ID", session.id), fromSecret("FM_TOKEN", FIRST_MATE_TOKEN_KEY),
         plain("FM_SPOOL", FIRST_MATE_SPOOL), if (resume) plain("FM_RESUME", "1") else null,
-        session.lineage?.let { plain("FM_LINEAGE_FILE", "$FIRST_MATE_MCP_DIR/$FIRST_MATE_LINEAGE_KEY") })
+        session.lineage?.let { plain("FM_LINEAGE_FILE", "$FIRST_MATE_MCP_DIR/$FIRST_MATE_LINEAGE_KEY") },
+        plain("FM_REPO", session.repo), if (gitToken) fromSecret("FM_GIT_TOKEN", FIRST_MATE_GIT_TOKEN_KEY) else null)
     return PodBuilder()
         .withNewMetadata().withName(name).withNamespace(FIRST_MATE_NAMESPACE).withLabels<String, String>(labels)
             .withAnnotations<String, String>(mapOf("frakworks.codefrak.com/repo" to session.repo, "frakworks.codefrak.com/login" to session.login))

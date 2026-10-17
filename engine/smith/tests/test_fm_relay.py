@@ -28,8 +28,8 @@ SESSION = "s-1"
 
 # Echoes each stream-json user line back as an assistant line; prints its argv first so a test sees --resume.
 FAKE_CLAUDE = r'''
-import json, sys
-print(json.dumps({"type": "system", "subtype": "init", "argv": sys.argv[1:]}), flush=True)
+import json, os, sys
+print(json.dumps({"type": "system", "subtype": "init", "argv": sys.argv[1:], "gitToken": os.environ.get("FM_GIT_TOKEN")}), flush=True)
 for raw in sys.stdin:
     m = json.loads(raw)
     print(json.dumps({"type": "assistant", "echo": m["message"]["content"]}), flush=True)
@@ -176,13 +176,13 @@ class RelayTest(unittest.TestCase):
         except Exception:
             pass
 
-    def relay(self, resume=False, home=None):
-        env = dict(os.environ, FM_ENGINE_URL=f"http://127.0.0.1:{self.engine.port}", FM_SESSION_ID=SESSION, FM_TOKEN=TOKEN,
+    def relay(self, resume=False, home=None, cwd=None, **extra):
+        env = dict(os.environ, **extra, FM_ENGINE_URL=f"http://127.0.0.1:{self.engine.port}", FM_SESSION_ID=SESSION, FM_TOKEN=TOKEN,
                    FM_SPOOL=os.path.join(self.tmp, "spool"), FM_POLL_WAIT="1", HOME=home or self.tmp)
         if resume:
             env["FM_RESUME"] = "1"
         p = subprocess.Popen([sys.executable, "-I", RELAY_PY, "--", sys.executable, "-I", self.claude, "-p"],
-                             env=env, cwd=self.tmp, stderr=subprocess.DEVNULL)
+                             env=env, cwd=cwd or self.tmp, stderr=subprocess.DEVNULL)
         self.procs.append(p)
         return p
 
@@ -282,6 +282,66 @@ class RelayTest(unittest.TestCase):
         session_file = os.path.join(home, ".claude", "projects", re.sub(r"[^A-Za-z0-9]", "-", cwd), "0b5e-77.jsonl")
         self.assertTrue(os.path.exists(session_file), session_file)
         self.assertEqual("running", self.engine.statuses[0]["state"])
+
+
+    def origin(self):
+        """A local origin for `owner/repo` (FM_GIT_URL is its parent), its default branch `main` one commit ahead."""
+        base = os.path.join(self.tmp, "origin")
+        src = os.path.join(base, "owner", "repo")
+        os.makedirs(src)
+        git = lambda *a: subprocess.run(["git", "-C", src, *a], check=True, capture_output=True)
+        git("init", "-q", "-b", "main")
+        with open(os.path.join(src, "README.md"), "w") as f:
+            f.write("the code\n")
+        git("add", ".")
+        git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "first")
+        return "file://" + base
+
+    def test_a_new_session_clones_its_repo_into_the_work_folder_and_claude_never_sees_the_git_token(self):
+        cwd = os.path.join(self.tmp, "work")
+        os.makedirs(cwd)
+        self.relay(cwd=cwd, FM_REPO="owner/repo", FM_GIT_URL=self.origin(), FM_GIT_TOKEN="github_pat_secret")
+        self.engine.wait_for(lambda: len(self.engine.out) >= 1)
+        init = json.loads(self.engine.out[1])
+        self.assertIsNone(init["gitToken"])
+        self.assertEqual(["-p"], init["argv"])
+        with open(os.path.join(cwd, "README.md")) as f:
+            self.assertEqual("the code\n", f.read())
+        log = subprocess.run(["git", "-C", cwd, "log", "-1", "--format=%s", "origin/main"], capture_output=True, text=True)
+        self.assertEqual("first", log.stdout.strip())
+        with open(os.path.join(cwd, ".git", "config")) as f:
+            self.assertNotIn("github_pat_secret", f.read())
+
+    def test_a_failed_clone_still_starts_claude_with_a_note_that_the_code_is_unavailable(self):
+        cwd = os.path.join(self.tmp, "work")
+        os.makedirs(cwd)
+        self.relay(cwd=cwd, FM_REPO="owner/missing", FM_GIT_URL="file://" + os.path.join(self.tmp, "nowhere"))
+        self.engine.wait_for(lambda: len(self.engine.out) >= 1)
+        argv = json.loads(self.engine.out[1])["argv"]
+        self.assertEqual("--append-system-prompt", argv[1])
+        self.assertIn("owner/missing could not be cloned", argv[2])
+        self.assertEqual("running", self.engine.statuses[0]["state"])
+
+    def test_a_resumed_snapshot_without_a_checkout_keeps_its_files_and_gets_the_repo_cloned(self):
+        buf = io.BytesIO()
+        with tarfile.open(fileobj=buf, mode="w:gz") as t:
+            data = b"kept\n"
+            info = tarfile.TarInfo("notes.txt")
+            info.size = len(data)
+            t.addfile(info, io.BytesIO(data))
+        cwd = os.path.join(self.tmp, "work")
+        os.makedirs(cwd)
+        self.engine.snapshot = {"claudeSessionId": "0b5e-77", "cwd": cwd, "deliveredSeq": 0,
+                                "sessionFile": base64.b64encode(b'{"type":"user"}\n').decode(),
+                                "workdirTar": base64.b64encode(buf.getvalue()).decode(), "size": 5, "dropped": False}
+        self.relay(resume=True, home=os.path.join(self.tmp, "home"), cwd=cwd, FM_REPO="owner/repo", FM_GIT_URL=self.origin())
+        self.engine.wait_for(lambda: len(self.engine.out) >= 1)
+        self.assertEqual(["-p", "--resume", "0b5e-77"], json.loads(self.engine.out[1])["argv"])
+        with open(os.path.join(cwd, "notes.txt")) as f:
+            self.assertEqual("kept\n", f.read())
+        with open(os.path.join(cwd, "README.md")) as f:
+            self.assertEqual("the code\n", f.read())
+        self.assertFalse(os.path.exists(os.path.join(cwd, ".fm-clone")))
 
 
 if __name__ == "__main__":

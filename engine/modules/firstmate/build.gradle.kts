@@ -9,6 +9,8 @@ plugins {
 
 dependencies {
     api(project(":engine-hitlp"))
+    // TargetRepos: the repo's Smith token for a session pod's clone.
+    implementation(project(":engine-github"))
     // The session pods (FirstMatePods): the version is engine-smith's.
     implementation("io.fabric8:kubernetes-client:7.3.1")
     testImplementation("io.fabric8:kubernetes-server-mock:7.3.1")

@@ -19,9 +19,13 @@ so any replica serves the session.
   posts `status exited` and stays up, so the engine can exec the snapshot before it deletes the pod.
 - Resume (`FM_RESUME` set): before claude starts, the relay GETs `snapshot`, writes the Claude session file under
   `$HOME/.claude/projects/` and unpacks the folder into its cwd, and adds `--resume <claude id>` to claude's argv.
+- Checkout (`FM_REPO` set): before claude starts, a cwd with no `.git` (a new session, a dropped snapshot, or one that
+  held no checkout) gets the repo's default branch cloned from GitHub, as a Smith's clone (`--depth 50`), with
+  `FM_GIT_TOKEN` answered by git-askpass: the token is in no URL, no `.git/config` and so no snapshot. A failed clone
+  starts claude anyway, its appended prompt saying the code is unavailable. `FM_GIT_TOKEN` never reaches claude's env.
 
 Environment: FM_ENGINE_URL, FM_SESSION_ID, FM_TOKEN (the session's first-mate-pod token), FM_SPOOL, FM_RESUME,
-FM_POLL_WAIT (seconds, default 25). Python standard library only, as meter-proxy.py.
+FM_REPO, FM_GIT_TOKEN, FM_POLL_WAIT (seconds, default 25). Python standard library only, as meter-proxy.py.
 """
 
 import base64
@@ -29,6 +33,7 @@ import io
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tarfile
@@ -185,6 +190,65 @@ def restore(engine, argv, home):
     return argv
 
 
+GIT_URL = "https://github.com"
+ASKPASS = "/usr/local/bin/git-askpass"
+CODE_UNAVAILABLE = ("System note: the code of {repo} could not be cloned into {cwd} when this pod started, so it is "
+                    "unavailable in this session; say so if asked about the code rather than guessing.")
+
+
+def git_env(token):
+    """git's env for a clone: the token for git-askpass alone (GH_TOKEN), never in a URL; no prompt."""
+    env = {k: v for k, v in os.environ.items() if k not in ("FM_GIT_TOKEN", "FM_TOKEN")}
+    env.update({"GIT_TERMINAL_PROMPT": "0", "GIT_ASKPASS": os.environ.get("FM_GIT_ASKPASS", ASKPASS)})
+    if token:
+        env["GH_TOKEN"] = token
+    return env
+
+
+def checkout(repo, cwd, token, git_url=GIT_URL):
+    """Clones repo's default branch into cwd unless it already has a `.git`; whether cwd holds a checkout. Into a
+    folder that already has files (a snapshot without a checkout) the clone goes beside them and only its `.git` moves
+    in, then the tracked files not already there are written."""
+    if os.path.isdir(os.path.join(cwd, ".git")):
+        return True
+    os.makedirs(cwd, exist_ok=True)
+    url = f"{git_url.rstrip('/')}/{repo}"
+    empty = not os.listdir(cwd)
+    target = cwd if empty else os.path.join(cwd, ".fm-clone")
+    try:
+        if not empty:
+            shutil.rmtree(target, ignore_errors=True)
+        r = subprocess.run(["git", "clone", "--quiet", "--depth", "50", url, target], env=git_env(token),
+                           stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, timeout=600)
+        if r.returncode != 0:
+            log(f"git clone of {repo} failed ({r.returncode}): {r.stderr.decode('utf-8', 'replace').strip()[-500:]}")
+            return False
+        if not empty:
+            os.rename(os.path.join(target, ".git"), os.path.join(cwd, ".git"))
+            subprocess.run(["git", "-C", cwd, "checkout-index", "--all", "--quiet"], stdin=subprocess.DEVNULL,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        log(f"cloned {repo} into {cwd}")
+        return True
+    except (OSError, subprocess.SubprocessError) as e:
+        log(f"git clone of {repo} failed: {e}")
+        return False
+    finally:
+        if not empty:
+            shutil.rmtree(target, ignore_errors=True)
+
+
+def note_unavailable(argv, repo, cwd):
+    """argv with the code-unavailable note at the end of its --append-system-prompt (added when there is none)."""
+    note = CODE_UNAVAILABLE.format(repo=repo, cwd=cwd)
+    argv = list(argv)
+    if "--append-system-prompt" in argv:
+        i = argv.index("--append-system-prompt") + 1
+        argv[i] = f"{argv[i]}\n\n{note}" if argv[i] else note
+    else:
+        argv += ["--append-system-prompt", note]
+    return argv
+
+
 class Relay:
     def __init__(self, engine, spool, argv, poll_wait):
         self.engine = engine
@@ -248,7 +312,8 @@ class Relay:
                 time.sleep(1)
 
     def run(self):
-        self.child = subprocess.Popen(self.argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+        env = {k: v for k, v in os.environ.items() if k != "FM_GIT_TOKEN"}
+        self.child = subprocess.Popen(self.argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE, env=env)
         self.engine.call("POST", "/status", {"state": "running"})
         threads = [threading.Thread(target=f, daemon=True) for f in (self.stdout, self.sender, self.inbox)]
         for t in threads:
@@ -272,6 +337,11 @@ def main(args):
     spool = Spool(env.get("FM_SPOOL", "/var/spool/fm-relay"))
     if env.get("FM_RESUME"):
         args = restore(engine, args, env.get("HOME", os.path.expanduser("~")))
+    repo = env.get("FM_REPO")
+    if repo:
+        cwd = os.getcwd()
+        if not checkout(repo, cwd, env.get("FM_GIT_TOKEN"), env.get("FM_GIT_URL", GIT_URL)):
+            args = note_unavailable(args, repo, cwd)
     relay = Relay(engine, spool, args, int(env.get("FM_POLL_WAIT", "25")))
     code = relay.run()
     if relay.freezing.is_set():
