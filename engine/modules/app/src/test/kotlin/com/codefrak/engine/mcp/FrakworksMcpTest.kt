@@ -245,7 +245,7 @@ class FrakworksMcpTest {
             "read_repos", "add_repo", "edit_repo", "remove_repo", "read_ci_runs", "cancel_intake", "amend_intake", "amend_ticket", "close_ticket", "comment_ticket", "read_ticket_runs", "search_tickets",
             "read_access", "add_access", "remove_access", "read_tokens", "mint_token", "revoke_token", "read_ticket", "list_private_docs", "read_private_doc",
             "read_repo_mcp_servers", "add_repo_mcp_server", "edit_repo_mcp_server", "remove_repo_mcp_server", "test_repo_mcp_server",
-            "read_ci_jobs", "read_ci_job", "search_ci_log", "rerun_ci_jobs", "read_version", "screenshot_desktop"), mcp.tools(mate).map { it.name })
+            "read_ci_jobs", "read_ci_job", "search_ci_log", "rerun_ci_jobs", "read_version", "read_desktop_release", "screenshot_desktop"), mcp.tools(mate).map { it.name })
         for (name in listOf("approve", "reauthorize")) {
             val tool = mcp.tools(mate).single { it.name == name }
             assertTrue(tool.description.isNotBlank())
@@ -259,7 +259,7 @@ class FrakworksMcpTest {
         val smithTools = mcp.tools(smith)
         assertEquals(listOf("submit_ask", "note_friction", "read_ci_log", "read_run_log", "list_private_docs", "read_private_doc", "list_attachments", "read_attachment",
             "steer_child", "await_children", "file_children", "answer_child", "note_for_next_parent", "read_ticket_runs", "read_transcript", "read_ticket",
-            "read_ci_jobs", "read_ci_job", "search_ci_log", "rerun_ci_jobs", "read_version"), smithTools.map { it.name })
+            "read_ci_jobs", "read_ci_job", "search_ci_log", "rerun_ci_jobs", "read_version", "read_desktop_release"), smithTools.map { it.name })
         assertEquals(setOf("ask"), (smithTools.first().inputSchema["properties"] as Map<*, *>).keys)
         val note = smithTools[1].inputSchema
         assertEquals(listOf("kind", "summary", "evidence", "severity"), (note["properties"] as Map<*, *>).keys.toList())
@@ -269,7 +269,7 @@ class FrakworksMcpTest {
         val unknown = McpCaller.Unknown("172.18.0.9", "docker is down")
         assertEquals(listOf("submit_ask", "note_friction", "read_ci_log", "read_run_log", "list_private_docs", "read_private_doc", "list_attachments", "read_attachment",
             "steer_child", "await_children", "file_children", "answer_child", "note_for_next_parent", "read_ticket_runs", "read_transcript", "read_ticket",
-            "read_ci_jobs", "read_ci_job", "search_ci_log", "rerun_ci_jobs", "read_version"), mcp.tools(unknown).map { it.name })
+            "read_ci_jobs", "read_ci_job", "search_ci_log", "rerun_ci_jobs", "read_version", "read_desktop_release"), mcp.tools(unknown).map { it.name })
         assertEquals("cannot tell whether the caller is a Smith sandbox: docker is down", error(call("submit_ask", mapOf("ask" to "x"), unknown)))
         assertTrue(engine.asks.isEmpty())
     }
