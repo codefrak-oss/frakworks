@@ -124,8 +124,11 @@ class SplitFeatureProcessTest {
 
     /** [parent]'s work item blocked by [child]'s, open or ended (an ended one is not adopted again as a fresh chore); answers the child's. */
     private fun blockedBy(parent: Long, child: Long): WorkItem {
-        val item = tickets.open(repo).firstOrNull { it.ticket == child }?.let { tickets.details(it.id) }
-            ?: run { tickets.ended += repo.lowercase() to child; tickets.forTicket(repo, child)!! }
+        // Once any item for [child] exists, the newest one (forTicket's, with reuseClosed) is the one the child's flow filed
+        // and closed: an older open item for the same number (minted by a flow a previous test left behind before this
+        // test filed its child) must not be linked in its place, or the parent waits on it forever (scan: [], row kept).
+        val item = if (tickets.open(repo).any { it.ticket == child }) tickets.forTicket(repo, child)!!
+            else run { tickets.ended += repo.lowercase() to child; tickets.forTicket(repo, child)!! }
         tickets.link(tickets.forTicket(repo, parent)!!.id, item.id)
         return item
     }
