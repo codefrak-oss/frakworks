@@ -137,6 +137,9 @@ jobs:
       PLATFORMS: linux/amd64
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Enough history for the sha-tag prune to tell new tags from old.
+          fetch-depth: 300
       - name: builder
         run: |
           docker buildx create --name frakworks --driver remote "$BUILDKIT_HOST"
@@ -156,6 +159,9 @@ jobs:
         run: |
           curl -sSf -H 'Accept: application/vnd.oci.image.index.v1+json' -H 'Accept: application/vnd.oci.image.manifest.v1+json' \
             "http://$REGISTRY/v2/frakworks-web/manifests/main" > /dev/null && echo "frakworks-web:main published"
+      # As images.yml does: the newest five sha tags stay, the rest go to the GC.
+      - name: prune old sha tags
+        run: .github/scripts/registry-prune-tags.sh "$REGISTRY" frakworks-web 5
       # Deployment `web` pulls :main (imagePullPolicy Always), so a restart
       # deploys it. WEB_KUBECONFIG is a kubeconfig for a ServiceAccount that
       # may only restart deployments/web in namespace frakworks (the deployment's

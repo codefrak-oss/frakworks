@@ -70,6 +70,9 @@ jobs:
             extra: --build-context framework=bots --build-context desktop=observability/desktop --build-context engine=engine
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Enough history for the sha-tag prune to tell new tags from old.
+          fetch-depth: 300
       # The runner pod has no Docker daemon. A new pod's network is admitted by
       # the NetworkPolicy a second or two after it starts, hence the retries.
       - name: builder
@@ -105,6 +108,10 @@ jobs:
             grep -q "\"architecture\": *\"$arch\"" manifest.json || { echo "no $arch manifest for ${{ matrix.image }}:main"; exit 1; }
             echo "$arch published"
           done
+      # Every push adds a sha-<commit> tag; the registry keeps the newest five
+      # and its weekly GC frees the rest (.github/scripts/registry-prune-tags.sh).
+      - name: prune old sha tags
+        run: .github/scripts/registry-prune-tags.sh "$REGISTRY" "${{ matrix.image }}" 5
       # The desktop's `npm test` in the image just pushed, with the network off,
       # against this checkout: the baked node_modules must be enough
       # (smith/Dockerfile). A build step on buildkitd stands in for the
