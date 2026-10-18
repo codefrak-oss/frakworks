@@ -34,6 +34,16 @@ docker pull registry.example:5000/frakworks-smith:main
 docker pull registry.example:5000/frakworks-smith:sha-1234abc
 ```
 
+Nothing deploys from a sha tag (Argo, the Smith pods and the desktop's
+Update all pull `:main`); the sha tags are a rollback handle. Each push keeps
+the newest five and deletes the manifests of the rest
+(`.github/scripts/registry-prune-tags.sh`, run by `images.yml` and
+`desktop-release.yml`), and the registry host's weekly `garbage-collect`
+frees their layers. That GC must run without `--delete-untagged`: on
+docker-registry 2.8 the flag deletes the platform manifests under every
+tagged OCI index, `:main` included, which took the fleet down on
+2026-10-18 (lundmatt1/homelab#100128).
+
 The local stack builds both images by default and uses a registry only when
 `FRAKWORKS_REGISTRY` names one (the seam for a public registry later):
 `engine/compose.local.yaml`'s engine service is
