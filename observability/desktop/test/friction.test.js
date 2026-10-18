@@ -15,7 +15,7 @@ const path = require("node:path");
 const React = require("react");
 const { renderToStaticMarkup } = require("react-dom/server");
 const {
-  frictionStats, perDayBars, kindBars, noteRow, pageState, fmtUtc, FrictionNotesView, FrictionNotesTable, FrictionStrip,
+  frictionStats, perDayBars, kindBars, noteRow, pageState, fmtUtc, fmtShort, FrictionNotesView, FrictionNotesTable, FrictionStrip,
   FrictionGroupsTable, FrictionMergeView, joinedBy, countLabel, groupRow, tableRows,
   KINDS, DEFAULT_WINDOW, DASH,
 } = require("../dist/friction.cjs");
@@ -82,7 +82,7 @@ test("the table lists the notes newest first with a link that opens the ticket i
   const rows = notes.map(noteRow);
   assert.deepEqual(rows.map((r) => r.id), ["f2", "f1", "b2", "b1", "a2", "a1"]);
   assert.deepEqual(rows[5], {
-    id: "a1", at: "2026-10-02 10:00 UTC", repo: "acme/widgets",
+    id: "a1", at: "10-02 10:00", atFull: "2026-10-02 10:00 UTC", repo: "acme/widgets",
     ticket: { repo: "acme/widgets", issue: 7, href: "frakworks://ticket/acme/widgets/7" },
     source: "as you go", kind: "bug", severity: "high", summary: "The <engine> answered 500 on a blank since.",
   });
@@ -223,8 +223,8 @@ test("a group row has the count (9 of 30 when members are hidden), newest, oldes
   assert.equal(countLabel({ count: 9, total: 30 }), "9 of 30");
   assert.equal(countLabel({}), DASH);
   assert.deepEqual(groupRow(groups[1]), {
-    id: 12, count: "2 of 3", newest: "2026-10-04 10:00 UTC", oldest: "2026-10-02 10:00 UTC", kind: "bug",
-    repos: "acme/gadgets, acme/widgets", severity: "high", title: "The <engine> answered 500 on a blank since.",
+    id: 12, count: "2 of 3", newest: "10-04 10:00", newestFull: "2026-10-04 10:00 UTC", oldest: "10-02 10:00", oldestFull: "2026-10-02 10:00 UTC", kind: "bug",
+    repos: "gadgets, widgets", reposFull: "acme/gadgets, acme/widgets", severity: "high", title: "The <engine> answered 500 on a blank since.",
     bug: null, fix: null, state: "open" });
   assert.equal(groupRow({ id: 1, count: 1, total: 1, repos: [], kind: "mixed" }).repos, DASH, "no repo is a dash");
   assert.equal(groupRow({ id: 1, count: 1, total: 1 }).severity, DASH);
@@ -238,13 +238,13 @@ test("a group row has the count (9 of 30 when members are hidden), newest, oldes
   const html = render(FrictionGroupsTable, { groups, notes: allNotes, open: {} });
   assert.match(html, /<table class="jevCalls frictionGroups">/);
   assert.match(html, /<th>count<\/th><th class="jevWhen">newest<\/th><th class="jevWhen">oldest<\/th><th>kind<\/th><th>repos<\/th><th>severity<\/th><th>title<\/th>/);
-  assert.match(html, /<tr class="jevRow frictionGroupRow severity-high" title="Show this group&#x27;s notes"><td class="frictionCount">4<\/td><td class="jevWhen">2026-10-04 12:00 UTC<\/td><td class="jevWhen">2026-10-02 11:00 UTC<\/td><td>mixed<\/td><td class="jevText" title="acme\/widgets, acme\/gadgets">acme\/widgets, acme\/gadgets<\/td><td>high<\/td>/,
+  assert.match(html, /<tr class="jevRow frictionGroupRow severity-high" title="Show this group&#x27;s notes"><td class="frictionCount">4<\/td><td class="jevWhen" title="2026-10-04 12:00 UTC">10-04 12:00<\/td><td class="jevWhen" title="2026-10-02 11:00 UTC">10-02 11:00<\/td><td>mixed<\/td><td class="jevText" title="acme\/widgets, acme\/gadgets">widgets, gadgets<\/td><td>high<\/td>/,
     "the highest severity colours the row as severity-high, the tie of kinds is mixed as the engine says");
   assert.match(html, /<td class="frictionCount">2 of 3<\/td>/);
   assert.match(html, /The &lt;engine&gt; answered 500 on a blank since\./, "a title is text, escaped");
   assert.doesNotMatch(html, /frictionGroupDetail|frictionNotes/, "no members while closed");
   // The ungrouped note: no count, its own time twice, its summary marked grouping…
-  assert.match(html, /<tr class="jevRow frictionGroupRow frictionUngrouped severity-unset"[^>]*><td class="frictionCount">—<\/td><td class="jevWhen">2026-10-04 11:30 UTC<\/td><td class="jevWhen">2026-10-04 11:30 UTC<\/td><td>bug<\/td>/);
+  assert.match(html, /<tr class="jevRow frictionGroupRow frictionUngrouped severity-unset"[^>]*><td class="frictionCount">—<\/td><td class="jevWhen" title="2026-10-04 11:30 UTC">10-04 11:30<\/td><td class="jevWhen" title="2026-10-04 11:30 UTC">10-04 11:30<\/td><td>bug<\/td>/);
   assert.match(html, /the brief describes a draft <span class="muted frictionGrouping">\(grouping…\)<\/span>/);
   assert.equal((html.match(/<tr class="jevRow frictionGroupRow/g) || []).length, 3);
 });
@@ -453,4 +453,22 @@ test("Fixed by is wired: the page calls fleet.frictionFix, main supplies the log
   assert.match(src("main.js"), /ipcMain\.handle\("engine:friction-fix", async \(_e, groupId, fix\) => \{\n  const by = await signedInLogin\(\);\n  const r = await frictionFix\(groupId, fix, by\);/);
   assert.match((await frictionFix(4, { repo: "nope", issue: 1 }, "someone")).error, /not a fixing ticket/);
   assert.match((await frictionFix("x", null, "someone")).error, /not a friction group id/);
+});
+
+test("the tables' dates are short, the full UTC time in the tooltip (#100126)", () => {
+  assert.equal(fmtShort("2026-10-17T19:44:31Z"), "10-17 19:44");
+  assert.equal(fmtShort(null), DASH);
+  assert.equal(fmtShort("nope"), DASH);
+  const r = groupRow({ id: 1, count: 1, total: 1, newest: "2026-10-17T19:44:00Z", oldest: "2026-10-16T08:05:00Z", repos: ["codefrak-oss/frakworks"] });
+  assert.equal(r.newest, "10-17 19:44");
+  assert.equal(r.newestFull, "2026-10-17 19:44 UTC");
+  assert.equal(r.oldest, "10-16 08:05");
+  assert.equal(r.repos, "frakworks", "the repo without its owner");
+  assert.equal(r.reposFull, "codefrak-oss/frakworks");
+  const n = noteRow({ id: "x", noted_at: "2026-10-17T19:44:00Z", repo: "codefrak-oss/frakworks" });
+  assert.equal(n.at, "10-17 19:44");
+  assert.equal(n.atFull, "2026-10-17 19:44 UTC");
+  const html = render(FrictionGroupsTable, { groups: [{ id: 1, count: 1, total: 1, newest: "2026-10-17T19:44:00Z", oldest: "2026-10-17T19:44:00Z", repos: ["codefrak-oss/frakworks"], title: "t" }], notes: [] });
+  assert.match(html, /<td class="jevWhen" title="2026-10-17 19:44 UTC">10-17 19:44<\/td>/);
+  assert.match(html, /<td class="jevText" title="codefrak-oss\/frakworks">frakworks<\/td>/);
 });

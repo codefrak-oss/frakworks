@@ -33,6 +33,14 @@ export const fmtUtc = (iso) => {
   return iso && Number.isFinite(t) ? `${new Date(t).toISOString().replace("T", " ").slice(0, 16)} UTC` : DASH;
 };
 
+/** An ISO date-time as UTC, short (`10-17 19:44`), for a table cell: fmtUtc goes in its tooltip; `—` for none. */
+export const fmtShort = (iso) => {
+  const t = Date.parse(iso);
+  return iso && Number.isFinite(t) ? new Date(t).toISOString().replace("T", " ").slice(5, 16) : DASH;
+};
+/** A repo's name without its owner (`acme/widgets` is `widgets`). */
+const repoName = (r) => String(r).split("/").pop();
+
 /** A count map as [key, count] in `known`'s order, then any other key the engine sent. */
 const ordered = (counts, known) => {
   const c = counts || {};
@@ -68,7 +76,8 @@ export const kindBars = (summary) => ordered(summary && summary.by_kind, KINDS);
  */
 export const noteRow = (n) => ({
   id: n.id,
-  at: fmtUtc(n.noted_at),
+  at: fmtShort(n.noted_at),
+  atFull: fmtUtc(n.noted_at),
   repo: n.repo || DASH,
   ticket: n.issue != null && n.repo ? { repo: n.repo, issue: n.issue, href: `frakworks://ticket/${n.repo}/${n.issue}` } : null,
   source: SOURCE_LABELS[n.source] || n.source || DASH,
@@ -170,10 +179,13 @@ export const countLabel = (g) => {
 export const groupRow = (g) => ({
   id: g.id,
   count: countLabel(g),
-  newest: fmtUtc(g.newest),
-  oldest: fmtUtc(g.oldest),
+  newest: fmtShort(g.newest),
+  newestFull: fmtUtc(g.newest),
+  oldest: fmtShort(g.oldest),
+  oldestFull: fmtUtc(g.oldest),
   kind: g.kind || DASH,
-  repos: Array.isArray(g.repos) && g.repos.length ? g.repos.join(", ") : DASH,
+  repos: Array.isArray(g.repos) && g.repos.length ? g.repos.map(repoName).join(", ") : DASH,
+  reposFull: Array.isArray(g.repos) && g.repos.length ? g.repos.join(", ") : DASH,
   severity: g.severity || DASH,
   title: g.title || DASH,
   bug: bugLink(g),
@@ -303,7 +315,7 @@ const FrictionNoteRow = ({ note, open, onToggle, onOpenTicket, grouped, onPullOu
     <>
       <tr className={`jevRow frictionRow severity-${note.severity || "unset"}${open ? " open" : ""}`}
           title={open ? "Hide this note" : "Show this note"} onClick={() => onToggle && onToggle(note.id)}>
-        <td className="jevWhen">{r.at}</td>
+        <td className="jevWhen" title={r.atFull}>{r.at}</td>
         <td className="jevText" title={note.repo || ""}>{r.repo}</td>
         <td>{r.ticket
           ? <a href={r.ticket.href} title={`${r.ticket.repo}#${r.ticket.issue}`}
@@ -417,10 +429,10 @@ const FrictionGroupRow = ({ group, open, onToggle, openNotes, onToggleNote, onOp
       <tr className={`jevRow frictionGroupRow severity-${group.severity || "unset"}${recurred ? " frictionRecurred" : ""}${open ? " open" : ""}`}
           title={recurred ? `recurred ${fmtUtc(r.fix && r.fix.recurredAt)}: a note arrived after the fix merged` : (open ? "Hide this group's notes" : "Show this group's notes")} onClick={() => onToggle && onToggle(`g${group.id}`)}>
         <td className="frictionCount">{r.count}</td>
-        <td className="jevWhen">{r.newest}</td>
-        <td className="jevWhen">{r.oldest}</td>
+        <td className="jevWhen" title={r.newestFull}>{r.newest}</td>
+        <td className="jevWhen" title={r.oldestFull}>{r.oldest}</td>
         <td>{r.kind}</td>
-        <td className="jevText" title={r.repos}>{r.repos}</td>
+        <td className="jevText" title={r.reposFull}>{r.repos}</td>
         <td>{r.severity}</td>
         <td className="jevText frictionTitle" title={group.title || ""}>{r.title}</td>
         <td className="frictionBug">{r.bug
@@ -475,10 +487,10 @@ const FrictionUngroupedRow = ({ note, open, onToggle, openNotes, onToggleNote, o
       <tr className={`jevRow frictionGroupRow frictionUngrouped severity-${note.severity || "unset"}${open ? " open" : ""}`}
           title={open ? "Hide this note" : "Show this note"} onClick={() => onToggle && onToggle(`n${note.id}`)}>
         <td className="frictionCount">{DASH}</td>
-        <td className="jevWhen">{r.at}</td>
-        <td className="jevWhen">{r.at}</td>
+        <td className="jevWhen" title={r.atFull}>{r.at}</td>
+        <td className="jevWhen" title={r.atFull}>{r.at}</td>
         <td>{r.kind}</td>
-        <td className="jevText" title={note.repo || ""}>{r.repo}</td>
+        <td className="jevText" title={note.repo || ""}>{note.repo ? repoName(note.repo) : DASH}</td>
         <td>{r.severity}</td>
         <td className="jevText frictionTitle" title={note.summary || ""}>{r.summary} <span className="muted frictionGrouping">({joinedBy(note)})</span></td>
         <td className="frictionBug">{DASH}</td>
