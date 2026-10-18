@@ -88,10 +88,12 @@ COPY --chown=smith:smith gradle.properties /home/smith/.gradle/gradle.properties
 COPY --from=engine --chown=smith:smith settings.gradle.kts build.gradle.kts gradle.properties /tmp/deps/engine/
 # Each module's build file, as engine/Dockerfile lists them (keep both in step with settings.gradle.kts).
 COPY --from=engine --chown=smith:smith modules/common/build.gradle.kts /tmp/deps/engine/modules/common/
+COPY --from=engine --chown=smith:smith modules/github-api/build.gradle.kts /tmp/deps/engine/modules/github-api/
 COPY --from=engine --chown=smith:smith modules/github/build.gradle.kts /tmp/deps/engine/modules/github/
 COPY --from=engine --chown=smith:smith modules/events/build.gradle.kts /tmp/deps/engine/modules/events/
 COPY --from=engine --chown=smith:smith modules/accounts/build.gradle.kts /tmp/deps/engine/modules/accounts/
 COPY --from=engine --chown=smith:smith modules/jev/build.gradle.kts /tmp/deps/engine/modules/jev/
+COPY --from=engine --chown=smith:smith modules/smith-api/build.gradle.kts /tmp/deps/engine/modules/smith-api/
 COPY --from=engine --chown=smith:smith modules/smith/build.gradle.kts /tmp/deps/engine/modules/smith/
 COPY --from=engine --chown=smith:smith modules/incidents/build.gradle.kts /tmp/deps/engine/modules/incidents/
 COPY --from=engine --chown=smith:smith modules/hitlp/build.gradle.kts /tmp/deps/engine/modules/hitlp/
