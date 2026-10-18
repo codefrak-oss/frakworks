@@ -1032,6 +1032,18 @@ body.rowResizing iframe, body.rowResizing webview { pointer-events: none; }
 .fleet-root .frictionMerge label { display: flex; align-items: center; gap: 6px; }
 .fleet-root .frictionMerge select { max-width: 360px; }
 .fleet-root .frictionGroupRow.frictionRecurred td { background: color-mix(in srgb, #d97706 14%, transparent); }
+/* The groups table fits its pane (#100126): short dates, fixed narrow columns, the title takes the rest. */
+.fleet-root .frictionGroups, .fleet-root .frictionNotes { width: 100%; }
+.fleet-root .frictionGroups th, .fleet-root .frictionGroups td,
+.fleet-root .frictionNotes th, .fleet-root .frictionNotes td { padding-left: 4px; padding-right: 8px; }
+.fleet-root .frictionGroups .jevWhen, .fleet-root .frictionNotes .jevWhen { width: 84px; }
+.fleet-root .frictionGroups > thead > tr > th:nth-child(1) { width: 52px; }
+.fleet-root .frictionGroups > thead > tr > th:nth-child(4) { width: 52px; }
+.fleet-root .frictionGroups > thead > tr > th:nth-child(5) { width: 15%; }
+.fleet-root .frictionGroups > thead > tr > th:nth-child(6) { width: 60px; }
+.fleet-root .frictionGroups > thead > tr > th:nth-child(8) { width: 60px; }
+.fleet-root .frictionGroups > thead > tr > th:nth-child(9) { width: 96px; }
+.fleet-root .frictionGroups td.frictionFix, .fleet-root .frictionGroups td.frictionBug { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fleet-root .frictionFixField { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 11px; margin-bottom: 6px; }
 .fleet-root .frictionFixField .pvButton { padding: 1px 7px; font-size: 11px; }
 .fleet-root .frictionShowFixed { display: flex; align-items: center; gap: 6px; font-size: 11px; margin: 4px 0; }
