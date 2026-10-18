@@ -113,10 +113,14 @@ configure(subprojects.filter { it.name.startsWith("engine-") }) {
             exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
         }
     }
+}
 
-    // Downloads every dependency jar without compiling; the Dockerfile runs it (`gradle resolveDependencies` at the
-    // root) in a layer of its own so code-only changes rebuild without network. In every module: each has test
-    // dependencies of its own (a mock server, test fixtures) that the app's classpaths do not hold.
+// Downloads every dependency jar without compiling; the Dockerfiles run it (`gradle resolveDependencies` at the
+// root) in a layer of its own so code-only changes rebuild without network. In every project, :sdk too: each has
+// test dependencies of its own (a mock server, test fixtures) that the app's classpaths do not hold, and each
+// resolves its own Kotlin compiler classpaths (kotlinBuildToolsApiClasspath and the like), which `--offline`
+// compiles need.
+subprojects {
     tasks.register("resolveDependencies") {
         doLast {
             configurations.filter { it.isCanBeResolved }.forEach { it.resolve() }
