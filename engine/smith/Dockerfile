@@ -82,16 +82,21 @@ ENV GRADLE_USER_HOME=/home/smith/.gradle
 # files, from the `engine` build context (images.yml and compose.local.yaml pass it),
 # and `gradle resolveDependencies` (engine/build.gradle.kts) over them, as engine/Dockerfile
 # does. No engine sources. settings.gradle.kts includes ../sdk, which is outside that
-# context: a stub build file stands in (the SDK's only dependency is the Kotlin plugin's,
-# which every module resolves too). The build files are dropped after; the jars stay.
+# context: a stub stands in (smith/sdk-stub: its build file mirrors sdk/build.gradle.kts's
+# repository and toolchain, plus one trivial .kt source). The SDK resolves Kotlin compiler
+# classpaths of its own (kotlinBuildToolsApiClasspath, kotlin-reflect, kotlinx-coroutines),
+# so resolveDependencies runs in it too, and `:sdk:compileKotlin --offline` after it fails
+# the image build if the cache is incomplete. The build files are dropped after; the jars stay.
 COPY --chown=smith:smith gradle.properties /home/smith/.gradle/gradle.properties
 COPY --from=engine --chown=smith:smith settings.gradle.kts build.gradle.kts gradle.properties /tmp/deps/engine/
 # Each module's build file, as engine/Dockerfile lists them (keep both in step with settings.gradle.kts).
 COPY --from=engine --chown=smith:smith modules/common/build.gradle.kts /tmp/deps/engine/modules/common/
+COPY --from=engine --chown=smith:smith modules/github-api/build.gradle.kts /tmp/deps/engine/modules/github-api/
 COPY --from=engine --chown=smith:smith modules/github/build.gradle.kts /tmp/deps/engine/modules/github/
 COPY --from=engine --chown=smith:smith modules/events/build.gradle.kts /tmp/deps/engine/modules/events/
 COPY --from=engine --chown=smith:smith modules/accounts/build.gradle.kts /tmp/deps/engine/modules/accounts/
 COPY --from=engine --chown=smith:smith modules/jev/build.gradle.kts /tmp/deps/engine/modules/jev/
+COPY --from=engine --chown=smith:smith modules/smith-api/build.gradle.kts /tmp/deps/engine/modules/smith-api/
 COPY --from=engine --chown=smith:smith modules/smith/build.gradle.kts /tmp/deps/engine/modules/smith/
 COPY --from=engine --chown=smith:smith modules/incidents/build.gradle.kts /tmp/deps/engine/modules/incidents/
 COPY --from=engine --chown=smith:smith modules/hitlp/build.gradle.kts /tmp/deps/engine/modules/hitlp/
@@ -105,7 +110,8 @@ COPY --from=engine --chown=smith:smith modules/flow-proposal/build.gradle.kts /t
 COPY --from=engine --chown=smith:smith modules/plugins/build.gradle.kts /tmp/deps/engine/modules/plugins/
 COPY --from=engine --chown=smith:smith modules/api/build.gradle.kts /tmp/deps/engine/modules/api/
 COPY --from=engine --chown=smith:smith modules/app/build.gradle.kts /tmp/deps/engine/modules/app/
-RUN mkdir -p /tmp/deps/sdk && echo 'plugins { kotlin("jvm") }' > /tmp/deps/sdk/build.gradle.kts \
-    && cd /tmp/deps/engine && gradle --no-daemon resolveDependencies \
+COPY --chown=smith:smith sdk-stub/ /tmp/deps/sdk/
+RUN cd /tmp/deps/engine && gradle --no-daemon resolveDependencies \
+    && gradle --no-daemon --offline :sdk:compileKotlin \
     && rm -rf /tmp/deps /home/smith/.gradle/daemon /home/smith/.gradle/caches/build-cache-1
 ENTRYPOINT ["run-smith"]
