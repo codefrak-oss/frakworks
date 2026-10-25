@@ -84,12 +84,16 @@ fun firstMatePodName(session: FirstMateSession): String = "first-mate-" + sessio
 /** The checkout MCP server's one tool, allowed in every pod. */
 const val FIRST_MATE_CHECKOUT_TOOL = "mcp__checkout__checkout_repo"
 
-fun firstMateArgv(model: String, effort: String, prompt: FirstMatePrompt, lineage: Boolean = false): List<String> = buildList {
+/** The allow rule for each of the repo's own MCP servers, as the desktop's `repoMcpServerRules`: `mcp__<name>__*`. */
+fun repoMcpServerRules(names: Collection<String>): List<String> = names.map { "mcp__${it}__*" }
+
+fun firstMateArgv(model: String, effort: String, prompt: FirstMatePrompt, lineage: Boolean = false,
+                  repoServers: Collection<String> = emptyList()): List<String> = buildList {
     addAll(listOf("claude", "-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose",
         "--model", model, "--effort", effort))
     // the pod's own checkout MCP server (fm-relay --mcp-checkout) is the engine's, not the desktop's: its tool is
     // added here rather than to shared/first-mate-prompt.json, which the desktop's tool lists match exactly
-    addAll(listOf("--allowedTools", (prompt.allowedTools + FIRST_MATE_CHECKOUT_TOOL).joinToString(",")))
+    addAll(listOf("--allowedTools", (prompt.allowedTools + FIRST_MATE_CHECKOUT_TOOL + repoMcpServerRules(repoServers)).joinToString(",")))
     if (prompt.deniedTools.isNotEmpty()) addAll(listOf("--disallowedTools", prompt.deniedTools.joinToString(",")))
     addAll(listOf("--strict-mcp-config", "--mcp-config", "$FIRST_MATE_MCP_DIR/mcp.json"))
     val appended = if (lineage) "${prompt.prompt}\n\n${firstMateLineageLine()}" else prompt.prompt
