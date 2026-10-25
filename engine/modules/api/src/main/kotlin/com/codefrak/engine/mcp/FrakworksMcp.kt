@@ -10,6 +10,7 @@ import com.codefrak.engine.github.GitHubCompare
 import com.codefrak.engine.github.GitHubPulls
 import com.codefrak.engine.github.IssueDetails
 import com.codefrak.engine.github.GitPush
+import com.codefrak.engine.hitlp.HitlpRequester
 import com.codefrak.engine.intake.AnswerAttachments
 import com.codefrak.engine.repos.CompareCommits
 import com.codefrak.engine.repos.McpProbe
@@ -60,6 +61,9 @@ import java.util.Locale
  * First mate's only, with a login; a Smith neither lists it nor may call it.
  * read_version (#100101, [VersionTool]) answers the engine's build version and commit, as `GET /version` does: every role's.
  * read_desktop_release (#100117, [DesktopReleaseTool]) maps a desktop version to its commit and tickets, and a ticket to the first release shipping it: every role's.
+ * hitlp_ask, hitlp_approve and hitlp_task (#100138, [HitlpTools]) put a question or an approval to the user on the
+ * configured HITLP server, answering the task id at once, and read a task's state and decision: First mate's only;
+ * absent (no [HitlpRequester] given) they are not listed.
  *
  * First mate's role ([McpCaller.Nobody]) lists [TOOLS]; its login is the
  * one its bearer token proved. A Smith's role lists [SMITH_TOOLS] only:
@@ -77,7 +81,8 @@ class FrakworksMcp(private val engine: FrakworksEngine, private val tiers: TierT
                    git: GitPush? = null, pulls: GitHubPulls? = null, events: EngineEvents? = null,
                    build: EngineBuild? = null, desktops: DesktopChannel? = null,
                    compare: CompareCommits? = null, titles: TicketTitles? = null, gitCompare: GitHubCompare? = null,
-                   details: IssueDetails? = null, merges: TicketMerges? = details?.let { d -> TicketMerges { r, n -> d.ticket(r, n)?.prs } }) : EngineMcpServer {
+                   details: IssueDetails? = null, merges: TicketMerges? = details?.let { d -> TicketMerges { r, n -> d.ticket(r, n)?.prs } },
+                   hitlp: HitlpRequester? = null) : EngineMcpServer {
     private val askTool = AskTool(engine, tiers)
     private val frictionNoteTool = FrictionNoteTool(friction, engine)
     private val fixTool = fixes?.let { FrictionFixTool(it) }
@@ -107,6 +112,7 @@ class FrakworksMcp(private val engine: FrakworksEngine, private val tiers: TierT
     private val versionTool = VersionTool(build)
     private val desktopReleaseTool = DesktopReleaseTool(engine, checkRuns, compare, titles, gitCompare, merges)
     private val screenshotTool = ScreenshotTool(desktops)
+    private val hitlpTools = hitlp?.let { HitlpTools(it) }
     override val name = NAME
     override val version = "1"
 
@@ -187,7 +193,8 @@ class FrakworksMcp(private val engine: FrakworksEngine, private val tiers: TierT
     /** Tools [EngineMcpController] streams: await_children ([ParentTools.STREAMED]). */
     override val streamed: Set<String> get() = ParentTools.STREAMED + ScreenshotTool.NAME
 
-    override fun tools() = if (fixTool == null) TOOLS else TOOLS + FrictionFixTool.TOOL + FrictionFixIntakeTool.TOOL
+    override fun tools() = TOOLS + (if (fixTool == null) emptyList() else listOf(FrictionFixTool.TOOL, FrictionFixIntakeTool.TOOL)) +
+        (if (hitlpTools == null) emptyList() else HitlpTools.TOOLS)
 
     /**
      * A Smith's lists [SMITH_TOOLS], and link_friction_fix_intake with the friction groups, [WorkItemTools] with the
@@ -229,6 +236,7 @@ class FrakworksMcp(private val engine: FrakworksEngine, private val tiers: TierT
                 ScreenshotTool.NAME -> mateOnly(caller, tool, "the user's desktop is First mate's to see, never a Smith's")
                 IntakeTools.AMEND_TICKET -> mateOnly(caller, tool, "tickets are the user's to amend")
                 CiRunsTool.NAME -> mateOnly(caller, tool, "CI run history is First mate's to read")
+                in HitlpTools.NAMES -> mateOnly(caller, tool, "asking the user through HITLP is First mate's; a Smith asks through its result")
                 in CiJobsTool.NAMES -> caller.caller.repo?.let { ciJobsTool.call(tool, args, it) }
                     ?: McpToolResult.error("no run repo for run ${caller.caller.runId}: $tool reads only a Smith's run's repo")
                 in MATE_ONLY_TOOLS -> mateOnly(caller, tool, "a friction group's fix is First mate's to set")
@@ -269,6 +277,7 @@ class FrakworksMcp(private val engine: FrakworksEngine, private val tiers: TierT
             VersionTool.NAME -> versionTool.call(args)
             DesktopReleaseTool.NAME -> desktopReleaseTool.call(args)
             ScreenshotTool.NAME -> screenshotTool.call(args, caller)
+            in HitlpTools.NAMES -> hitlpTools?.call(tool, args) ?: McpToolResult.error("unknown tool: ${json(tool)}")
             FrictionFixIntakeTool.NAME -> fixIntakeTool?.let { t -> login(caller)?.let { t.call(args, it) } ?: noLogin("link") }
                 ?: McpToolResult.error("unknown tool: ${json(tool)}")
             FrictionFixTool.NAME -> fixTool?.let { t -> login(caller)?.let { t.call(args, it) } ?: noLogin("link") }
