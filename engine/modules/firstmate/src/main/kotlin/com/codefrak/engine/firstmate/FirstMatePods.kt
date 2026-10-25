@@ -110,7 +110,8 @@ class KubernetesFirstMateSessionPods(
         val git = runCatching { gitToken(session.repo) }.onFailure { log.warn("first-mate session {}: no git token for {}: {}", session.id, session.repo, it.message) }.getOrNull()
         k.secrets().inNamespace(FIRST_MATE_NAMESPACE).resource(firstMateSecret(name, session, mcp.rebasedOn(s.engineUrl), a.env, a.token, token, git)).create()
         k.pods().inNamespace(FIRST_MATE_NAMESPACE).resource(firstMatePod(name, session, s.image,
-            firstMateCommand(firstMateArgv(a.model, a.effort, prompt, lineage = session.lineage != null)),
+            firstMateCommand(firstMateArgv(a.model, a.effort, prompt, lineage = session.lineage != null,
+                repoServers = mcp.servers.keys - FirstMateMcpConfig.ENGINE_SERVERS.toSet() - FirstMateMcpConfig.CHECKOUT_SERVER)),
             name, a.env, memoryBytes, cpus, s.memoryRequestBytes, s.cpuRequest, engineUrl = s.engineUrl, resume = restore != null,
             gitToken = git != null)).create()
         log.info("first-mate session {} pod {}/{} (epoch {}) created on {} {} (tier {}) for @{}{}", session.id, FIRST_MATE_NAMESPACE, name, epoch, a.model,
