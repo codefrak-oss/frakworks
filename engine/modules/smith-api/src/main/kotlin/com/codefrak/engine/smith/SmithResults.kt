@@ -38,6 +38,8 @@ data class WorkResult(
     @PassAlong val question: String? = null,
     @PassAlong val reason: String? = null,
     val children: List<SplitDraft> = emptyList(),
+    /** What the merged work changed, 10-50 words ([SUMMARY_WORDS]); kept per ticket and shown once it closes by merge (engine/README.md, "Implementation summary"). */
+    val implementationSummary: String? = null,
 ) {
     /**
      * Every rule the engine enforces before acting; empty when the result can be acted on. [parent] is the
@@ -67,6 +69,11 @@ data class WorkResult(
         }
         if (outcome != SPLIT && children.isNotEmpty()) add("children are only for outcome '$SPLIT'")
         if (outcome == "ask" && question.isNullOrBlank()) add("outcome 'ask' needs a question")
+        if (implementationSummary != null) {
+            if (outcome != "done") add("implementationSummary is only for outcome 'done'")
+            val words = implementationSummary.trim().split(Regex("\\s+")).count { it.isNotEmpty() }
+            if (words !in SUMMARY_WORDS) add("implementationSummary has $words words; write ${SUMMARY_WORDS.first}-${SUMMARY_WORDS.last}, what the diff changed")
+        }
     }
 
     /**
@@ -83,6 +90,7 @@ data class WorkResult(
         const val NOTHING_TO_DO = "nothing-to-do"
         const val SPLIT = "split"
         val OUTCOMES = setOf("done", NOTHING_TO_DO, "ask", SPLIT)
+        val SUMMARY_WORDS = 10..50
         fun parse(bytes: ByteArray): WorkResult = engineJson.readValue(bytes)
     }
 }

@@ -1291,6 +1291,13 @@ a full-width accent stripe.
 
 ## One ticket detail (#802)
 
+A completed ticket (closed, with a merged PR) draws an **Implementation
+summary** section between Description and Pull requests: the 10-50 words the
+engine's `GET /ticket` answers as `implementationSummary` (engine/README.md,
+"Implementation summary"), mapped to `issue.implementationSummary` by
+`src/ticket-data.js`. An open ticket, or one with no summary (done before the
+engine kept them), draws nothing in its place.
+
 A ticket opens in one component, `TicketDetail` (`src/renderer/detail.jsx`),
 through one screen (`TicketScreen` in `index.jsx`), whichever list opened it:
 

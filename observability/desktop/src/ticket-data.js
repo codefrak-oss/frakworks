@@ -128,6 +128,10 @@ function toDocument(t, repo, n) {
     closedAt: t.closedAt || null,
     // Who asked for it (the engine's `engine.handled_issue.asked_by`), null when the engine has not seen it.
     askedBy: typeof t.askedBy === "string" && t.askedBy ? t.askedBy : null,
+    // What the merged work changed (engine.implementation_summary), null unless the engine
+    // serves it: only for a ticket closed with a merged PR.
+    implementationSummary: typeof t.implementationSummary === "string" && t.implementationSummary.trim()
+      ? t.implementationSummary.trim() : null,
     comments: (t.comments || []).map((c) => ({
       id: commentIdOf(c),
       revision: commentRevisionOf(c),

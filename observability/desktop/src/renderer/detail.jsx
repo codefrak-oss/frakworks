@@ -237,6 +237,12 @@ export const TicketDetailView = ({
         <h2>Description</h2>
         <Description body={di.body} html={doc.body_html} mode={mode} onMode={onMode || (() => {})} />
       </>}
+      {/* What the merged work changed (#100141): the engine serves it only for a
+          ticket closed with a merged PR, so an open one, or one done before it, draws nothing. */}
+      {di && di.state === "CLOSED" && di.implementationSummary && <>
+        <h2>Implementation summary</h2>
+        <p className="tdImplSummary">{di.implementationSummary}</p>
+      </>}
       {doc && ((doc.prs && doc.prs.length) || doc.prs_error) && <>
         <h2>Pull requests</h2>
         <LinkedPrs prs={doc.prs || []} error={doc.prs_error} />

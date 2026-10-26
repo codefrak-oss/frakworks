@@ -7,6 +7,7 @@ import com.codefrak.engine.proposal.PitchOption
 import com.codefrak.engine.proposal.ProposalPitches
 import com.codefrak.engine.research.ResearchAnswers
 import com.codefrak.engine.repos.HandledIssues
+import com.codefrak.engine.repos.ImplementationSummaries
 import com.codefrak.engine.repos.TargetRepos
 import com.codefrak.engine.workitems.WorkItemDetails
 import com.codefrak.engine.workitems.WorkItemTickets
@@ -20,8 +21,10 @@ import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.RestController
 
 /** A [TicketDetail]'s fields, with the repo it is in beside them, and `askedBy`: who asked for it (`engine.handled_issue.asked_by`), null when the engine has not seen it,
- * and `points`: its story points (`engine.handled_issue.points`, bots/story-points.md), null when the engine has not seen it or it has none. */
-data class TicketView(val repo: String, @get:JsonUnwrapped val ticket: TicketDetail, val askedBy: String? = null, val points: Int? = null)
+ * and `points`: its story points (`engine.handled_issue.points`, bots/story-points.md), null when the engine has not seen it or it has none,
+ * and `implementationSummary`: what its merged work changed (`engine.implementation_summary`), null unless it is closed with a merged PR. */
+data class TicketView(val repo: String, @get:JsonUnwrapped val ticket: TicketDetail, val askedBy: String? = null, val points: Int? = null,
+                      val implementationSummary: String? = null)
 
 /**
  * A proposal's pitch: `kind` `html` (the pitch page as committed) or `markdown` (the doc, rendered by GitHub); or a
@@ -42,13 +45,17 @@ data class PitchView(val kind: String, val path: String?, val prUrl: String, val
 class TicketDetailController(private val details: IssueDetails, private val repos: TargetRepos, private val pitches: Pitches,
                              private val pulled: ProposalPitches, private val research: ResearchAnswers,
                              private val handled: HandledIssues, private val choices: ProposalChoices,
-                             private val items: WorkItemDetails) {
+                             private val items: WorkItemDetails, private val summaries: ImplementationSummaries) {
     private val log = LoggerFactory.getLogger(TicketDetailController::class.java)
 
     /** 404 `{error}` for an issue GitHub does not have or a repo that is not a target repo; 502 `{error}` when GitHub fails. */
     @GetMapping("/ticket/{owner}/{repo}/{n}", produces = [MediaType.APPLICATION_JSON_VALUE])
     fun ticket(@PathVariable owner: String, @PathVariable repo: String, @PathVariable n: Long): ResponseEntity<Any> =
-        read(owner, repo, "ticket $n", { "no issue $it#$n" }) { full -> (if (n >= WorkItemTickets.FIRST) items.ticket(full, n) else details.ticket(full, n))?.let { TicketView(full, it, handled.askedBy(full, n), handled.points(full, n)) } }
+        read(owner, repo, "ticket $n", { "no issue $it#$n" }) { full -> (if (n >= WorkItemTickets.FIRST) items.ticket(full, n) else details.ticket(full, n))?.let { TicketView(full, it, handled.askedBy(full, n), handled.points(full, n), summaryOf(full, it)) } }
+
+    /** The stored summary of a ticket completed by merge (closed, a closing PR merged); null for any other. */
+    private fun summaryOf(full: String, t: TicketDetail): String? =
+        if (t.state == "CLOSED" && t.prs.any { it.state == "MERGED" }) summaries.of(full, t.number) else null
 
     /**
      * The issue's comments as GitHub's REST API sends them, oldest first, every page: what the

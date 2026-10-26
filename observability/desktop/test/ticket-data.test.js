@@ -85,7 +85,7 @@ test("a whole document: the engine's ticket mapped onto what the view and the pi
   assert.deepEqual(d.issue, {
     node_id: "I_kw1281", number: 1281, title: "t", body: "Goal: do it", state: "OPEN",
     url: "https://github.com/codefrak-oss/frakworks/issues/1281", labels: ["bot-task", "p3"], points: null,
-    createdAt: "2026-09-21T00:00:00Z", closedAt: null, askedBy: null,
+    createdAt: "2026-09-21T00:00:00Z", closedAt: null, askedBy: null, implementationSummary: null,
     comments: [{ id: "IC_1", revision: commentRevisionOf(c), author: "example-smith",
       createdAt: "2026-09-21T00:10:00Z", updatedAt: "2026-09-21T00:12:00Z", body: "Done. ok", url: "c1" }],
   });
@@ -171,4 +171,14 @@ test("toDocument carries the engine's story points, null when it has none", () =
   const { toDocument } = require("../src/ticket-data");
   assert.equal(toDocument(engineTicket({ points: 3 }), "codefrak-oss/frakworks", 1281).issue.points, 3);
   assert.equal(toDocument(engineTicket(), "codefrak-oss/frakworks", 1281).issue.points, null);
+});
+
+test("the engine's implementationSummary is carried onto the issue, trimmed; blank is null", async () => {
+  const of = async (implementationSummary) => (await fetchTicketData(1281, {
+    repo: "codefrak-oss/frakworks", now: () => 1789909840,
+    fetchDetail: fakeDetail({ ticket: { ...engineTicket(), implementationSummary }, error: null }),
+  })).issue.implementationSummary;
+  assert.equal(await of("  Adds the field.  "), "Adds the field.");
+  assert.equal(await of("   "), null);
+  assert.equal(await of(undefined), null);
 });

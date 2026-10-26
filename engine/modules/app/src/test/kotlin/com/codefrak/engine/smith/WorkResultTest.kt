@@ -74,4 +74,16 @@ class WorkResultTest {
         assertEquals(1557L, Brief.parent("## Goal\n\nx\n\nPart 2 of 3 of #1557.\n\n<!-- engine: split of #1557 -->"))
         assertEquals(null, Brief.parent("## Goal\n\nNo parent here."))
     }
+
+    @Test
+    fun `an implementation summary must be 10-50 words, and only on done`() {
+        fun withSummary(words: Int, outcome: String = "done") = parse(
+            """{"outcome":"$outcome","title":"t","summary":"s","question":"q","implementationSummary":"${List(words) { "w" }.joinToString(" ")}"}""")
+        assertEquals(emptyList(), withSummary(10).problems(emptyList(), hasBundle = true))
+        assertEquals(emptyList(), withSummary(50).problems(emptyList(), hasBundle = true))
+        assertTrue(withSummary(9).problems(emptyList(), true).any { "has 9 words" in it })
+        assertTrue(withSummary(51).problems(emptyList(), true).any { "has 51 words" in it })
+        assertTrue(withSummary(12, "ask").problems(emptyList(), false).any { "only for outcome 'done'" in it })
+        assertEquals(null, done().implementationSummary, "optional")
+    }
 }

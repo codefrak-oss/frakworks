@@ -277,6 +277,18 @@ Moved to [`docs/friction-notes.md`](docs/friction-notes.md).
 
 Moved to [`docs/saved-first-mate-chats.md`](docs/saved-first-mate-chats.md).
 
+## Implementation summary
+
+A work Smith's `done` result may carry `implementationSummary`: 10-50 words on
+what its diff changed (`bots/smith.md`, "The implementation summary"). The
+rules refuse one outside 10-50 words or on another outcome. When `read result`
+accepts it, `ImplementationSummaryListener` keeps it in
+`engine.implementation_summary` (V103), one row per ticket, the latest round's
+winning, with no step at merge. `GET /ticket/{owner}/{repo}/{n}` answers it as
+`implementationSummary` only for a ticket that is `CLOSED` with a `MERGED`
+closing PR; otherwise null. Tickets done before this have no row and show none
+(no backfill).
+
 ## Ticket timeline
 
 Moved to [`docs/ticket-timeline.md`](docs/ticket-timeline.md).
