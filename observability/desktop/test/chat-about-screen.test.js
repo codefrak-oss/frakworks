@@ -77,7 +77,7 @@ test("the live header has <-- chat about this on its own row below the heading",
   assert.doesNotMatch(button[1], /disabled/);
   assert.match(button[1], new RegExp(`title="${CHAT_SCREEN_TITLE}"`));
   assert.ok(header.indexOf(">First mate<") < header.indexOf("fmChatScreen"), "after the heading text");
-  const buttonsRow = balancedDiv(header, '<div class="fmHeaderButtons">');
+  const buttonsRow = balancedDiv(header, '<div class="fmHeaderButtons fmClusterRow">');
   assert.doesNotMatch(buttonsRow, /fmChatScreen/, "not a child of the buttons row (Start new conversation's row)");
   assert.ok(header.indexOf("fmChatScreen") < header.indexOf("fmNewConversation"), "before Start new conversation in document order");
 });

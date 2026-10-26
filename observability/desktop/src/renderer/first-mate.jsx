@@ -327,13 +327,31 @@ export const PopControl = ({ canPop, onPop }) => (
 // a repo switcher (`snapshot.chat_repo_on` false).
 export const NO_CHAT_REPO = "No repo yet";
 export const CHAT_REPO_LABEL = "This chat's repo:";
-// Issue #2551: Start new conversation names the repo the new chat starts with
-// (the switcher's, or none in All repos), so the order is plain: the switcher
-// picks a new chat's repo, the chip below changes it afterwards.
-export const newConversationRepoText = (selection) =>
-  selection && selection.repo ? ` · in ${selection.repo}` : " · no repo yet";
+// Issue #2551: Start new conversation names the repo the new chat starts with,
+// so the order is plain: the switcher picks a new chat's repo, the chip
+// changes it afterwards. #100140: it follows main's rule (first-mate.js
+// _startChatRepo): the switcher's repo, else in All repos the repo last used,
+// which is this chat's while the target repos list it, else none. So the
+// cluster never says "no repo" beside a repo a new chat would start in.
+export const NEW_CHAT_NO_REPO = " · no repo";
+export const clusterRepoLabels = (selection, snapshot) => {
+  const s = snapshot || {};
+  const picked = (selection && selection.repo) || null;
+  const repos = selection && Array.isArray(selection.repos) ? selection.repos : null;
+  const last = !picked && s.chat_repo && (!repos || repos.includes(s.chat_repo)) ? s.chat_repo : null;
+  const next = picked || last;
+  return {
+    on: Boolean(s.chat_repo_on),
+    chat: s.chat_repo || null,
+    chatSticky: Boolean(s.chat_repo_sticky && s.chat_repo),
+    next,
+    nextSticky: Boolean(last),
+    newChatSuffix: next ? ` · in ${next}${last ? ` (${CHAT_REPO_STICKY_TAG})` : ""}` : NEW_CHAT_NO_REPO,
+  };
+};
+export const newConversationRepoText = (selection, snapshot) => clusterRepoLabels(selection, snapshot).newChatSuffix;
 export const NEW_CONVERSATION_TITLE =
-  "Starts a new chat in the repo switcher's repo (none in All repos); change it afterwards with \"This chat's repo\"";
+  "Starts a new chat in the repo switcher's repo (in All repos, the repo last used); change it afterwards with \"This chat's repo\"";
 // Issue #100116: a new chat in All repos starts with the repo last used, and
 // the chip tags it until the user picks one, so the guess is never silent.
 export const CHAT_REPO_STICKY_TAG = "last used";
@@ -528,29 +546,38 @@ export const FirstMate = ({ snapshot, font, onOpenTicket, onOpenFile, draft, onD
   // History panels, which have no compose row, keep it in the header. Only the
   // live strip has "<-- chat about this" (#733), on its own row under the
   // heading (#1752), and, last, "Open in Claude Code ⇗" (#820).
+  // #100140: the header's actions sit in rows by purpose, each an even-gapped
+  // row whose buttons stretch to fill it: "New chat" (<-- chat about this,
+  // Start new conversation), then "This chat" (its repo chip, Save for later,
+  // Open in Claude Code or the pop control).
+  const labels = clusterRepoLabels(selection, s);
   const makeHeader = (withPop) => (
     <div className="fmHeader">
       <div className="fmHeaderTitle">First mate</div>
-      {withPop ? null : (
-        <div className="fmChatScreenRow">
-          <ChatScreenControl off={chatAboutScreenOff} onChat={onChatAboutScreen} />
+      <div className="fmCluster fmClusterNew">
+        <div className="fmClusterCaption">New chat</div>
+        <div className="fmClusterRow">
+          {withPop ? null : <ChatScreenControl off={chatAboutScreenOff} onChat={onChatAboutScreen} />}
+          <button className="fmNewConversation" onClick={onNewConversation}
+                  title={labels.on ? NEW_CONVERSATION_TITLE : undefined}>Start new conversation{labels.on ? (
+            <span className="fmNewConversationRepo">{labels.newChatSuffix}</span>
+          ) : null}</button>
         </div>
-      )}
-      <div className="fmHeaderButtons">
-        <button className="fmNewConversation" onClick={onNewConversation}
-                title={s.chat_repo_on ? NEW_CONVERSATION_TITLE : undefined}>Start new conversation{s.chat_repo_on ? (
-          <span className="fmNewConversationRepo">{newConversationRepoText(selection)}</span>
-        ) : null}</button>
-        {withPop ? pop : null}
-        <SaveButton snapshot={s} saveState={saveState} onSave={onSave} />
-        {withPop ? null : <OpenInItermButton snapshot={s} itermState={itermState} onOpenInIterm={onOpenInIterm} />}
       </div>
-      {s.chat_repo_on ? (
-        <div className="fmChatRepoRow">
-          <ChatRepoChip chatRepo={s.chat_repo || null} sticky={Boolean(s.chat_repo_sticky)} repos={selection && selection.repos}
-                        onSetRepo={onSetChatRepo} disabled={busy} />
+      <div className="fmCluster fmClusterChat">
+        <div className="fmClusterCaption">This chat</div>
+        {labels.on ? (
+          <div className="fmChatRepoRow">
+            <ChatRepoChip chatRepo={labels.chat} sticky={labels.chatSticky} repos={selection && selection.repos}
+                          onSetRepo={onSetChatRepo} disabled={busy} />
+          </div>
+        ) : null}
+        <div className="fmHeaderButtons fmClusterRow">
+          {withPop ? pop : null}
+          <SaveButton snapshot={s} saveState={saveState} onSave={onSave} />
+          {withPop ? null : <OpenInItermButton snapshot={s} itermState={itermState} onOpenInIterm={onOpenInIterm} />}
         </div>
-      ) : null}
+      </div>
     </div>
   );
   const header = makeHeader(true);
