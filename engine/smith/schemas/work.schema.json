@@ -27,6 +27,11 @@
     "reason": {
       "$ref": "#/$defs/content"
     },
+    "implementationSummary": {
+      "type": "string",
+      "pattern": "^\\s*\\S+(\\s+\\S+){9,49}\\s*$",
+      "description": "For 'done': 10-50 words on what the diff changed (not the ask restated). Shown on the ticket once it closes by merge."
+    },
     "question": {
       "$ref": "#/$defs/content"
     },

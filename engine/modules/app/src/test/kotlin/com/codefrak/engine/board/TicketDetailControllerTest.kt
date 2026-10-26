@@ -8,6 +8,7 @@ import com.codefrak.engine.github.TicketDetail
 import com.codefrak.engine.github.TicketPull
 import com.codefrak.engine.github.TicketPulls
 import com.codefrak.engine.repos.HandledIssues
+import com.codefrak.engine.repos.ImplementationSummaries
 import com.codefrak.engine.repos.TargetRepos
 import com.codefrak.engine.workitems.NewWorkItem
 import com.codefrak.engine.workitems.WorkItem
@@ -39,6 +40,7 @@ class TicketDetailControllerTest {
     @Autowired lateinit var handled: HandledIssues
     @Autowired lateinit var runtime: RuntimeService
     @Autowired lateinit var store: WorkItemStore
+    @Autowired lateinit var summaries: ImplementationSummaries
 
     private val t0 = OffsetDateTime.parse("2026-09-24T10:00:00Z")
 
@@ -47,6 +49,7 @@ class TicketDetailControllerTest {
         jdbc.sql("DELETE FROM engine.target_repo").update()
         jdbc.sql("DELETE FROM engine.handled_issue").update()
         jdbc.sql("DELETE FROM engine.work_item").update()
+        jdbc.sql("DELETE FROM engine.implementation_summary").update()
         details.onHead.clear()
         details.tickets.clear(); details.failing.clear(); details.restComments.clear(); details.files.clear(); details.pulls.clear()
         repos.add("o/r")
@@ -295,5 +298,24 @@ class TicketDetailControllerTest {
         mvc.get("/ticket/o/r/$n").andExpect { status { isOk() }; jsonPath("$.state") { value("CLOSED") }; jsonPath("$.closedAt") { exists() } }
         mvc.get("/ticket/o/r/${n + 50}").andExpect { status { isNotFound() }; jsonPath("$.error") { value("no issue o/r#${n + 50}") } }
         mvc.get("/ticket/o/r/${n + 50}/comments").andExpect { status { isNotFound() } }
+    }
+
+    private fun ticket(n: Long, state: String, pr: String?) = TicketDetail("I_$n", n, "t", "b", "<p>b</p>", state,
+        "https://github.com/o/r/issues/$n", emptyList(), t0, null, emptyList(),
+        listOfNotNull(pr?.let { TicketPull(n + 100, "t", "https://github.com/o/r/pull/${n + 100}", it, false, null) }))
+
+    @Test
+    fun `the implementation summary is served only for a ticket closed by a merged PR`() {
+        val text = "Adds an implementation summary to work results, stored per ticket and shown on completed tickets."
+        details.tickets["o/r" to 20L] = ticket(20, "CLOSED", "MERGED")
+        details.tickets["o/r" to 21L] = ticket(21, "OPEN", "OPEN")
+        details.tickets["o/r" to 22L] = ticket(22, "CLOSED", "CLOSED")
+        details.tickets["o/r" to 23L] = ticket(23, "CLOSED", "MERGED")
+        listOf(20L, 21L, 22L).forEach { summaries.save("o/r", it, text) }
+        summaries.save("o/r", 20, "$text Latest round.")
+        mvc.get("/ticket/o/r/20").andExpect { jsonPath("$.implementationSummary") { value("$text Latest round.") } }
+        mvc.get("/ticket/o/r/21").andExpect { jsonPath("$.implementationSummary") { doesNotExist() } }
+        mvc.get("/ticket/o/r/22").andExpect { jsonPath("$.implementationSummary") { doesNotExist() } }
+        mvc.get("/ticket/o/r/23").andExpect { status { isOk() }; jsonPath("$.implementationSummary") { doesNotExist() } }
     }
 }

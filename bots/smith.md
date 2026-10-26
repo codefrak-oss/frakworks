@@ -655,6 +655,14 @@ not tidy the worktree. Your run can be ended from outside at any moment; a
 Smith that is cut off after the PR but before the closing comment is
 indistinguishable from a crash and its finished work gets marked `blocked`.
 
+### The implementation summary — what your change did, in 10-50 words
+
+Every `done` work result that pushes commits carries `implementationSummary`:
+10-50 words on what the diff changed (the files, behaviour and data it
+touches), not the ask restated. The engine refuses one outside 10-50 words,
+keeps the latest round's per ticket, and the desktop shows it on the ticket
+once it closes by a merged PR (engine/README.md, "Implementation summary").
+
 ### The post-deployment check — when your change needs a look once it is live
 
 Some changes can only be judged in production: a figure that must accumulate,
