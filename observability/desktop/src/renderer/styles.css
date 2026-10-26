@@ -665,9 +665,26 @@ body.rowResizing iframe, body.rowResizing webview { pointer-events: none; }
 .fmHeader { font-size: 10.5px; font-weight: 600; letter-spacing: .6px; text-transform: uppercase;
             color: var(--muted); display: flex; flex-direction: column; row-gap: 4px; }
 .fmHeaderButtons { display: flex; flex-wrap: wrap; align-items: center; row-gap: 4px; }
-/* "<-- chat about this" sits on its own row under the heading (#1752), so it
-   is left-aligned and carries no inline offset from the row above it. */
-.fmChatScreenRow { display: flex; }
+/* #100140: the header's actions in rows by purpose (New chat, This chat). Each
+   row has one even gap, and its buttons stretch to share the row, so a wrap
+   fills the next line evenly rather than leaving a ragged end; inline
+   margins are dropped in favour of the gap. An error takes a line of its own. */
+.fmHeader { container-type: inline-size; }
+.fmCluster { display: flex; flex-direction: column; gap: 4px; padding-top: 4px;
+  border-top: 1px solid rgba(255,255,255,0.06); }
+.fmClusterCaption { font-size: 9.5px; letter-spacing: .6px; color: var(--muted); opacity: 0.8; }
+.fmClusterRow { display: flex; flex-wrap: wrap; align-items: stretch; gap: 4px 6px; }
+.fmClusterRow > button { flex: 1 1 auto; margin-left: 0; text-align: center; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; max-width: 100%; text-transform: none; letter-spacing: normal; }
+.fmClusterRow > .fmSaveError, .fmClusterRow > .fmItermError { flex: 1 0 100%; margin-left: 0;
+  text-transform: none; letter-spacing: normal; font-weight: normal; }
+.fmCluster .fmChatRepoRow { margin-top: 0; }
+.fmCluster .fmChatRepo { margin: 0; width: 100%; }
+.fmCluster .fmChatRepoSelect { flex: 1 1 0; min-width: 0; text-overflow: ellipsis; }
+/* Narrow panes: one button per line, all the same width. */
+@container (max-width: 240px) {
+  .fmClusterRow > button { flex-basis: 100%; }
+}
 .fmNotice { font-size: 10.5px; color: var(--sev-warn); }
 /* First mate's model line (#240): what runs next. */
 
@@ -1500,7 +1517,8 @@ ul.ecProse { padding-left: 18px; }
   flex-wrap: wrap; max-width: 100%; box-sizing: border-box; }
 .fmChatRepoLabel { white-space: nowrap; text-transform: none; letter-spacing: normal; color: var(--muted); font-size: 12px; font-weight: normal; }
 .fmChatRepoNone { border-color: #d9a400; color: #d9a400; }
-.fmChatRepoSticky { text-transform: none; letter-spacing: normal; margin-left: 6px; padding: 0 6px; border-radius: 8px; font-size: 11px; font-weight: 600; line-height: 16px; white-space: nowrap; background: rgba(217, 164, 0, 0.18); color: #d9a400; }
+/* #100140: the tag is the chip's own trailing segment, flush against its border. */
+.fmChatRepoSticky { text-transform: none; letter-spacing: normal; margin-left: auto; margin-right: -4px; padding: 0 6px; border-radius: 8px; font-size: 11px; font-weight: 600; line-height: 16px; white-space: nowrap; background: rgba(217, 164, 0, 0.18); color: #d9a400; }
 .fmChatRepoSelect { background: transparent; color: inherit; border: none; font: inherit; }
 
 /* The HITLP task view (hitlp-task.jsx): decision first, the story below. */

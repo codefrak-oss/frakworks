@@ -4077,6 +4077,16 @@ header and buttons stay in the app's sans-serif.
   `>` prefix. One line height throughout the transcript and one blank line
   (`1lh`) between turns; no role labels, separators or rounded cards.
 
+### The header's action rows (#100140)
+
+The header groups its actions in two rows by purpose: **New chat**
+(`<-- chat about this` and **Start new conversation**, both start one) and
+**This chat** (the repo chip, **Save for later**, **Open in Claude Code ⇗**;
+in History, the pop control in its place). Each row has one even gap and its
+buttons stretch to share it, so a wrap fills the next line evenly; below a
+240px pane each button takes a full line. A save or hand-off error takes a
+line of its own.
+
 ### The chat's repo (#2343)
 
 Each First mate conversation has its own repo, separate from the repo
@@ -4084,10 +4094,13 @@ switcher. The pane makes the order plain (#2551):
 
 - **Before starting:** the repo switcher picks a new chat's repo, and
   **Start new conversation** names it: `Start new conversation · in
-  owner/name`, or `· no repo yet` in All repos (its tooltip says so).
-- **After starting:** a chip on its own row below the header buttons,
+  owner/name`. In All repos it names the repo last used, the one a new chat
+  starts in (below), as `· in owner/name (last used)`, or `· no repo` when
+  there is none, so it never says "no repo" beside a repo in use (#100140).
+- **After starting:** a chip in the header's **This chat** row,
   `This chat's repo: owner/name` (or an amber **No repo yet**), shows and
-  changes the current chat's repo. Its dropdown lists the target repos and
+  changes the current chat's repo; its **last used** tag is the chip's own
+  trailing segment. Its dropdown lists the target repos and
   **No repo yet**. A pick there right after starting, before the first
   message, still moves the chat's cwd and MCP servers (#2363).
 

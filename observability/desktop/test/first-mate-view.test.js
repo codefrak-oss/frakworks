@@ -316,7 +316,8 @@ test("a plain click on a reference calls onOpenTicket and preventDefault", () =>
 
 test("Save for later sits after Start new conversation, disabled with nothing to save", () => {
   const html = draw(React.createElement(FirstMate, { snapshot: snap({ can_save: false }) }));
-  assert.match(html, /Start new conversation<\/button><button class="fmSaveButton" disabled=""[^>]*>Save for later</);
+  assert.ok(html.indexOf("Start new conversation") < html.indexOf("fmSaveButton"), "the New chat row comes first (#100140)");
+  assert.match(html, /<button class="fmSaveButton" disabled=""[^>]*>Save for later</);
   const on = draw(React.createElement(FirstMate, { snapshot: snap({ can_save: true, history: [{ role: "user", text: "hi", at: 1 }] }) }));
   assert.match(on, /<button class="fmSaveButton" title="[^"]*">Save for later</);
 });
@@ -342,7 +343,7 @@ test("Open in Claude Code follows Save for later directly", () => {
   const header = (h) => h.slice(h.indexOf("fmHeaderButtons"), h.indexOf("fmTranscript"));
   const html = header(draw(React.createElement(FirstMate, { snapshot: snap({ can_save: true, history: [{ role: "user", text: "hi", at: 1 }] }) })));
   const save = html.indexOf("fmSaveButton"), open = html.indexOf("Open in Claude Code");
-  assert.ok(html.indexOf("Start new conversation") < save && save < open);
+  assert.ok(save < open);
   assert.match(html, /Save for later<\/button><button class="fmIterm"[^>]*>Open in Claude Code ⇗</);
 });
 
@@ -617,7 +618,7 @@ test("Start new conversation names the new chat's repo, the chip below it is thi
   assert.ok(one.indexOf("fmNewConversation") < one.indexOf("fmChatRepoRow"), "chip row after the button");
   assert.doesNotMatch(one, /fmChatRepoMismatch/);
   const all = draw(React.createElement(FirstMate, { snapshot: snap({ chat_repo_on: true, chat_repo: "o/a" }), selection: { repo: null, repos: ["o/a"] } }));
-  assert.match(all, / · no repo yet</);
+  assert.match(all, / · in o\/a \(last used\)</, "All repos: the new chat starts in the repo last used, as main does (#100140)");
   assert.doesNotMatch(all, /fmChatRepoMismatch|applies to new chats only/);
   const other = draw(React.createElement(FirstMate, { snapshot: snap({ chat_repo_on: true, chat_repo: null }), selection: { repo: "o/b", repos: ["o/b"] } }));
   assert.doesNotMatch(other, /applies to new chats only/);
@@ -629,5 +630,5 @@ test("the chip tags a carried-over repo \"last used\" (#100116)", () => {
   const sticky = draw(React.createElement(FirstMate, { snapshot: snap({ chat_repo_on: true, chat_repo: "o/a", chat_repo_sticky: true }), selection: { repo: null, repos: ["o/a"] } }));
   assert.match(sticky, /fmChatRepoSticky[^>]*>last used</);
   const picked = draw(React.createElement(FirstMate, { snapshot: snap({ chat_repo_on: true, chat_repo: "o/a" }), selection: { repo: null, repos: ["o/a"] } }));
-  assert.doesNotMatch(picked, /last used/);
+  assert.doesNotMatch(picked, /fmChatRepoSticky/);
 });
