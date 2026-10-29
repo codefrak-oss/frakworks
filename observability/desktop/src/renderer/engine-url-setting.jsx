@@ -6,7 +6,7 @@
 
 import { useEffect, useState } from "react";
 
-export const ENGINE_URL_UNSET = "No engine URL is set: the app makes no engine call until you enter one.";
+export const UNSET_URL_PROMPT = "No engine URL is set: the app makes no engine call until you enter one.";
 
 export const EngineUrlPanel = ({ onLoad, onSave }) => {
   const [url, setUrl] = useState(null);
@@ -32,7 +32,7 @@ export const EngineUrlPanel = ({ onLoad, onSave }) => {
         <span className="acName">Engine URL</span>
       </div>
       <p className="fmmHint">The engine this app reads and writes, e.g. https://engine.example, or the local stack's http://localhost:&lt;port&gt;. Kept on this machine; saving relaunches the app.</p>
-      {url === "" && <div className="err">{ENGINE_URL_UNSET}</div>}
+      {url === "" && <div className="err">{UNSET_URL_PROMPT}</div>}
       {error && <div className="err">{error}</div>}
       {url == null
         ? <div className="fmmEmpty">reading…</div>
