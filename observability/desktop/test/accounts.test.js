@@ -826,3 +826,61 @@ test("the Which account would be used? tile is on Analytics > AI Accounts only, 
   const config = render({ result, showUsage: false, onAction: async () => ({ ok: true }) });
   assert.doesNotMatch(config, /Which account would be used\?|tier-accounts-tile/);
 });
+
+// ---- API keys, billing cycle and credit (engine/docs/ai-accounts.md, "API keys and credit") ----
+
+test("the key, billing and credit actions are the engine's requests for them", async () => {
+  const cases = [
+    [{ op: "api-key", name: "max-1", key: " sk-ant-usr-a " }, "PUT", "/accounts/max-1/api-key", { key: "sk-ant-usr-a" }],
+    [{ op: "admin-key", name: "max-1", key: "sk-ant-admin01-b" }, "PUT", "/accounts/max-1/admin-key", { key: "sk-ant-admin01-b" }],
+    [{ op: "clear-api-key", name: "max-1" }, "DELETE", "/accounts/max-1/api-key", undefined],
+    [{ op: "clear-admin-key", name: "max-1" }, "DELETE", "/accounts/max-1/admin-key", undefined],
+    [{ op: "billing", name: "max-1", cycleDate: "2026-01-14", grantCents: 10000 }, "PUT", "/accounts/max-1/billing", { cycleDate: "2026-01-14", grantCents: 10000 }],
+    [{ op: "refreshCredit", name: "max-1" }, "POST", "/accounts/max-1/credit/refresh", undefined],
+  ];
+  for (const [action, method, p, body] of cases) {
+    const { calls, fetch } = recorder();
+    assert.deepEqual(await accountAction(action, { env: {}, fetch }), { ok: true, status: 204 });
+    assert.deepEqual(calls, [{ url: `http://localhost:8090${p}`, method, body }]);
+  }
+});
+
+test("a key of the wrong kind or a bad billing cycle is refused before any request", async () => {
+  const { calls, fetch } = recorder();
+  for (const [action, expect] of [
+    [{ op: "api-key", name: "x", key: "sk-ant-admin01-k" }, /API key starts with sk-ant-api03- or sk-ant-usr-/],
+    [{ op: "admin-key", name: "x", key: "sk-ant-api03-k" }, /admin key starts with sk-ant-admin01- or sk-ant-usr-/],
+    [{ op: "api-key", name: "x", key: "sk-ant-usr-a b" }, /whitespace/],
+    [{ op: "billing", name: "x", cycleDate: "14th", grantCents: 1 }, /YYYY-MM-DD/],
+    [{ op: "billing", name: "x", cycleDate: "2026-01-14", grantCents: -1 }, /whole number of cents/],
+  ]) assert.match((await accountAction(action, { env: {}, fetch })).error, expect);
+  assert.deepEqual(calls, []);
+});
+
+test("a tracked account's tile shows the credit used, left and the cycle, and a failed refresh says so", () => {
+  const { fmtCents } = require("../dist/accounts.cjs");
+  assert.equal(fmtCents("3712.4567"), "$37.12");
+  assert.equal(fmtCents(null), "–");
+  const a = { ...ACCOUNTS[0], adminKeySet: true, apiKeySet: true, billingCycleDate: "2026-01-14", grantCents: 10000,
+    usedCents: 3712, remainingCents: 6288, cycleStart: "2026-10-14", cycleEnd: "2026-11-14",
+    creditRefreshedAt: new Date(Date.now() - 120000).toISOString(), creditError: "cost_report answered 500: overloaded", usage: null };
+  const html = render({ result: { accounts: [a] } });
+  assert.ok(html.includes("$37.12 used / $100.00 · $62.88 left"), html);
+  assert.ok(html.includes("cycle 2026-10-14 – 2026-11-14"));
+  assert.ok(html.includes("credit refresh failed: cost_report answered 500: overloaded"));
+  assert.doesNotMatch(render({ result: { accounts: [{ ...ACCOUNTS[0], usage: null }] } }), /acCredit/, "untracked: no credit row");
+});
+
+test("the API keys tab shows whether each key is set, never a key, and asks for the cycle before the admin key", () => {
+  const a = { ...ACCOUNTS[0], apiKeySet: true, adminKeySet: false, billingCycleDate: null, grantCents: null };
+  const html = editDialog(a, "keys");
+  assert.match(html, /● set/);
+  assert.match(html, /type="password"[^>]*value=""/);
+  assert.match(html, />Clear</);
+  assert.match(html, /Set the billing cycle first/);
+  const dated = editDialog({ ...a, billingCycleDate: "2026-01-14", grantCents: 10000 }, "keys");
+  assert.match(dated, /value="2026-01-14"/);
+  assert.match(dated, /value="100"/);
+  assert.match(dated, /set admin key: sk-ant-admin01-/);
+  assert.match(editDialog(ACCOUNTS[1], "keys"), /Only an Anthropic account/);
+});
