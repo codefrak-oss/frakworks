@@ -197,6 +197,19 @@ class AiAccountsTest(@Autowired val accounts: AiAccounts, @Autowired val jdbc: J
     }
 
     @Test
+    fun `the summarizer's key is an enabled anthropic account's API key, never its OAuth token, and moves no rotation`() = withOnly(listOf("ak-a", "ak-b")) {
+        assertNull(accounts.peekApiKey(), "no account has an API key: no fallback to the OAuth token")
+        accounts.storeKey("ak-b", ApiKeyKind.API, "sk-ant-api03-b")
+        val key = assertNotNull(accounts.peekApiKey())
+        assertEquals(AccountKey("ak-b", "sk-ant-api03-b"), key)
+        assertFalse("sk-ant" in key.toString(), "the key stays out of its toString")
+        assertEquals(2, jdbc.sql("SELECT COUNT(*) FROM engine.ai_account WHERE name IN ('ak-a', 'ak-b') AND last_used_at IS NULL")
+            .query(Int::class.java).single(), "never marked used")
+        accounts.setEnabled("ak-b", false)
+        assertNull(accounts.peekApiKey(), "a disabled account's key is not used")
+    }
+
+    @Test
     fun `an account whose weekly budget would expire unused is picked first for Fable`() = withOnly(listOf("wk-b", "wk-z")) { now ->
         meter("wk-z", 0.2, sevenDay = 0.70, sevenReset = now.plusHours(12))   // pace 0.3 × 168 / 12 = 4.2: expiring
         meter("wk-b", 0.2, sevenDay = 0.3, sevenReset = now.plusDays(6))     // pace 0.7 × 168 / 144 = 0.82: not

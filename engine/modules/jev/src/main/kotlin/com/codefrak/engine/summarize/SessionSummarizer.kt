@@ -1,5 +1,6 @@
 package com.codefrak.engine.summarize
 
+import com.codefrak.engine.accounts.AccountKey
 import com.codefrak.engine.accounts.AiAccounts
 import org.springframework.stereotype.Component
 
@@ -36,17 +37,17 @@ interface SessionSummarizer {
     fun summarize(context: String, digest: String, recent: String): SessionSummary
 }
 
-/** The credential the summary call sends: an Anthropic OAuth token, or null when the engine holds none usable. */
+/** The API key the summary call sends, and its account; null when no `anthropic` account has one. */
 fun interface SummaryCredential {
-    fun anthropic(): String?
+    fun anthropic(): AccountKey?
 }
 
 /**
- * The anthropic `engine.ai_account` the picker would choose next, read with
- * [AiAccounts.peek] so the Smiths' rotation is not moved (engine/README.md,
- * "Summarize: a live run summarized"). No new secret: the accounts Smiths run on.
+ * An `anthropic` `engine.ai_account`'s API key, read with [AiAccounts.peekApiKey]
+ * so the Smiths' rotation is not moved (engine/docs/summarize-a-live-run-summarized.md).
+ * Never the account's Claude Code OAuth token.
  */
 @Component
 class AccountSummaryCredential(private val accounts: AiAccounts) : SummaryCredential {
-    override fun anthropic(): String? = accounts.peek("anthropic")?.let { accounts.credential(it) }
+    override fun anthropic(): AccountKey? = accounts.peekApiKey()
 }

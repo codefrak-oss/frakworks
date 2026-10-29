@@ -110,7 +110,7 @@ class AiAccounts(private val jdbc: JdbcClient, private val secrets: SecretsKey, 
             (if (kind == ApiKeyKind.ADMIN) ", credit_used_cents = NULL, credit_refreshed_at = NULL, credit_error = NULL" else "") +
             " WHERE name = :n").param("n", name).update() == 1
 
-    /** The key in the clear; null when none is stored. Read only by the credit refresh ([ApiCreditRefresh]) for the admin key. */
+    /** The key in the clear; null when none is stored. Read by the credit refresh ([ApiCreditRefresh]) for the admin key and by [peekApiKey] for the API key. */
     fun key(name: String, kind: ApiKeyKind): String? =
         jdbc.sql("SELECT ${kind.column} FROM engine.ai_account WHERE name = :n AND ${kind.column} IS NOT NULL").param("n", name)
             .query { rs, _ -> rs.getBytes(1) }.optional().map { secrets.open(it, kind.aad(name)) }.orElse(null)
@@ -178,10 +178,22 @@ class AiAccounts(private val jdbc: JdbcClient, private val secrets: SecretsKey, 
 
     /**
      * The account [pick] would choose, without marking it picked, so the
-     * Smiths' rotation is unaffected: what the summarize endpoint's call bills to
-     * (engine/README.md, "Summarize: a live run summarized"). Null when there is none.
+     * Smiths' rotation is unaffected (`GET /tiers/accounts`). Null when there is none.
      */
     fun peek(provider: String, model: String? = null): String? = best(provider, model)
+
+    /**
+     * The enabled `anthropic` account with an API key ([ApiKeyKind.API]) that
+     * the summarize endpoint's call bills to, with the key in the clear: the
+     * least recently used, then by name, read without marking it used, so the
+     * Smiths' rotation is unaffected. Null when no such account has one. Never
+     * the OAuth credential: a Claude Code token does not call the Messages API.
+     */
+    fun peekApiKey(): AccountKey? {
+        val name = jdbc.sql("""SELECT name FROM engine.ai_account WHERE provider = 'anthropic' AND enabled AND api_key IS NOT NULL
+            ORDER BY last_used_at NULLS FIRST, name LIMIT 1""").query(String::class.java).optional().orElse(null) ?: return null
+        return key(name, ApiKeyKind.API)?.let { AccountKey(name, it) }
+    }
 
     private class Ranked(val name: String, val pace: Double, val saturated: Boolean, val fableOut: Boolean)
 
@@ -254,7 +266,7 @@ class AiAccounts(private val jdbc: JdbcClient, private val secrets: SecretsKey, 
     /**
      * The token in the clear, for a Smith about to start; null when the account
      * has none. Outside the accounts' own code and a Smith's start, the
-     * callers are the summarize endpoint's call ([peek]), the engine's Jev call
+     * callers are the engine's Jev call
      * ([jevCredential]), First mate's pick ([AccountPickController]) and the
      * on-demand meter refresh ([AiAccountController.refreshUsage]).
      */
@@ -277,4 +289,9 @@ class AiAccounts(private val jdbc: JdbcClient, private val secrets: SecretsKey, 
             " OR (u.seven_day_status = 'rejected' AND u.seven_day_reset > CURRENT_TIMESTAMP)" +
             " OR u.limit_rejected_reset > CURRENT_TIMESTAMP)"
     }
+}
+
+/** An account's API key in the clear, with the account it belongs to ([AiAccounts.peekApiKey]). */
+data class AccountKey(val account: String, val key: String) {
+    override fun toString() = "AccountKey($account, ***)"
 }
