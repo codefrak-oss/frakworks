@@ -33,6 +33,13 @@ interface CredentialVerifier {
      * came. `POST /accounts/{name}/usage/refresh` reads the meter off it.
      */
     fun probeAnthropic(token: String): ProbeReply
+
+    /**
+     * Tries an Anthropic API key (a one-token `POST /v1/messages`) or Admin API
+     * key (`GET /v1/organizations/me`, which costs nothing) before it is stored
+     * (engine/docs/ai-accounts.md, "API keys and credit").
+     */
+    fun verifyKey(kind: ApiKeyKind, key: String): Verdict
 }
 
 /**
@@ -74,6 +81,26 @@ class HttpCredentialVerifier(
             status == 429 -> Verdict(true, true, "$provider accepted it, but the account is rate-limited right now (429)")
             status == 401 || status == 403 -> Verdict(false, true, "$provider refused it ($status): ${reason(response.body())}")
             else -> Verdict(false, false, "$provider answered $status, which says nothing about the token: ${reason(response.body())}")
+        }
+    }
+
+    override fun verifyKey(kind: ApiKeyKind, key: String): Verdict {
+        val base = anthropic.trimEnd('/')
+        val request = when (kind) {
+            ApiKeyKind.API -> HttpRequest.newBuilder(URI("$base/v1/messages")).header("content-type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(API_KEY_PROBE))
+            ApiKeyKind.ADMIN -> HttpRequest.newBuilder(URI("$base/v1/organizations/me")).GET()
+        }.header("x-api-key", key).header("anthropic-version", "2023-06-01").timeout(TIMEOUT).build()
+        val sent = System.nanoTime()
+        val response = try { client.send(request, HttpResponse.BodyHandlers.ofString()) }
+            catch (e: Exception) { return Verdict(false, false, "could not reach anthropic: ${e.message ?: e.javaClass.simpleName}") }
+        if (kind == ApiKeyKind.API) recordProbe("credential-verify", sent, response.body())
+        val status = response.statusCode()
+        return when {
+            status in 200..299 -> Verdict(true, true, "anthropic accepted the ${kind.label}")
+            status == 429 && kind == ApiKeyKind.API -> Verdict(true, true, "anthropic accepted the ${kind.label}, but it is rate-limited right now (429)")
+            status in 400..499 && status != 429 -> Verdict(false, true, "anthropic refused the ${kind.label} ($status): ${reason(response.body())}")
+            else -> Verdict(false, false, "anthropic answered $status, which says nothing about the ${kind.label}: ${reason(response.body())}")
         }
     }
 
@@ -121,5 +148,8 @@ class HttpCredentialVerifier(
         const val ANTHROPIC_PROBE = """{"model":"$PROBE_MODEL","max_tokens":1,""" +
             """"system":"You are Claude Code, Anthropic's official CLI for Claude.",""" +
             """"messages":[{"role":"user","content":"ok"}]}"""
+
+        /** An API key's probe: one token on the cheapest model, with no Claude Code system line (no OAuth here). */
+        const val API_KEY_PROBE = """{"model":"$PROBE_MODEL","max_tokens":1,"messages":[{"role":"user","content":"ok"}]}"""
     }
 }

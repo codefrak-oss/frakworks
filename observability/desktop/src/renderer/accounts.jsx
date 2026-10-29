@@ -298,6 +298,104 @@ const CredentialForm = ({ account, busy, run, onClose, keepOpen = false }) => {
   );
 };
 
+/** Cents as dollars, `$37.12`; "–" for none. A cost_report figure has fractions of a cent: rounded here only. */
+export const fmtCents = (c) => {
+  const n = typeof c === "number" ? c : typeof c === "string" ? Number(c) : NaN;
+  return Number.isFinite(n) ? `${n < 0 ? "-" : ""}$${(Math.abs(n) / 100).toFixed(2)}` : "–";
+};
+
+/**
+ * The API credit this cycle (engine/docs/ai-accounts.md, "API keys and
+ * credit"): used of the grant as a bar, what is left, the cycle, when the
+ * engine last read cost_report and why its last read failed. Null for an
+ * account that tracks none (no admin key or no billing-cycle date).
+ */
+export const CreditRow = ({ account: a, now }) => {
+  if (!a.adminKeySet || !a.billingCycleDate) return null;
+  const used = a.usedCents == null ? null : Number(a.usedCents);
+  const grant = typeof a.grantCents === "number" ? a.grantCents : null;
+  const frac = used != null && grant ? Math.min(1, Math.max(0, used / grant)) : null;
+  return (
+    <div className="acCredit">
+      <div className="acWindow" title="API credit this cycle, from the Admin API's cost report (it lags about 5 minutes)">
+        <span className="acWinLabel">API</span>
+        <span className="acBar"><span className={`acFill ${meterLevel(frac || 0)}`} style={{ width: `${Math.round((frac || 0) * 100)}%` }} /></span>
+        <span className="acCreditText">{used == null ? "not read yet" : `${fmtCents(used)} used / ${fmtCents(grant)} · ${fmtCents(a.remainingCents)} left`}</span>
+      </div>
+      <div className="acNote">
+        {a.cycleStart ? `cycle ${a.cycleStart} – ${a.cycleEnd}` : ""}
+        {a.creditRefreshedAt ? ` · refreshed ${fmtAgo(a.creditRefreshedAt, now)}` : ""}
+      </div>
+      {a.creditError && <div className="acProblem" role="alert">credit refresh failed: {a.creditError}</div>}
+    </div>
+  );
+};
+
+/** One key's row: whether it is set, a password input sent once, Save, and Clear when one is stored. */
+const KeyForm = ({ account, op, label, set, hint, busy, run }) => {
+  const [key, setKey] = useState("");
+  const submit = async (e) => {
+    e.preventDefault();
+    const k = key; setKey("");
+    await run({ op, name: account.name, key: k }, `set ${account.name}'s ${label}`);
+  };
+  return (
+    <form className="acForm" onSubmit={submit}>
+      <span className={set ? "acVerdict ok" : "acDim"}>{set ? "● set" : "not set"}</span>
+      <input className="acInput acToken" type="password" autoComplete="off" placeholder={`${set ? "replace" : "set"} ${label}: ${hint}`}
+        value={key} onChange={(e) => setKey(e.target.value)} />
+      <button className="acBtn primary" type="submit" disabled={busy || !key.trim()}>Save</button>
+      {set && <button className="acBtn" type="button" disabled={busy}
+        onClick={() => run({ op: `clear-${op}`, name: account.name }, `cleared ${account.name}'s ${label}`)}>Clear</button>}
+    </form>
+  );
+};
+
+/** The billing-cycle date and grant (dollars here, cents to the engine). */
+const BillingForm = ({ account: a, busy, run }) => {
+  const [date, setDate] = useState(a.billingCycleDate || "");
+  const [grant, setGrant] = useState(typeof a.grantCents === "number" ? String(a.grantCents / 100) : "");
+  const dollars = Number(grant);
+  const bad = grant.trim() === "" || !Number.isFinite(dollars) || dollars < 0;
+  const submit = async (e) => {
+    e.preventDefault();
+    await run({ op: "billing", name: a.name, cycleDate: date, grantCents: Math.round(dollars * 100) }, `set ${a.name}'s billing cycle`);
+  };
+  return (
+    <form className="acForm" onSubmit={submit}>
+      <input className="acInput" type="date" aria-label="billing-cycle date" value={date} onChange={(e) => setDate(e.target.value)} />
+      <input className="acInput" type="number" min="0" step="0.01" aria-label="grant per cycle, dollars" placeholder="grant per cycle, $"
+        value={grant} onChange={(e) => setGrant(e.target.value)} />
+      <button className="acBtn primary" type="submit" disabled={busy || !date || bad}>Save</button>
+      <div className="acNote">The cycle renews on this date's day each month; the grant is the plan's API credit per cycle (e.g. 100 on Max 5x).</div>
+    </form>
+  );
+};
+
+/** The API keys tab: the billing cycle first (an admin key needs it), then both keys, then the credit as read. */
+const KeysTab = ({ account: a, busy, run }) => {
+  if (a.provider !== "anthropic") return <p className="ecProse">Only an Anthropic account takes an API key and an admin key.</p>;
+  return <>
+    <p className="ecProse">Each key is tried against Anthropic, then sealed by the engine and never shown again; what is typed here is sent once and cleared.</p>
+    <div className="erTitle">Billing cycle</div>
+    <BillingForm account={a} busy={busy} run={run} />
+    <div className="erTitle">API key</div>
+    <KeyForm account={a} op="api-key" label="API key" set={a.apiKeySet} hint="sk-ant-api03-… or sk-ant-usr-…" busy={busy} run={run} />
+    <div className="erTitle">Admin key</div>
+    {a.billingCycleDate
+      ? <KeyForm account={a} op="admin-key" label="admin key" set={a.adminKeySet} hint="sk-ant-admin01-… or sk-ant-usr-…" busy={busy} run={run} />
+      : <p className="ecProse">Set the billing cycle first: the credit used is counted from it.</p>}
+    {a.adminKeySet && a.billingCycleDate && <>
+      <div className="erTitle">Credit this cycle</div>
+      <CreditRow account={a} now={Date.now()} />
+      <div className="acForm">
+        <button className="acBtn" type="button" disabled={busy} title="read the Admin API's cost report now"
+          onClick={() => run({ op: "refreshCredit", name: a.name }, `${a.name}: credit refreshed`)}>Refresh credit</button>
+      </div>
+    </>}
+  </>;
+};
+
 /** Removing is the one action that loses something (the sealed credential): say so and ask. */
 const RemoveConfirm = ({ account, busy, run, onClose }) => (
   <div className="acEdit">
@@ -315,6 +413,7 @@ const RemoveConfirm = ({ account, busy, run, onClose }) => (
 export const ACCOUNT_TABS = [
   { key: "details", label: "Details" },
   { key: "credential", label: "Credential" },
+  { key: "keys", label: "API keys" },
   { key: "remove", label: "Remove" },
 ];
 
@@ -360,6 +459,7 @@ export const EditAccountDialog = ({ account: a, tab, onTab, busy, run, verify, e
             </div>
           </>}
         </>}
+        {tab === "keys" && <KeysTab account={a} busy={busy} run={run} />}
         {tab === "remove" && <RemoveConfirm account={a} busy={busy} run={run} onClose={onClose} />}
         {error && <div className="uoFail">{String(error)}</div>}
       </div>
@@ -605,6 +705,7 @@ export const Accounts = ({ result, onRefresh, refreshing, onAction, onRefreshUsa
                         {hasFableReading(u) &&
                           <WindowRow label="F" title="Fable limit" usage={u} util={u.fableUtilization} reset={u.fableReset} now={now} />}
                         <FableRow usage={u} now={now} />
+                        <CreditRow account={a} now={now} />
                       </div>}
                   <footer className="acTileFoot">
                     <div className="acFacts">

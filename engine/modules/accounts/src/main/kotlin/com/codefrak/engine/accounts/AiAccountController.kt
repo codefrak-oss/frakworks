@@ -21,6 +21,10 @@ data class SetEmail(val email: String? = null)
 data class SetCredential(val token: String, val verify: Boolean = true)
 data class SetEnabled(val enabled: Boolean)
 data class Rename(val name: String)
+/** An API or admin key, sent once; `verify: false` is not offered: a key is always tried before it is stored. */
+data class SetKey(val key: String)
+/** The day the plan's API credit cycle renews (ISO date; its day of the month repeats monthly) and the grant per cycle, in cents. */
+data class SetBilling(val cycleDate: java.time.LocalDate, val grantCents: Long)
 
 /** [AccountUsage] plus the derived `rejected`, evaluated now, and the Fable limit as recorded and as metered. */
 data class UsageView(
@@ -50,13 +54,26 @@ data class AccountView(
     val name: String, val provider: String, val email: String?, val enabled: Boolean,
     val hasCredential: Boolean, val credentialSetAt: java.time.OffsetDateTime?, val addedAt: java.time.OffsetDateTime,
     val running: List<ModelCount>,
+    /** Whether each key is stored; a key itself is never in a view (engine/docs/ai-accounts.md, "API keys and credit"). */
+    val apiKeySet: Boolean, val adminKeySet: Boolean,
+    val billingCycleDate: java.time.LocalDate?, val grantCents: Long?,
+    /** The current cycle ([cycleStart] today, UTC), null without a date. */
+    val cycleStart: java.time.LocalDate?, val cycleEnd: java.time.LocalDate?,
+    /** Cents spent this cycle as last read, the grant less that, when it was read, and why the last refresh failed. */
+    val usedCents: java.math.BigDecimal?, val remainingCents: java.math.BigDecimal?,
+    val creditRefreshedAt: java.time.OffsetDateTime?, val creditError: String?,
 ) {
-    constructor(a: AiAccount, running: List<ModelCount>) :
-        this(a.name, a.provider, a.email, a.enabled, a.hasCredential, a.credentialSetAt, a.addedAt, running)
+    constructor(a: AiAccount, running: List<ModelCount>, today: java.time.LocalDate) : this(
+        a.name, a.provider, a.email, a.enabled, a.hasCredential, a.credentialSetAt, a.addedAt, running,
+        a.apiKeySet, a.adminKeySet, a.billingCycleDate, a.grantCents,
+        a.billingCycleDate?.let { cycleStart(it, today) }, a.billingCycleDate?.let { cycleEnd(it, cycleStart(it, today)) },
+        a.usedCents, a.usedCents?.let { used -> a.grantCents?.let { java.math.BigDecimal.valueOf(it) - used } },
+        a.creditRefreshedAt, a.creditError,
+    )
 
     companion object {
         fun of(accounts: List<AiAccount>, running: Map<String, List<ModelCount>>) =
-            accounts.map { AccountView(it, running[it.name].orEmpty()) }
+            accounts.map { AccountView(it, running[it.name].orEmpty(), java.time.LocalDate.now(java.time.ZoneOffset.UTC)) }
     }
 }
 
@@ -76,7 +93,8 @@ private fun checkName(name: String) {
  */
 @RestController
 class AiAccountController(private val accounts: AiAccounts, private val secrets: SecretsKey, private val usages: AccountUsages,
-                          private val verifier: CredentialVerifier, private val telemetry: RunningModels, private val events: EngineEvents) {
+                          private val verifier: CredentialVerifier, private val telemetry: RunningModels, private val events: EngineEvents,
+                          private val credit: ApiCreditRefresh) {
     @GetMapping("/accounts")
     fun list() = AccountView.of(accounts.list(), telemetry.running())
 
@@ -141,6 +159,70 @@ class AiAccountController(private val accounts: AiAccounts, private val secrets:
             }
         }
         return if (accounts.setCredential(name, body.token)) { changed(name); ResponseEntity.noContent().build() } else ResponseEntity.notFound().build()
+    }
+
+    /**
+     * Sets an Anthropic account's API key or admin key (engine/docs/ai-accounts.md,
+     * "API keys and credit"), after trying it against Anthropic: 400 for a key
+     * of the wrong shape, 422 with Anthropic's message when it refuses the key,
+     * 502 when it could not be asked; nothing is stored in any of those. 409
+     * for a provider that is not anthropic, and for an admin key on an account
+     * with no billing-cycle date: the date is what the credit is counted from.
+     * A stored admin key's credit is read at once.
+     */
+    private fun setKey(name: String, kind: ApiKeyKind, key: String): ResponseEntity<Unit> {
+        val account = accounts.get(name) ?: return ResponseEntity.notFound().build()
+        if (account.provider != "anthropic") throw ResponseStatusException(HttpStatus.CONFLICT, "only an anthropic account takes an ${kind.label}")
+        if (kind == ApiKeyKind.ADMIN && account.billingCycleDate == null)
+            throw ResponseStatusException(HttpStatus.CONFLICT, "set $name's billing-cycle date and grant (PUT /accounts/$name/billing) before its admin key")
+        if (!secrets.configured) throw ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "ENGINE_SECRETS_KEY is not set")
+        kind.problem(key)?.let { throw ResponseStatusException(HttpStatus.BAD_REQUEST, it) }
+        val verdict = verifier.verifyKey(kind, key)
+        if (!verdict.valid && verdict.reachable) throw ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, verdict.detail)
+        if (!verdict.valid) throw ResponseStatusException(HttpStatus.BAD_GATEWAY, "${verdict.detail}; nothing was saved")
+        if (!accounts.storeKey(name, kind, key)) return ResponseEntity.notFound().build()
+        if (kind == ApiKeyKind.ADMIN) credit.refresh(name) else changed(name)
+        return ResponseEntity.noContent().build()
+    }
+
+    private fun clearKey(name: String, kind: ApiKeyKind): ResponseEntity<Unit> =
+        if (accounts.clearKey(name, kind)) { changed(name); ResponseEntity.noContent().build() } else ResponseEntity.notFound().build()
+
+    @PutMapping("/accounts/{name}/api-key")
+    fun setApiKey(@PathVariable name: String, @RequestBody body: SetKey) = setKey(name, ApiKeyKind.API, body.key)
+
+    @DeleteMapping("/accounts/{name}/api-key")
+    fun clearApiKey(@PathVariable name: String) = clearKey(name, ApiKeyKind.API)
+
+    @PutMapping("/accounts/{name}/admin-key")
+    fun setAdminKey(@PathVariable name: String, @RequestBody body: SetKey) = setKey(name, ApiKeyKind.ADMIN, body.key)
+
+    @DeleteMapping("/accounts/{name}/admin-key")
+    fun clearAdminKey(@PathVariable name: String) = clearKey(name, ApiKeyKind.ADMIN)
+
+    /**
+     * Sets the billing-cycle date and the grant per cycle, in cents. 400 for a
+     * negative grant, 409 for a provider that is not anthropic. With an admin
+     * key stored, the credit is read again at once for the cycle the date gives.
+     */
+    @PutMapping("/accounts/{name}/billing")
+    fun setBilling(@PathVariable name: String, @RequestBody body: SetBilling): ResponseEntity<Unit> {
+        if (body.grantCents < 0) throw ResponseStatusException(HttpStatus.BAD_REQUEST, "grantCents is 0 or more")
+        val account = accounts.get(name) ?: return ResponseEntity.notFound().build()
+        if (account.provider != "anthropic") throw ResponseStatusException(HttpStatus.CONFLICT, "only an anthropic account has API credit")
+        if (!accounts.setBilling(name, body.cycleDate, body.grantCents)) return ResponseEntity.notFound().build()
+        if (account.adminKeySet) credit.refresh(name) else changed(name)
+        return ResponseEntity.noContent().build()
+    }
+
+    /** Re-reads the account's credit from cost_report now; 409 with no admin key or date, 502 with the error when it failed. */
+    @PostMapping("/accounts/{name}/credit/refresh")
+    fun refreshCredit(@PathVariable name: String): ResponseEntity<Unit> {
+        val account = accounts.get(name) ?: return ResponseEntity.notFound().build()
+        if (!account.adminKeySet || account.billingCycleDate == null)
+            throw ResponseStatusException(HttpStatus.CONFLICT, "$name has no admin key and billing-cycle date to read credit with")
+        if (!credit.refresh(name)) throw ResponseStatusException(HttpStatus.BAD_GATEWAY, accounts.get(name)?.creditError ?: "refresh failed")
+        return ResponseEntity.noContent().build()
     }
 
     /** Tries the stored credential against its provider now; 404 when there is none. */

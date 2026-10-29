@@ -21,7 +21,7 @@ import kotlin.test.assertTrue
 @SpringBootTest
 class AiAccountsTest(@Autowired val accounts: AiAccounts, @Autowired val jdbc: JdbcClient, @Autowired val secrets: SecretsKey,
                      @Autowired val api: AiAccountController, @Autowired val verifier: FakeVerifier, @Autowired val usages: AccountUsages,
-                     @Autowired val events: com.codefrak.engine.events.EngineEvents) {
+                     @Autowired val events: com.codefrak.engine.events.EngineEvents, @Autowired val credit: ApiCreditRefresh) {
     @TestConfiguration
     class Fakes { @Bean @Primary fun verifier() = FakeVerifier() }
 
@@ -886,7 +886,7 @@ class AiAccountsTest(@Autowired val accounts: AiAccounts, @Autowired val jdbc: J
             assertEquals(409, status(assertFailsWith<ResponseStatusException> { api.rename("rf-a", Rename("engine")) }))
             val telemetry = org.mockito.Mockito.mock(com.codefrak.engine.smith.SmithTelemetry::class.java)
             org.mockito.Mockito.`when`(telemetry.running()).thenReturn(mapOf("rf-a" to listOf(com.codefrak.engine.smith.ModelCount("claude-opus-5-5", 1))))
-            val busy = AiAccountController(accounts, secrets, usages, verifier, telemetry, events)
+            val busy = AiAccountController(accounts, secrets, usages, verifier, telemetry, events, credit)
             val live = assertFailsWith<ResponseStatusException> { busy.rename("rf-a", Rename("rf-c")) }
             assertEquals(409, status(live))
             assertTrue(live.reason!!.contains("in use"), live.reason)
@@ -917,4 +917,8 @@ class FakeVerifier : CredentialVerifier {
     val probed = mutableListOf<String>()
     override fun verify(provider: String, token: String): Verdict { tried += token; providers += provider; return next.also { next = Verdict(true, true, "accepted") } }
     override fun probeAnthropic(token: String): ProbeReply { probed += token; return probe ?: throw ProbeUnreachable("could not reach anthropic: Connection refused") }
+    /** The key verdict, answered once then back to accepted, and every key tried with its kind. */
+    var nextKey = Verdict(true, true, "accepted")
+    val keys = mutableListOf<Pair<ApiKeyKind, String>>()
+    override fun verifyKey(kind: ApiKeyKind, key: String): Verdict { keys += kind to key; return nextKey.also { nextKey = Verdict(true, true, "accepted") } }
 }

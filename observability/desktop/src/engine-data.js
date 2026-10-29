@@ -509,6 +509,10 @@ const PROVIDERS = ["anthropic", "openai", "jev", "codex"];
  *   { op: "remove", name }               DELETE /accounts/<name>
  *   { op: "verify", name }               POST   /accounts/<name>/verify
  *   { op: "refreshUsage", name }         POST   /accounts/<name>/usage/refresh (anthropic only: the engine re-reads its meter)
+ *   { op: "api-key" | "admin-key", name, key }  PUT /accounts/<name>/api-key | admin-key (anthropic only; the engine tries it first)
+ *   { op: "clear-api-key" | "clear-admin-key", name }  DELETE /accounts/<name>/api-key | admin-key
+ *   { op: "billing", name, cycleDate, grantCents }  PUT /accounts/<name>/billing (the API credit cycle's date and grant)
+ *   { op: "refreshCredit", name }        POST   /accounts/<name>/credit/refresh (re-reads cost_report now)
  *   { op: "refiner-tier", tier }         PUT    /intake/tier (no account: the page's refiner section)
  *   { op: "tier", tier, model, effort }  PUT    /tiers/<tier> (no account: the page's Tiers section)
  *   { op: "security-tier", tier }        PUT    /security/tier (the Tiers section's security row)
@@ -524,6 +528,19 @@ const PROVIDERS = ["anthropic", "openai", "jev", "codex"];
 const MAX_EMAIL_CHARS = 200;
 /** The engine's cap on an account's name. */
 const MAX_NAME_CHARS = 100;
+
+/** The prefixes the engine takes for each Anthropic key (ApiKeyKind); `sk-ant-usr-` works as both. */
+const API_KEY_PREFIXES = { "api-key": ["sk-ant-api03-", "sk-ant-usr-"], "admin-key": ["sk-ant-admin01-", "sk-ant-usr-"] };
+
+/** Why `key` cannot be the `op` ("api-key" or "admin-key") kind of key, or null; the engine checks the same. */
+function apiKeyProblem(op, key) {
+  const label = op === "api-key" ? "API key" : "admin key";
+  if (!key) return `${label} is empty`;
+  const space = key.search(/\s/);
+  if (space >= 0) return `${label} has whitespace at character ${space + 1} of ${key.length}; paste it as one unbroken line`;
+  if (!API_KEY_PREFIXES[op].some((p) => key.startsWith(p))) return `an Anthropic ${label} starts with ${API_KEY_PREFIXES[op].join(" or ")}`;
+  return null;
+}
 
 async function accountAction(action, opts = {}) {
   const a = action && typeof action === "object" ? action : {};
@@ -593,6 +610,26 @@ async function accountAction(action, opts = {}) {
     case "refreshUsage":
       // The engine's 409 (no meter), 404 (no credential) or 502 (no reading) comes back as its own error.
       return sendJson("POST", `${at}/usage/refresh`, undefined, opts);
+    case "api-key":
+    case "admin-key": {
+      const problem = apiKeyProblem(a.op, typeof a.key === "string" ? a.key.trim() : "");
+      if (problem) return { error: problem };
+      // The engine answers 422 with Anthropic's own message for a key it refused, 409 for an admin key with no billing date.
+      const r = await sendJson("PUT", `${at}/${a.op}`, { key: a.key.trim() }, opts);
+      if (r.error && / 503 /.test(r.error)) r.error += " (the engine has no ENGINE_SECRETS_KEY, so it cannot seal a key)";
+      return r;
+    }
+    case "clear-api-key":
+    case "clear-admin-key":
+      return sendJson("DELETE", `${at}/${a.op.slice("clear-".length)}`, undefined, opts);
+    case "billing": {
+      const date = typeof a.cycleDate === "string" ? a.cycleDate.trim() : "";
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(date))) return { error: "the billing-cycle date is YYYY-MM-DD" };
+      if (!Number.isInteger(a.grantCents) || a.grantCents < 0) return { error: "the grant is a whole number of cents, 0 or more" };
+      return sendJson("PUT", `${at}/billing`, { cycleDate: date, grantCents: a.grantCents }, opts);
+    }
+    case "refreshCredit":
+      return sendJson("POST", `${at}/credit/refresh`, undefined, opts);
     default:
       return { error: `unknown account action ${JSON.stringify(a.op)}` };
   }

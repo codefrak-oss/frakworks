@@ -52,3 +52,22 @@ fun providerOf(model: String) = when {
     model.startsWith("gpt-") -> "openai"
     else -> throw IllegalArgumentException("no provider for model $model")
 }
+
+/** An Anthropic account's two API keys beside its OAuth credential (engine/docs/ai-accounts.md, "API keys and credit"). */
+enum class ApiKeyKind(val column: String, val label: String, val prefixes: List<String>) {
+    /** A Console API key; `sk-ant-usr-` is a user-scoped key, which works as both. */
+    API("api_key", "API key", listOf("sk-ant-api03-", "sk-ant-usr-")),
+    ADMIN("admin_key", "admin key", listOf("sk-ant-admin01-", "sk-ant-usr-"));
+
+    /** The associated data it is sealed with: the account and the kind, so a key opens only in its own row and column. */
+    fun aad(account: String) = "$account/$column"
+
+    /** Why `key` cannot be this kind of key, or null when it can: no whitespace, one of [prefixes]. */
+    fun problem(key: String): String? {
+        if (key.isBlank()) return "$label is empty"
+        val space = key.indexOfFirst { it.isWhitespace() }
+        if (space >= 0) return "$label has whitespace at character ${space + 1} of ${key.length}; paste it as one unbroken line"
+        if (prefixes.none { key.startsWith(it) }) return "an Anthropic $label starts with ${prefixes.joinToString(" or ")}"
+        return null
+    }
+}

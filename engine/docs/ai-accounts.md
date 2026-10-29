@@ -25,6 +25,48 @@ secrets broker (`bots/secrets-mcp`, removed 2026-09-27) answered a different
 question — what a running Smith may fetch for its ticket — and was never on
 this path.
 
+**API keys and credit** (#100142). A Max plan includes a monthly grant of
+Claude API credit (e.g. $100 on Max 5x) that renews each billing cycle,
+expires at its end and does not cover Claude Code. An `anthropic` account can
+hold, beside its OAuth credential, an **API key** and an **Admin API key**,
+both sealed like the credential (columns `api_key` and `admin_key`, each with
+its sealing key's id; the associated data is `<name>/<column>`, so a key opens
+only in its own row and column; a rename reseals them), and a **billing-cycle
+date** and **grant** (`billing_cycle_date`, `credit_grant_cents`). They are set
+through the API (or the desktop's Edit… > API keys tab) and never read back:
+
+| Request | |
+|---|---|
+| `PUT /accounts/{name}/api-key` `{"key"}` | Takes `sk-ant-api03-…` or `sk-ant-usr-…`; tried first with a one-token `POST /v1/messages` on `x-api-key`. |
+| `PUT /accounts/{name}/admin-key` `{"key"}` | Takes `sk-ant-admin01-…` or `sk-ant-usr-…`; tried first with `GET /v1/organizations/me`. 409 while the account has no billing-cycle date. The credit is read at once. |
+| `DELETE /accounts/{name}/api-key`, `…/admin-key` | Deletes the key; clearing the admin key drops the credit figure. |
+| `PUT /accounts/{name}/billing` `{"cycleDate": "YYYY-MM-DD", "grantCents"}` | The date's day of the month is when each cycle starts; the grant is per cycle, in cents. |
+| `POST /accounts/{name}/credit/refresh` | Reads the credit now; 502 with the error when it fails. |
+
+A key of the wrong shape is a 400, a key Anthropic refuses a 422 with
+Anthropic's own message, and no answer at all a 502; nothing is stored in any
+of them. Only an `anthropic` account takes these (409 otherwise). The admin
+key must belong to a team organization: an individual org's key gets
+`permission_error` on the admin endpoints.
+
+**Credit used this cycle.** Anthropic has no balance endpoint, so the engine
+sums spend itself: every 5 minutes (`ApiCreditRefresh`, under the engine
+lease; cost_report allows one call a minute and lags about 5 minutes), for
+each account with an admin key and a date, it pages
+`GET /v1/organizations/cost_report?starting_at=<cycle start>&bucket_width=1d`
+and adds every result's `amount` (cents, a decimal string) exactly. The cycle
+start is the date's day in the current month (UTC), clamped to the month's
+length (a 31st starts on Feb 28 or 29), or the month before's when that is
+still ahead. The sum is stored in `credit_used_cents` with
+`credit_refreshed_at`. A failed read keeps the last figure and stores the
+reason in `credit_error`, cleared by the next good one. Each refresh publishes
+the `setting` `accounts` frame, so the desktop redraws without polling.
+`GET /accounts` carries `apiKeySet`, `adminKeySet`, `billingCycleDate`,
+`grantCents`, `cycleStart`, `cycleEnd`, `usedCents`, `remainingCents` (grant
+less used), `creditRefreshedAt` and `creditError`; never a key. The report is
+the whole organization's spend: it counts what any key of the org spent, which
+is the figure the grant is drawn down by.
+
 **No claude.ai connectors in a Smith.** A `claude setup-token` token carries
 inference scope only, so `claude -p` under it never loads the account's
 claude.ai connectors (Drive, Gmail, Claude Docs…); only MCP servers configured

@@ -24,7 +24,7 @@ class HttpCredentialVerifierTest {
     fun start() {
         stub = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
         stub.createContext("/") { ex ->
-            val headers = listOf("authorization", "anthropic-beta", "anthropic-version").associateWith { ex.requestHeaders.getFirst(it) }
+            val headers = listOf("authorization", "anthropic-beta", "anthropic-version", "x-api-key").associateWith { ex.requestHeaders.getFirst(it) }
             seen += Triple(ex.requestMethod, ex.requestURI.path, headers)
             bodies += String(ex.requestBody.readAllBytes())
             replyHeaders.forEach { (k, v) -> ex.responseHeaders.add(k, v) }
@@ -131,5 +131,43 @@ class HttpCredentialVerifierTest {
         val gone = verifier.verify("anthropic", "sk-ant-oat01-t")
         assertFalse(gone.valid); assertFalse(gone.reachable)
         assertTrue(gone.detail.startsWith("could not reach anthropic"), gone.detail)
+    }
+
+    @Test
+    fun `an api key is tried with a one-token message on x-api-key, with no oauth beta`() {
+        assertEquals(Verdict(true, true, "anthropic accepted the API key"), verifier.verifyKey(ApiKeyKind.API, "sk-ant-usr-k"))
+        val (method, path, headers) = seen.single()
+        assertEquals("POST" to "/v1/messages", method to path)
+        assertEquals("sk-ant-usr-k", headers["x-api-key"])
+        assertEquals(null, headers["authorization"])
+        assertEquals(null, headers["anthropic-beta"])
+        assertTrue(bodies.single().contains("\"max_tokens\":1"))
+    }
+
+    @Test
+    fun `an admin key is tried on organizations me, and a refusal carries anthropic's message`() {
+        status = 401; body = """{"type":"error","error":{"type":"authentication_error","message":"invalid x-api-key"}}"""
+        assertEquals(Verdict(false, true, "anthropic refused the admin key (401): invalid x-api-key"),
+            verifier.verifyKey(ApiKeyKind.ADMIN, "sk-ant-admin01-k"))
+        val (method, path, headers) = seen.single()
+        assertEquals("GET" to "/v1/organizations/me", method to path)
+        assertEquals("sk-ant-admin01-k", headers["x-api-key"])
+    }
+
+    @Test
+    fun `a server error says nothing about the key`() {
+        status = 500
+        assertFalse(verifier.verifyKey(ApiKeyKind.ADMIN, "sk-ant-admin01-k").reachable)
+    }
+
+    @Test
+    fun `key prefixes - sk-ant-usr- for both, api03 for the api key and admin01 for the admin key`() {
+        assertEquals(null, ApiKeyKind.API.problem("sk-ant-usr-x"))
+        assertEquals(null, ApiKeyKind.ADMIN.problem("sk-ant-usr-x"))
+        assertEquals(null, ApiKeyKind.API.problem("sk-ant-api03-x"))
+        assertEquals(null, ApiKeyKind.ADMIN.problem("sk-ant-admin01-x"))
+        assertEquals("an Anthropic API key starts with sk-ant-api03- or sk-ant-usr-", ApiKeyKind.API.problem("sk-ant-admin01-x"))
+        assertEquals("an Anthropic admin key starts with sk-ant-admin01- or sk-ant-usr-", ApiKeyKind.ADMIN.problem("sk-ant-oat01-x"))
+        assertTrue(ApiKeyKind.API.problem("sk-ant-usr-a b")!!.contains("whitespace"))
     }
 }

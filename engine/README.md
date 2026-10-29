@@ -342,7 +342,11 @@ commit's sha, which `MergePrDelegate` keeps as the flow variable `mergeSha` for 
 
 ## AI accounts
 
-Moved to [`docs/ai-accounts.md`](docs/ai-accounts.md).
+Moved to [`docs/ai-accounts.md`](docs/ai-accounts.md). An Anthropic account
+also takes a sealed API key and Admin API key, a billing-cycle date and the
+plan's API credit grant; the engine reads the credit used this cycle from the
+Admin API's cost report every 5 minutes and pushes it to the desktop
+(`docs/ai-accounts.md`, "API keys and credit").
 
 ## The usage meter
 
