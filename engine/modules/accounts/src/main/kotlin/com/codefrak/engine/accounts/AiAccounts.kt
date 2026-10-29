@@ -3,7 +3,9 @@ package com.codefrak.engine.accounts
 import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.stereotype.Repository
 import org.springframework.transaction.annotation.Transactional
+import java.math.BigDecimal
 import java.time.Instant
+import java.time.LocalDate
 import java.time.OffsetDateTime
 
 /** What the API shows: never the credential, only that there is one. */
@@ -12,6 +14,12 @@ data class AiAccount(
     /** The user's note of whose login it is; never read by the engine (engine/README.md, "AI accounts"). */
     val email: String?, val enabled: Boolean,
     val hasCredential: Boolean, val credentialSetAt: OffsetDateTime?, val addedAt: OffsetDateTime,
+    /** Whether an API key and an Admin API key are stored; never the keys (engine/docs/ai-accounts.md, "API keys and credit"). */
+    val apiKeySet: Boolean = false, val adminKeySet: Boolean = false,
+    /** The day the plan's API credit cycle renews from, and its grant in cents. */
+    val billingCycleDate: LocalDate? = null, val grantCents: Long? = null,
+    /** Cents spent this cycle as cost_report last read, when, and why the last refresh failed (null when it did not). */
+    val usedCents: BigDecimal? = null, val creditRefreshedAt: OffsetDateTime? = null, val creditError: String? = null,
 )
 
 /** The longest email note an account takes (`engine.ai_account.email`). */
@@ -23,10 +31,13 @@ fun noteOf(email: String?): String? = email?.trim()?.ifEmpty { null }
 /** The engine's own `engine.ai_account` table; Flyway owns its schema (db/migration). */
 @Repository
 class AiAccounts(private val jdbc: JdbcClient, private val secrets: SecretsKey, private val usages: AccountUsages) {
-    private val columns = "name, provider, email, enabled, credential IS NOT NULL, credential_set_at, added_at"
+    private val columns = "name, provider, email, enabled, credential IS NOT NULL, credential_set_at, added_at, " +
+        "api_key IS NOT NULL, admin_key IS NOT NULL, billing_cycle_date, credit_grant_cents, credit_used_cents, credit_refreshed_at, credit_error"
     private fun row(rs: java.sql.ResultSet) = AiAccount(
         rs.getString(1), rs.getString(2), rs.getString(3), rs.getBoolean(4), rs.getBoolean(5),
         rs.getObject(6, OffsetDateTime::class.java), rs.getObject(7, OffsetDateTime::class.java),
+        rs.getBoolean(8), rs.getBoolean(9), rs.getObject(10, LocalDate::class.java), rs.getObject(11) as Long?,
+        rs.getBigDecimal(12), rs.getObject(13, OffsetDateTime::class.java), rs.getString(14),
     )
 
     fun list(): List<AiAccount> =
@@ -53,18 +64,24 @@ class AiAccounts(private val jdbc: JdbcClient, private val secrets: SecretsKey, 
      */
     @Transactional
     fun rename(from: String, to: String): Boolean {
-        val sealed = jdbc.sql("SELECT credential FROM engine.ai_account WHERE name = :n").param("n", from)
-            .query { rs, _ -> java.util.Optional.ofNullable(rs.getBytes(1)) }.optional().orElse(null) ?: return false
-        val resealed = sealed.map { secrets.seal(secrets.open(it, from), to) }.orElse(null)
-        if (resealed == null) jdbc.sql("UPDATE engine.ai_account SET name = :to WHERE name = :from").param("to", to).param("from", from).update()
-        else jdbc.sql("UPDATE engine.ai_account SET name = :to, credential = :c, key_id = :k WHERE name = :from")
-            .param("to", to).param("c", resealed).param("k", secrets.id).param("from", from).update()
+        val sealed = jdbc.sql("SELECT credential, api_key, admin_key FROM engine.ai_account WHERE name = :n").param("n", from)
+            .query { rs, _ -> listOf(rs.getBytes(1), rs.getBytes(2), rs.getBytes(3)) }.optional().orElse(null) ?: return false
+        val (credential, apiKey, adminKey) = sealed
+        jdbc.sql("UPDATE engine.ai_account SET name = :to WHERE name = :from").param("to", to).param("from", from).update()
+        // Each sealed value carries the name as associated data: opened under the old one, sealed under the new.
+        credential?.let { setCredentialSealed(to, secrets.seal(secrets.open(it, from), to)) }
+        apiKey?.let { storeKey(to, ApiKeyKind.API, secrets.open(it, ApiKeyKind.API.aad(from))) }
+        adminKey?.let { storeKey(to, ApiKeyKind.ADMIN, secrets.open(it, ApiKeyKind.ADMIN.aad(from))) }
         // A reading left under the new name by a removed account belongs to no account: the renamed one's wins.
         jdbc.sql("DELETE FROM engine.ai_account_usage WHERE account = :to").param("to", to).update()
         for (table in listOf("ai_account_usage", "smith_run_stats", "jev_call"))
             jdbc.sql("UPDATE engine.$table SET account = :to WHERE account = :from").param("to", to).param("from", from).update()
         return true
     }
+
+    private fun setCredentialSealed(name: String, sealed: ByteArray) =
+        jdbc.sql("UPDATE engine.ai_account SET credential = :c, key_id = :k WHERE name = :n")
+            .param("c", sealed).param("k", secrets.id).param("n", name).update()
 
     /** False when it was not there. */
     fun remove(name: String): Boolean =
@@ -77,6 +94,52 @@ class AiAccounts(private val jdbc: JdbcClient, private val secrets: SecretsKey, 
     fun setCredential(name: String, token: String): Boolean =
         jdbc.sql("UPDATE engine.ai_account SET credential = :c, key_id = :k, credential_set_at = CURRENT_TIMESTAMP WHERE name = :n")
             .param("c", secrets.seal(token, name)).param("k", secrets.id).param("n", name).update() == 1
+
+    /**
+     * Seals an API or Admin API key under the engine's key, with the account
+     * name and the key's kind as associated data (so neither opens in the
+     * other's column or row), and stores it; false when there is no such account.
+     */
+    fun storeKey(name: String, kind: ApiKeyKind, key: String): Boolean =
+        jdbc.sql("UPDATE engine.ai_account SET ${kind.column} = :c, ${kind.column}_id = :k WHERE name = :n")
+            .param("c", secrets.seal(key, kind.aad(name))).param("k", secrets.id).param("n", name).update() == 1
+
+    /** Deletes the key; clearing the admin key also drops the credit figure it read. False when there is no such account. */
+    fun clearKey(name: String, kind: ApiKeyKind): Boolean =
+        jdbc.sql("UPDATE engine.ai_account SET ${kind.column} = NULL, ${kind.column}_id = NULL" +
+            (if (kind == ApiKeyKind.ADMIN) ", credit_used_cents = NULL, credit_refreshed_at = NULL, credit_error = NULL" else "") +
+            " WHERE name = :n").param("n", name).update() == 1
+
+    /** The key in the clear; null when none is stored. Read only by the credit refresh ([ApiCreditRefresh]) for the admin key. */
+    fun key(name: String, kind: ApiKeyKind): String? =
+        jdbc.sql("SELECT ${kind.column} FROM engine.ai_account WHERE name = :n AND ${kind.column} IS NOT NULL").param("n", name)
+            .query { rs, _ -> rs.getBytes(1) }.optional().map { secrets.open(it, kind.aad(name)) }.orElse(null)
+
+    fun adminKey(name: String): String? = key(name, ApiKeyKind.ADMIN)
+
+    /**
+     * Sets the billing-cycle date and the grant. A changed date starts a
+     * different cycle, so the figure read for the old one is dropped until the
+     * next refresh. False when there is no such account.
+     */
+    fun setBilling(name: String, cycleDate: LocalDate, grantCents: Long): Boolean =
+        jdbc.sql("""UPDATE engine.ai_account SET credit_grant_cents = :g,
+                credit_used_cents = CASE WHEN billing_cycle_date = :d THEN credit_used_cents END,
+                credit_refreshed_at = CASE WHEN billing_cycle_date = :d THEN credit_refreshed_at END,
+                billing_cycle_date = :d WHERE name = :n""")
+            .param("d", cycleDate).param("g", grantCents).param("n", name).update() == 1
+
+    /** The accounts the credit refresh reads: those with an admin key and a billing-cycle date. */
+    fun creditTracked(): List<String> =
+        jdbc.sql("SELECT name FROM engine.ai_account WHERE admin_key IS NOT NULL AND billing_cycle_date IS NOT NULL ORDER BY name")
+            .query(String::class.java).list().filterNotNull()
+
+    /** A refresh's outcome: [usedCents] and now, or (null) the [error] beside the figure last read. */
+    fun recordCredit(name: String, usedCents: BigDecimal?, error: String?) {
+        if (usedCents != null) jdbc.sql("UPDATE engine.ai_account SET credit_used_cents = :u, credit_refreshed_at = CURRENT_TIMESTAMP, credit_error = NULL WHERE name = :n")
+            .param("u", usedCents).param("n", name).update()
+        else jdbc.sql("UPDATE engine.ai_account SET credit_error = :e WHERE name = :n").param("e", error).param("n", name).update()
+    }
 
     /**
      * The picker: among the provider's enabled accounts that have a credential
