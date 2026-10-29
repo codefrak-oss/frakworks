@@ -2,6 +2,8 @@ package com.codefrak.engine.frakpanel
 
 import com.codefrak.engine.accounts.AccountUsages
 import com.codefrak.engine.accounts.AiAccounts
+import com.codefrak.engine.accounts.cycleEnd
+import com.codefrak.engine.accounts.cycleStart
 import com.codefrak.engine.board.IssueBoard
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.core.io.ClassPathResource
@@ -12,8 +14,11 @@ import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.server.ResponseStatusException
+import java.math.BigDecimal
 import java.time.Instant
+import java.time.LocalDate
 import java.time.OffsetDateTime
+import java.time.ZoneOffset
 
 /** One plan window of a tile row: utilization 0-1 and when it resets, either null when unread. */
 data class TileWindow(val utilization: Double?, val reset: OffsetDateTime?)
@@ -28,6 +33,17 @@ data class TileWindow(val utilization: Double?, val reset: OffsetDateTime?)
 data class TileAccount(
     val name: String, val provider: String, val state: String,
     val fiveHour: TileWindow, val sevenDay: TileWindow, val fable: TileWindow, val fableLimit: TileFableLimit,
+    val credit: TileCredit? = null,
+)
+
+/**
+ * This cycle's API credit of a row, as `GET /accounts` reports it (engine/docs/ai-accounts.md, "API keys and
+ * credit"); null on a row with no billing-cycle date or grant. `usedCents`/`remainingCents` are null with no
+ * reading yet; `error` is why the last refresh failed. Never a key or a key-set flag.
+ */
+data class TileCredit(
+    val grantCents: Long, val usedCents: BigDecimal?, val remainingCents: BigDecimal?,
+    val cycleStart: LocalDate, val cycleEnd: LocalDate, val refreshedAt: OffsetDateTime?, val error: String?,
 )
 
 /** The reached Fable limit of a tile row and its recorded reset; `reset` is null when not reached. */
@@ -87,6 +103,7 @@ class FrakpanelTileController(private val tiles: FrakpanelTiles, private val acc
     fun aiAccountsState(): ResponseEntity<AiAccountsTile> {
         on()
         val now = Instant.now()
+        val today = LocalDate.now(ZoneOffset.UTC)
         val byAccount = usages.list().associateBy { it.account }
         val rows = accounts.list().map { a ->
             val u = byAccount[a.name]
@@ -98,7 +115,11 @@ class FrakpanelTileController(private val tiles: FrakpanelTiles, private val acc
             TileAccount(a.name, a.provider, state,
                 TileWindow(u?.fiveHourUtilization, u?.fiveHourReset), TileWindow(u?.sevenDayUtilization, u?.sevenDayReset),
                 TileWindow(u?.fableUtilization, u?.fableReset),
-                if (u?.fableReached(now) == true) TileFableLimit(true, u.fableLimitReset) else TileFableLimit(false, null))
+                if (u?.fableReached(now) == true) TileFableLimit(true, u.fableLimitReset) else TileFableLimit(false, null),
+                a.billingCycleDate?.let { d -> a.grantCents?.let { g ->
+                    val start = cycleStart(d, today)
+                    TileCredit(g, a.usedCents, a.usedCents?.let { BigDecimal.valueOf(g) - it }, start, cycleEnd(d, start), a.creditRefreshedAt, a.creditError)
+                } })
         }
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(AiAccountsTile(rows, now, commit))
     }

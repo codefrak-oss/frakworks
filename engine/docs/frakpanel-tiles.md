@@ -36,7 +36,15 @@ later poll answers another, so an open tile picks up a newly deployed engine.
   rather than the old one: no utilization number, an empty bar, and the
   countdown "awaiting new reading" — the window has already rolled over. The
   "Fable limit reached" line follows no such rule (the desktop applies none
-  to it either). No tier-to-account section, and never a
+  to it either). An account with a billing-cycle date and a grant (engine/docs/ai-accounts.md,
+  "API keys and credit") also carries `credit` {`grantCents`, `usedCents`,
+  `remainingCents`, `cycleStart`, `cycleEnd`, `refreshedAt`, `error`}, the
+  figures `GET /accounts` reports, and the row ends with an "API" bar: dollars
+  used of the grant, then "API credit: $x left · Nd left in cycle (ends
+  date)". A `creditError` shows as "credit error" and its text, no reading yet
+  as "no reading", never a stale or zero figure. An account without a cycle
+  and grant carries `credit: null` and has no such bar; no key or key-set flag
+  reaches the state. No tier-to-account section, and never a
   credential or an email note: the state is its own DTO.
 - **frakworks issues tile:** `GET /frakpanel/tiles/frakworks-issues` is the
   page; it polls `GET /frakpanel/tiles/frakworks-issues/state` (relative) every

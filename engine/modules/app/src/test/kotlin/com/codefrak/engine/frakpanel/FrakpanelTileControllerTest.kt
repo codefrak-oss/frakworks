@@ -17,6 +17,9 @@ import org.springframework.context.annotation.Import
 import org.springframework.test.context.TestPropertySource
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
+import com.codefrak.engine.accounts.ApiKeyKind
+import java.math.BigDecimal
+import java.time.LocalDate
 import java.time.OffsetDateTime
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -35,7 +38,7 @@ class FrakpanelTileControllerTest {
     @Autowired lateinit var store: WorkItemStore
     @Autowired lateinit var repos: TargetRepos
 
-    private val names = listOf("tile-on", "tile-off", "tile-blocked", "tile-fable")
+    private val names = listOf("tile-on", "tile-off", "tile-blocked", "tile-fable", "tile-credit", "tile-nocredit", "tile-crediterr")
 
     @AfterEach
     fun reset() {
@@ -103,6 +106,33 @@ class FrakpanelTileControllerTest {
         }.andReturn().response.contentAsString
         assertFalse("sk-ant" in body || "tile-secret" in body || "example.com" in body || "credential" in body.lowercase())
         assertFalse("tier" in body.lowercase())
+    }
+
+    @Test
+    fun `on - an account with a cycle and grant carries this cycle's API credit, one without none, an error as such`() {
+        tiles.set(true)
+        val anchor = LocalDate.now(java.time.ZoneOffset.UTC).minusDays(3)
+        accounts.add("tile-credit", "anthropic"); accounts.storeKey("tile-credit", ApiKeyKind.ADMIN, "sk-ant-admin01-tile-secret")
+        accounts.setBilling("tile-credit", anchor, 10000); accounts.recordCredit("tile-credit", BigDecimal("2550"), null)
+        accounts.add("tile-nocredit", "anthropic")
+        accounts.add("tile-crediterr", "anthropic"); accounts.setBilling("tile-crediterr", anchor, 5000)
+        accounts.recordCredit("tile-crediterr", null, "cost_report answered 401")
+
+        val body = mvc.get("/frakpanel/tiles/ai-accounts/state").andExpect {
+            status { isOk() }
+            jsonPath("$.accounts[?(@.name=='tile-credit')].credit.grantCents") { value(10000) }
+            jsonPath("$.accounts[?(@.name=='tile-credit')].credit.usedCents") { value(2550.0) }
+            jsonPath("$.accounts[?(@.name=='tile-credit')].credit.remainingCents") { value(7450.0) }
+            jsonPath("$.accounts[?(@.name=='tile-credit')].credit.cycleStart") { value(anchor.toString()) }
+            jsonPath("$.accounts[?(@.name=='tile-credit')].credit.cycleEnd") { isNotEmpty() }
+            jsonPath("$.accounts[?(@.name=='tile-credit')].credit.refreshedAt") { isNotEmpty() }
+            jsonPath("$.accounts[?(@.name=='tile-credit')].credit.error") { value(null as Any?) }
+            jsonPath("$.accounts[?(@.name=='tile-nocredit')].credit") { value(null as Any?) }
+            jsonPath("$.accounts[?(@.name=='tile-crediterr')].credit.grantCents") { value(5000) }
+            jsonPath("$.accounts[?(@.name=='tile-crediterr')].credit.usedCents") { value(null as Any?) }
+            jsonPath("$.accounts[?(@.name=='tile-crediterr')].credit.error") { value("cost_report answered 401") }
+        }.andReturn().response.contentAsString
+        assertFalse("sk-ant" in body || "tile-secret" in body || "keyset" in body.lowercase() || "apikey" in body.lowercase() || "adminkey" in body.lowercase())
     }
 
     @Test
