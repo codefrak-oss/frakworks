@@ -1,5 +1,6 @@
 package com.codefrak.engine.summarize
 
+import com.codefrak.engine.accounts.AccountKey
 import com.codefrak.engine.accounts.ClaudeTokens
 import com.codefrak.engine.accounts.ClaudeUsage
 import com.codefrak.engine.accounts.ClaudeUsageSink
@@ -41,42 +42,42 @@ class SessionSummarizerTest {
     private fun stub(text: String, status: Int = 200) =
         StubAnthropic(status, json.writeValueAsString(mapOf("content" to listOf(mapOf("type" to "text", "text" to text))))).also { stubs += it }
 
-    private fun summarizer(url: String, token: String? = "sk-ant-oat01-sum") = HttpSessionSummarizer({ token }, url, "claude-haiku-4-5")
+    private fun summarizer(url: String, key: AccountKey? = AccountKey("acct-a", "sk-ant-api03-sum")) = HttpSessionSummarizer({ key }, url, "claude-haiku-4-5")
 
     private fun words(s: String) = s.trim().split(Regex("\\s+")).size
 
     @Test
-    fun `the request carries the prompt verbatim, the model, the digest and the OAuth headers`() {
+    fun `the request carries the prompt verbatim, the model, the digest and the account's API key on x-api-key`() {
         val api = stub("""{"summary":"It is storing sessions.","now":"Testing."}""")
         val summary = summarizer(api.url).summarize("Ticket acme/widgets#7, a work run.", "said: hello", "tool Bash: run tests")
         assertEquals(SessionSummary("It is storing sessions.", "Testing."), summary)
 
         val body = api.bodies.single()
         assertEquals("claude-haiku-4-5", body["model"])
-        val system = (body["system"] as List<*>).map { (it as Map<*, *>)["text"] }
-        assertEquals(listOf(HttpSessionSummarizer.CLAUDE_CODE, HttpSessionSummarizer.PROMPT), system)
+        assertEquals(HttpSessionSummarizer.PROMPT, body["system"])
         val user = ((body["messages"] as List<*>).single() as Map<*, *>)["content"] as String
         assertTrue(user.startsWith("Ticket acme/widgets#7, a work run.") && "said: hello" in user, user)
 
         assertTrue(user.endsWith("\n\n${HttpSessionSummarizer.RECENT}\ntool Bash: run tests"), user)
 
         val h = api.headers.single()
-        assertEquals("Bearer sk-ant-oat01-sum", h["authorization"])
-        assertEquals("oauth-2025-04-20", h["anthropic-beta"])
+        assertEquals("sk-ant-api03-sum", h["x-api-key"])
+        assertEquals(null, h["authorization"])
+        assertEquals(null, h["anthropic-beta"])
         assertEquals("2023-06-01", h["anthropic-version"])
     }
 
     /** engine/README.md, "Consumption ledger": the summarizer's call goes in the ledger with its model and tokens, no cost. */
     @Test
-    fun `each summary is recorded in the ledger as the summarizer's with its model and tokens`() {
+    fun `each summary is recorded in the ledger as the summarizer's with its account, model and tokens`() {
         val api = StubAnthropic(reply = json.writeValueAsString(mapOf(
             "content" to listOf(mapOf("type" to "text", "text" to """{"summary":"It works.","now":"Testing."}""")),
             "usage" to mapOf("input_tokens" to 900, "output_tokens" to 30, "cache_read_input_tokens" to 0, "cache_creation_input_tokens" to 5),
         ))).also { stubs += it }
         val recorded = mutableListOf<ClaudeUsage>()
-        HttpSessionSummarizer({ "sk-ant-oat01-sum" }, api.url, "claude-haiku-4-5", ClaudeUsageSink { recorded += it }).summarize("c", "d", "r")
+        HttpSessionSummarizer({ AccountKey("acct-a", "sk-ant-api03-sum") }, api.url, "claude-haiku-4-5", ClaudeUsageSink { recorded += it }).summarize("c", "d", "r")
         val u = recorded.single()
-        assertEquals("summarizer", u.caller); assertEquals("claude-haiku-4-5", u.model)
+        assertEquals("summarizer", u.caller); assertEquals("acct-a", u.account); assertEquals("claude-haiku-4-5", u.model)
         assertEquals(ClaudeTokens(900, 30, 0, 5), u.tokens); assertEquals(null, u.costUsd)
     }
 
@@ -114,17 +115,19 @@ class SessionSummarizerTest {
     }
 
     @Test
-    fun `no credential is SummaryUnavailable and no call is made`() {
+    fun `no account with an API key is SummaryUnavailable naming where to set one, and no call is made`() {
         val api = stub("{}")
-        assertFailsWith<SummaryUnavailable> { summarizer(api.url, token = null).summarize("c", "d", "r") }
+        val e = assertFailsWith<SummaryUnavailable> { summarizer(api.url, key = null).summarize("c", "d", "r") }
+        assertEquals(HttpSessionSummarizer.NO_API_KEY, e.message)
+        assertTrue("PUT /accounts/{name}/api-key" in e.message!! && "API keys" in e.message!!, e.message)
         assertTrue(api.bodies.isEmpty())
     }
 
     @Test
     fun `a refusal, an unreachable provider or an answer that is not the JSON asked for is SummaryFailed`() {
-        val refused = StubAnthropic(401, """{"type":"error","error":{"type":"authentication_error","message":"invalid bearer token"}}""").also { stubs += it }
+        val refused = StubAnthropic(401, """{"type":"error","error":{"type":"authentication_error","message":"invalid x-api-key"}}""").also { stubs += it }
         val e = assertFailsWith<SummaryFailed> { summarizer(refused.url).summarize("c", "d", "r") }
-        assertEquals("anthropic answered 401: invalid bearer token", e.message)
+        assertEquals("anthropic answered 401: invalid x-api-key", e.message)
         assertFailsWith<SummaryFailed> { summarizer("http://127.0.0.1:1").summarize("c", "d", "r") }
         assertFailsWith<SummaryFailed> { summarizer(stub("I cannot tell.").url).summarize("c", "d", "r") }
         assertFailsWith<SummaryFailed> { summarizer(stub("""{"summary":"only this"}""").url).summarize("c", "d", "r") }

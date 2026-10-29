@@ -334,9 +334,13 @@ run fails at "start smith" as an incident with `no account available until
 gate, which still applies on top for `claude-fable-*` models.
 
 **The summarize endpoint's account.** The summarize endpoint ("Summarize: a live run summarized") calls
-Anthropic with the account the picker would choose next among the `anthropic`
-accounts, found by `AiAccounts.peek`: the same order as `pick`, without
-recording the use, so a summary never changes which account the next Smith gets.
+Anthropic's Messages API with an `anthropic` account's API key (sent on
+`x-api-key`), never its Claude Code OAuth token: `AiAccounts.peekApiKey` names
+the enabled `anthropic` account with an API key set, least recently used first,
+without recording the use, so a summary never changes which account the next
+Smith gets. When no such account has one, the endpoint answers 503 saying so
+(set one with `PUT /accounts/{name}/api-key`, or the desktop's Edit… > API keys)
+and makes no Anthropic call; there is no fallback to the OAuth token.
 
 **Which account each tier would get: `GET /tiers/accounts`** (#1260, `tier/TierAccounts.kt`).
 One row per tier of the tier map, tier ascending, each `{tier, model, effort, account,

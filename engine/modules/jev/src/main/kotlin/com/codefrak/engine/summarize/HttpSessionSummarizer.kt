@@ -16,11 +16,10 @@ import java.time.OffsetDateTime
 
 /**
  * One Anthropic `/v1/messages` call per summary, on `engine.summarize.model` (default
- * `claude-haiku-4-5`), sent the way [com.codefrak.engine.accounts.HttpCredentialVerifier]
- * sends it: an OAuth bearer, the oauth beta header, and Claude Code's system
- * line first. The digest and its last turns go as two marked sections; the
+ * `claude-haiku-4-5`), sent with an `anthropic` account's API key on `x-api-key`
+ * ([SummaryCredential]), never a Claude Code OAuth token. The digest and its last turns go as two marked sections; the
  * model answers JSON `{"summary","now"}`, and the word limits are
- * enforced on what comes back. The token goes nowhere else and is never logged.
+ * enforced on what comes back. The key goes nowhere else and is never logged.
  */
 @Component
 class HttpSessionSummarizer(
@@ -33,12 +32,10 @@ class HttpSessionSummarizer(
     private val client: HttpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build()
 
     override fun summarize(context: String, digest: String, recent: String): SessionSummary {
-        val token = credential.anthropic()
-            ?: throw SummaryUnavailable("no enabled anthropic account with a credential to summarize with")
+        val key = credential.anthropic() ?: throw SummaryUnavailable(NO_API_KEY)
         val request = HttpRequest.newBuilder(URI(upstream.trimEnd('/') + "/v1/messages"))
-            .header("authorization", "Bearer $token")
+            .header("x-api-key", key.key)
             .header("anthropic-version", "2023-06-01")
-            .header("anthropic-beta", "oauth-2025-04-20")
             .header("content-type", "application/json")
             .timeout(Duration.ofSeconds(15)) // under the desktop app's 20 s, so its answer is the engine's
             .POST(HttpRequest.BodyPublishers.ofString(body(context, digest, recent))).build()
@@ -46,17 +43,17 @@ class HttpSessionSummarizer(
         val response = try { client.send(request, HttpResponse.BodyHandlers.ofString()) }
             catch (e: Exception) { throw SummaryFailed("could not reach anthropic: ${e.message ?: e.javaClass.simpleName}") }
         // No cost: the engine has no price table (#1009).
-        usage.record(ClaudeUsage(caller = "summarizer", model = model, ended = OffsetDateTime.now(),
+        usage.record(ClaudeUsage(caller = "summarizer", account = key.account, model = model, ended = OffsetDateTime.now(),
             durationMs = (System.nanoTime() - sent) / 1_000_000, tokens = ClaudeTokens.ofReply(response.body())))
         if (response.statusCode() !in 200..299) throw SummaryFailed("anthropic answered ${response.statusCode()}: ${reason(response.body())}")
         return parse(response.body()).limited()
     }
 
-    /** The request body: [CLAUDE_CODE] then [PROMPT] as the system; the context, digest and [RECENT] section as the one user turn. */
+    /** The request body: [PROMPT] as the system; the context, digest and [RECENT] section as the one user turn. */
     fun body(context: String, digest: String, recent: String): String = engineJson.writeValueAsString(linkedMapOf(
         "model" to model,
         "max_tokens" to 400,
-        "system" to listOf(mapOf("type" to "text", "text" to CLAUDE_CODE), mapOf("type" to "text", "text" to PROMPT)),
+        "system" to PROMPT,
         "messages" to listOf(mapOf("role" to "user", "content" to "$context\n\nThe session so far:\n$digest\n\n$RECENT\n$recent")),
     ))
 
@@ -78,8 +75,9 @@ class HttpSessionSummarizer(
     }.getOrNull() ?: body.take(200).ifBlank { "no reason given" }
 
     companion object {
-        /** An OAuth token is for Claude Code: its system line goes first. */
-        const val CLAUDE_CODE = "You are Claude Code, Anthropic's official CLI for Claude."
+        /** The 503's message when no `anthropic` account has an API key. */
+        const val NO_API_KEY = "no enabled Anthropic account has an API key to summarize with: set one with " +
+            "PUT /accounts/{name}/api-key, or in the desktop app under Edit… > API keys"
 
         /** What the model is asked; a test asserts this is what is sent. */
         const val PROMPT = """You are watching an autonomous coding agent (a "Smith") work a ticket, and you tell a person watching it what it is up to.

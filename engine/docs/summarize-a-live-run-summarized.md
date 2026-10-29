@@ -43,12 +43,16 @@ model to answer `now` from that section only. It writes nothing.
 | 404 | The repo is not a target repo. |
 | 409 | No Smith is running on the ticket, or it has written nothing yet. |
 | 502 | The provider failed or did not answer the JSON asked for. |
-| 503 | No enabled `anthropic` account with a credential, or the sandbox lookup failed. |
+| 503 | No enabled `anthropic` account has an API key (the message names `PUT /accounts/{name}/api-key` and the desktop's Edit… > API keys), or the sandbox lookup failed. |
 
 **The model and the account.** One Anthropic `/v1/messages` call
 (`summarize/HttpSessionSummarizer.kt`) to `engine.summarize.model`
 (`ENGINE_SUMMARIZE_MODEL`, default `claude-haiku-4-5`) at `engine.anthropic.upstream`,
-with a 15 s timeout (under the desktop's 20 s). It bills to an `anthropic`
-account in `engine.ai_account` ("AI accounts"): the one the picker would choose
-next, read with `AiAccounts.peek`, which does not touch `last_used_at`, so a
-summary does not move the Smiths' rotation. No new secret or provider.
+with a 15 s timeout (under the desktop's 20 s). It sends an `anthropic`
+account's API key (`engine.ai_account.api_key`, "AI accounts") on `x-api-key`,
+never the account's Claude Code OAuth token: `AiAccounts.peekApiKey` reads the
+enabled account with a key, least recently used first, without touching
+`last_used_at`, so a summary does not move the Smiths' rotation. With no such
+key it answers 503 and calls nothing. Each answered call goes in the
+consumption ledger as caller `summarizer`, naming the account; its spend counts
+toward the account's API credit used.
