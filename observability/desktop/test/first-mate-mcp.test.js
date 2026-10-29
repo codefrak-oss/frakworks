@@ -36,7 +36,7 @@ const start = async (mcpServersFn) => {
     submitIntakeFn: async () => ({ ok: true, intakeId: "intake-1" }),
     resolveTierFn: () => ({ model: "sonnet", effort: "medium" }),
     fetchFlowFn: async () => ({ error: "no engine in tests" }),
-    engineEnvFn: async () => ({ ENGINE_URL: "http://127.0.0.1:9" }),
+    engineEnvFn: async () => ({ engineUrl: "http://127.0.0.1:9" }),
     repoFn: () => REPO,
     mcpServersFn: async (repo) => { asked.push(repo); return mcpServersFn(repo); },
   }).init();
@@ -118,7 +118,7 @@ test("the written config carries the token from engineEnvFn's ENGINE_TOKEN, mode
     submitIntakeFn: async () => ({ ok: true, intakeId: "intake-1" }),
     resolveTierFn: () => ({ model: "sonnet", effort: "medium" }),
     fetchFlowFn: async () => ({ error: "no engine in tests" }),
-    engineEnvFn: async () => ({ ENGINE_URL: "http://127.0.0.1:9", ENGINE_TOKEN: token }),
+    engineEnvFn: async () => ({ engineUrl: "http://127.0.0.1:9", ENGINE_TOKEN: token }),
     repoFn: () => REPO,
     mcpServersFn: async () => ({ servers: {} }),
   }).init();
@@ -146,7 +146,7 @@ test("a server added, then removed, for the same repo reaches the next child sta
   let servers = {};
   let asks = 0;
   const m = new FirstMateManager({ dir, command: "true", launchArgs: [], cwd: dir, freshDir: dir,
-    engineEnvFn: async () => ({ ENGINE_URL: "http://127.0.0.1:9" }), repoFn: () => "acme/w",
+    engineEnvFn: async () => ({ engineUrl: "http://127.0.0.1:9" }), repoFn: () => "acme/w",
     mcpServersFn: async () => { asks++; return { servers }; } }).init();
   await m._ensureMcpConfig("acme/w");
   assert.deepEqual(m.repoServerNames, []);

@@ -20,7 +20,7 @@ test("new conversation + picker repo before first message -> clone cwd and repo 
   const m = new FirstMateManager({
     dir, command, launchArgs, cwd: freshDir, freshDir,
     submitIntakeFn: async () => ({ ok: true }), resolveTierFn: () => ({ model: "sonnet", effort: "medium" }),
-    fetchFlowFn: async () => ({ error: "x" }), engineEnvFn: async () => ({ ENGINE_URL: "http://127.0.0.1:9" }),
+    fetchFlowFn: async () => ({ error: "x" }), engineEnvFn: async () => ({ engineUrl: "http://127.0.0.1:9" }),
     repoFn: () => null, // switcher on All repos
     mcpServersFn: async (r) => { asked.push(r); return { servers: { ops: { type: "http", url: "https://x/mcp", headers: {} } } }; },
   }).init();
@@ -70,7 +70,7 @@ test("switcher repo picked before Start new conversation -> the new chat's cwd a
   const m = new FirstMateManager({
     dir, command, launchArgs, cwd: freshDir, freshDir,
     submitIntakeFn: async () => ({ ok: true }), resolveTierFn: () => ({ model: "sonnet", effort: "medium" }),
-    fetchFlowFn: async () => ({ error: "x" }), engineEnvFn: async () => ({ ENGINE_URL: "http://127.0.0.1:9" }),
+    fetchFlowFn: async () => ({ error: "x" }), engineEnvFn: async () => ({ engineUrl: "http://127.0.0.1:9" }),
     repoFn: () => "acme/widgets", // switcher set first
     mcpServersFn: async () => ({ servers: { ops: { type: "http", url: "https://x/mcp", headers: {} } } }),
   }).init();

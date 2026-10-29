@@ -62,7 +62,22 @@ const { fetchNeeds, fetchHitlpTasks, fetchHitlpTask } = require("./needs-you");
 const { createHitlpSurface, FILE: HITLP_SURFACE_FILE } = require("./hitlp-surface");
 const repoSelection = require("./repo-selection");
 const { fetchTicketTree, fetchDoneTickets } = require("./ticket-tree");
-const { trustSystemCAs, fetchIssues, fetchFlow, fetchAccounts, fetchTierAccounts, pickAccount, fetchRefinerTier, fetchSmithHosting, fetchFirstMateHosting, fetchFrakpanelTiles, fetchSecurityTier, fetchCheckTier, accountAction, engineUrl, fetchProcessInstances, fetchProcessTree, fetchProcessXml, retryIncident, cancelFlow, fetchIncidentFixes, fetchDoctorHistory, fetchDoctorRuns, fetchDoctorBugs, fetchConsumption, fetchCiRuns, startIncidentFix, startIncidentPropose, teachJudge, uploadAttachment, submitIntake, fetchTicketTimeline, summarizeTicket, predictReview, fetchTicketDetail, fetchChanges, fetchTicketPitch, fetchDesignDeck, fetchProposals, fetchProposalPage, fetchRepoTree, fetchRepoFile, fetchJevCalls, fetchJevCall, fetchJevSummary, fetchSshVerdicts, fetchFrictionSummary, fetchFrictionNotes, fetchFrictionGroups, frictionPullOut, frictionNotTwoThings, frictionMerge, frictionFix, fetchRepoRows, requestSetupCheck, repoAction, fetchEngineAccess, engineAccessAction, fetchRepoNames, fetchSavedChats, fetchSavedChat, saveChat, deleteSavedChat, fetchJobs, registerJob, executeJob, deleteJob, fetchRefactorConfig, saveRefactorConfig, fetchJobRuns, fetchActiveBuilds, fetchRepoMcpServers, saveRepoMcpServer, deleteRepoMcpServer, testRepoMcpServer, fetchRepoMcpConfig, fetchLineage } = require("./engine-data");
+const { trustSystemCAs, fetchIssues, fetchFlow, fetchAccounts, fetchTierAccounts, pickAccount, fetchRefinerTier, fetchSmithHosting, fetchFirstMateHosting, fetchFrakpanelTiles, fetchSecurityTier, fetchCheckTier, accountAction, engineUrl, fetchProcessInstances, fetchProcessTree, fetchProcessXml, retryIncident, cancelFlow, fetchIncidentFixes, fetchDoctorHistory, fetchDoctorRuns, fetchDoctorBugs, fetchConsumption, fetchCiRuns, startIncidentFix, startIncidentPropose, teachJudge, uploadAttachment, submitIntake, fetchTicketTimeline, summarizeTicket, predictReview, fetchTicketDetail, fetchChanges, fetchTicketPitch, fetchDesignDeck, fetchProposals, fetchProposalPage, fetchRepoTree, fetchRepoFile, fetchJevCalls, fetchJevCall, fetchJevSummary, fetchSshVerdicts, fetchFrictionSummary, fetchFrictionNotes, fetchFrictionGroups, frictionPullOut, frictionNotTwoThings, frictionMerge, frictionFix, fetchRepoRows, requestSetupCheck, repoAction, fetchEngineAccess, engineAccessAction, fetchRepoNames, fetchSavedChats, fetchSavedChat, saveChat, deleteSavedChat, fetchJobs, registerJob, executeJob, deleteJob, fetchRefactorConfig, saveRefactorConfig, fetchJobRuns, fetchActiveBuilds, fetchRepoMcpServers, saveRepoMcpServer, deleteRepoMcpServer, testRepoMcpServer, fetchRepoMcpConfig, fetchLineage, setEngineUrl } = require("./engine-data");
+// Config > frakworks > Engine URL (#100144, src/engine-url-setting.js): read
+// once here, before anything below reaches the engine; no default. A save
+// relaunches the app, so every connection and client starts on the new URL.
+const engineUrlSetting = require("./engine-url-setting");
+const engineUrlFile = () => path.join(app.getPath("userData"), engineUrlSetting.FILE_NAME);
+setEngineUrl(engineUrlSetting.load(engineUrlFile()));
+if (!engineUrl()) console.log("[engine] no engine URL set: no engine call until one is entered under Config > frakworks > Engine URL");
+ipcMain.handle("engine-url:setting", () => ({ url: engineUrl() }));
+ipcMain.handle("engine-url:set", (_e, url) => {
+  const r = engineUrlSetting.save(engineUrlFile(), url);
+  if (r.error) return r;
+  console.log(`[engine] engine URL: ${r.url || "cleared"}; relaunching`);
+  setImmediate(() => { app.relaunch(); app.exit(0); });
+  return r;
+});
 const { probeStdio } = require("./mcp-stdio-probe");
 const { savedChatView, resumability } = require("./saved-chats");
 const claudeCode = require("./claude-code-sessions");
@@ -73,8 +88,8 @@ const appVersion = require("./app-version");
 const appUpdate = require("./app-update");
 const engineUpdate = require("./engine-update");
 const updatePreview = require("./update-preview");
-// An https ENGINE_URL (an engine on a cluster) is signed by a CA the system trusts, not Node's bundled list.
-try { if (!trustSystemCAs()) console.log("[engine] this Node cannot add the system's CAs; an https ENGINE_URL needs a public CA"); }
+// An https engine URL (an engine on a cluster) is signed by a CA the system trusts, not Node's bundled list.
+try { if (!trustSystemCAs()) console.log("[engine] this Node cannot add the system's CAs; an https engine URL needs a public CA"); }
 catch (e) { console.log(`[engine] system CAs not added: ${(e && e.message) || e}`); }
 const updateProgress = require("./engine-update-progress");
 const updateChanges = require("./engine-update-changes");
@@ -1158,7 +1173,7 @@ function registerFirstMateIpc(win) {
     // Authorization header from the 0600 config only: main to first-mate.js,
     // never the child's env or a log. The token names First mate's login.
     engineEnvFn: async () => ({
-      ENGINE_URL: engineUrl(),
+      engineUrl: engineUrl(),
       ENGINE_TOKEN: engineToken.signedIn() ? engineToken.bearer().slice("Bearer ".length) : undefined,
     }),
     // Open in Claude Code (#820): whether iTerm2 is here, read once at
@@ -1848,12 +1863,12 @@ app.whenReady().then(() => {
   engineToken.load();
   const win = createWindow();
   screenshotAllowed = screenshot.load(screenshotFile());
-  desktopChannel.start();
+  if (engineUrl()) desktopChannel.start();
   app.on("browser-window-focus", () => desktopChannel.report({ focused: true }));
   ensureSelection();
   if (updater) { updater.check(); setInterval(() => updater.check(), appUpdate.CHECK_MS); }
   else { fetchOrigin(); setInterval(fetchOrigin, appVersion.FETCH_MS); }
-  engineUpdater.check(); setInterval(() => engineUpdater.check(), engineUpdate.CHECK_MS);
+  if (engineUrl()) { engineUpdater.check(); setInterval(() => engineUpdater.check(), engineUpdate.CHECK_MS); }
   registerFirstMateIpc(win);
   ipcMain.on("fleet:rendered", async (_e, state) => {
     console.log(`[fleet] rendered: ${state.kind}${state.message ? ` — ${state.message}` : ""}`);

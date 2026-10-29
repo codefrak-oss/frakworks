@@ -43,7 +43,7 @@ const harness = () => {
   return { run, unmount };
 };
 const tick = (ms = 0) => new Promise((r) => setTimeout(r, ms));
-const DOWN = "engine unreachable at http://localhost:8090/saved-chats: fetch failed";
+const DOWN = "engine unreachable at http://engine.test/saved-chats: fetch failed";
 
 // window.fleet with the stream push, a savedChats() that fails until `up`, and savedChat().
 const fakeFleet = () => {

@@ -2,6 +2,9 @@
 // and saving `GET`/`PUT /settings/first-mate-hosting` against a stand-in fetch,
 // main's and preload's IPC, and first-mate-hosting.jsx drawing and saving it.
 "use strict";
+// Config > frakworks > Engine URL, as main sets it at launch (src/engine-url-setting.js).
+const TEST_ENGINE_URL = "http://engine.test";
+require("../src/engine-data").setEngineUrl(TEST_ENGINE_URL);
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
@@ -32,7 +35,7 @@ const walk = (el, out = []) => {
 test("fetchFirstMateHosting reads GET /settings/first-mate-hosting; a failed or odd answer is the error", async () => {
   const { calls, fetch } = recorder(200, { ...SETTINGS, hosting: "kubernetes" });
   assert.deepEqual(await fetchFirstMateHosting({ env: {}, fetch }), { firstMateHosting: { hosting: "kubernetes" }, error: null });
-  assert.equal(calls[0].url, "http://localhost:8090/settings/first-mate-hosting");
+  assert.equal(calls[0].url, "http://engine.test/settings/first-mate-hosting");
   assert.match((await fetchFirstMateHosting({ env: {}, fetch: recorder(500, "boom").fetch })).error, /500/);
   assert.match((await fetchFirstMateHosting({ env: {}, fetch: recorder(200, { hosting: "vm" }).fetch })).error, /local or kubernetes/);
   assert.ok((await fetchFirstMateHosting({ env: {}, fetch: recorder(0, new Error("ECONNREFUSED")).fetch })).error);
@@ -42,7 +45,7 @@ test("the first-mate-hosting action is PUT /settings/first-mate-hosting with the
   const { calls, fetch } = recorder(200, { ...SETTINGS, hosting: "kubernetes", extra: 1 });
   const r = await accountAction({ op: "first-mate-hosting", hosting: "kubernetes" }, { env: {}, fetch });
   assert.deepEqual(r, { ok: true, status: 200, firstMateHosting: { hosting: "kubernetes" } });
-  assert.deepEqual(calls, [{ url: "http://localhost:8090/settings/first-mate-hosting", method: "PUT", body: { hosting: "kubernetes" } }]);
+  assert.deepEqual(calls, [{ url: "http://engine.test/settings/first-mate-hosting", method: "PUT", body: { hosting: "kubernetes" } }]);
 });
 
 test("a hosting that is neither local nor kubernetes is refused before any request; the engine's 400 is said back", async () => {

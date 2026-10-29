@@ -194,6 +194,9 @@ function createWebFleet({ storage, prefs, persist, win = null, stream = null, fi
     // A screenshot is of the desktop app's window (#100105): the web page has none to give.
     screenshotSetting: () => Promise.resolve({ allowed: false, error: OMITTED }),
     setScreenshotSetting: () => Promise.resolve({ allowed: false, error: OMITTED }),
+    // The engine URL is the desktop's setting (#100144): the page's engine is its own origin.
+    engineUrlSetting: () => Promise.resolve({ url: null, error: OMITTED }),
+    setEngineUrlSetting: () => Promise.resolve({ error: OMITTED }),
     teachJudge: omitted,
     // Config > frakworks > HITLP server (#2489): verified with GET /tasks, kept in
     // sessionStorage; status answers the URL alone, never the credential.

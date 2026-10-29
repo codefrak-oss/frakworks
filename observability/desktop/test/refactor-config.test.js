@@ -9,7 +9,7 @@ const { renderToStaticMarkup } = require("react-dom/server");
 const { fetchRefactorConfig, saveRefactorConfig, fetchJobRuns } = require("../src/engine-data");
 const { schedulePreset, presetSeconds, configForm, refactorPatch, saveRefactor, saveRefactorPage, RefactorView, SCHEDULE_PRESETS } = require("../dist/refactor-config.cjs");
 
-const env = { ENGINE_URL: "http://engine.test" };
+const env = { engineUrl: "http://engine.test" };
 const CONFIG = { repo: "acme/widgets", enabled: false, schedule: 604800, values: "shipped", valuesDefault: "shipped",
   maxTickets: 2, maxLines: 300, approval: "human", jobId: null, updatedAt: null, updatedBy: null, tier: null };
 const stub = (status, body) => {

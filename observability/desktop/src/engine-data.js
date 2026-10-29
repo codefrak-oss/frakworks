@@ -7,26 +7,38 @@
 // down, a non-2xx, a body that is not JSON, a timeout) becomes `{ error }`,
 // which the renderer draws in its `.err` block.
 //
+// The engine's URL is the Config > frakworks > Engine URL setting
+// (src/engine-url-setting.js), which main hands over with setEngineUrl: there
+// is no default. Unset, every call below answers NO_ENGINE_PROMPT and fetches
+// nothing.
+//
 // Environment:
-//   ENGINE_URL             the engine (default http://localhost:8090, the
-//                          local stack's published port; or an https URL,
-//                          an engine on a cluster, see trustSystemCAs)
 //   ENGINE_TIMEOUT_SECS    per-request timeout (default 20)
 "use strict";
 
 const { credentialProblem } = require("./credential-rules");
 
-const DEFAULT_ENGINE_URL = "http://localhost:8090";
 const DEFAULT_TIMEOUT_SECS = 20;
 /** A repo's child-work modes (engine/README.md, "Split features"), the values `childMode` takes. */
 const CHILD_MODES = Object.freeze(["serial", "parallel", "live"]);
 
 // In a browser page (the web version, src/web/) there is no `process`: the
 // engine is the page's own origin, so every URL below is a relative path.
-const PAGE_ENV = Object.freeze({ ENGINE_URL: "" });
+const PAGE_ENV = Object.freeze({ engineUrl: "" });
 const PROCESS_ENV = typeof process !== "undefined" && process.env ? process.env : PAGE_ENV;
 
-const engineUrl = (env = PROCESS_ENV) => (env === PAGE_ENV ? "" : (env.ENGINE_URL || DEFAULT_ENGINE_URL)).replace(/\/+$/, "");
+// The setting's value, set by main (setEngineUrl) at launch and on a save.
+let configuredUrl = null;
+function setEngineUrl(url) { configuredUrl = typeof url === "string" && url.trim() ? url.trim().replace(/\/+$/, "") : null; }
+const NO_ENGINE_PROMPT = "no engine URL set: enter the engine's URL under Config > frakworks > Engine URL";
+
+// The base URL, or null while none is set. An `env` other than this process's
+// may carry `engineUrl` (tests, and PAGE_ENV's relative ""); process.env never does.
+const engineUrl = (env = PROCESS_ENV) => {
+  const u = env && env !== PROCESS_ENV && "engineUrl" in env ? env.engineUrl : configuredUrl;
+  if (env === PAGE_ENV) return "";
+  return typeof u === "string" && u ? u.replace(/\/+$/, "") : null;
+};
 const timeoutMs = (env = PROCESS_ENV) => Number(env.ENGINE_TIMEOUT_SECS || DEFAULT_TIMEOUT_SECS) * 1000;
 
 // The bearer token (#2206): main sets
@@ -50,7 +62,7 @@ const signInError = (status, what) => (status === 401 ? `${SIGN_IN_PROMPT} (engi
 /**
  * Adds the system's trusted CAs (the macOS keychain, the OS store) to the ones
  * Node's fetch trusts, which are only its bundled Mozilla list: an
- * `ENGINE_URL` like https://engine.k8s.example, signed by a lab CA the machine
+ * engine URL like https://engine.k8s.example, signed by a lab CA the machine
  * trusts, then works like any other. Returns whether it could; a Node without
  * `tls.setDefaultCACertificates` keeps the bundled list.
  */
@@ -79,10 +91,11 @@ async function fetchRetrying(fetch, url, init, delayMs = RETRY_DELAY_MS) {
 }
 
 /**
- * GET <ENGINE_URL><path>, parsed. Resolves to { value } or { error }; never
+ * GET <engine URL><path>, parsed. Resolves to { value } or { error }; never
  * rejects. `fetch` is injectable so tests run without a server.
  */
 async function getJson(path, { env = PROCESS_ENV, fetch = globalThis.fetch, retryDelayMs } = {}) {
+  if (engineUrl(env) == null) return { error: NO_ENGINE_PROMPT };
   const url = `${engineUrl(env)}${path}`;
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), timeoutMs(env));
@@ -170,7 +183,7 @@ async function fetchAccounts(opts = {}) {
 }
 
 /**
- * A write to the engine: <method> <ENGINE_URL><path> with a JSON body.
+ * A write to the engine: <method> <engine URL><path> with a JSON body.
  * Resolves to { ok: true, status } or { error }; never rejects. The body is
  * never echoed into the error, since it may carry a credential.
  */
@@ -178,6 +191,7 @@ async function fetchAccounts(opts = {}) {
 // `keep` adds the engine's `status` and whole `body` text to an error, for a
 // view that shows the engine's answer verbatim (Config > Jobs).
 async function sendJson(method, path, body, { env = PROCESS_ENV, fetch = globalThis.fetch, parse = false, headers = null, keep = false, retryDelayMs } = {}) {
+  if (engineUrl(env) == null) return { error: NO_ENGINE_PROMPT };
   const url = `${engineUrl(env)}${path}`;
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), timeoutMs(env));
@@ -677,6 +691,7 @@ async function fetchProcessTree(instance, opts = {}) {
 async function fetchProcessXml(definitionId, { env = PROCESS_ENV, fetch = globalThis.fetch } = {}) {
   if (typeof definitionId !== "string" || !DEFINITION_ID.test(definitionId)) return { error: `not a process definition id: ${JSON.stringify(definitionId)}` };
   const path = `/camunda/definitions/${encodeURIComponent(definitionId)}/xml`;
+  if (engineUrl(env) == null) return { error: NO_ENGINE_PROMPT };
   const url = `${engineUrl(env)}${path}`;
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), timeoutMs(env));
@@ -925,6 +940,7 @@ async function submitIntake(ask, submittedBy = undefined, { env = PROCESS_ENV, f
   if (repo === undefined || repo === null) return { error: "an ask needs the repo to file in (owner/name)" };
   if (typeof repo !== "string" || !REPO_FULL.test(repo)) return { error: `not an owner/name repo: ${JSON.stringify(repo)}` };
   body.repo = repo;
+  if (engineUrl(env) == null) return { error: NO_ENGINE_PROMPT };
   const url = `${engineUrl(env)}/intake`;
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), timeoutMs(env));
@@ -1197,6 +1213,7 @@ async function fetchRepoFile(owner, repo, path, ref, { env = PROCESS_ENV, fetch 
   if (!validRepoPath(path)) return { error: `not a file path: ${JSON.stringify(path)}` };
   const q = `?path=${encodeURIComponent(path)}${ref ? `&ref=${encodeURIComponent(ref)}` : ""}`;
   const at = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/file`;
+  if (engineUrl(env) == null) return { error: NO_ENGINE_PROMPT };
   const url = `${engineUrl(env)}${at}${q}`;
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), timeoutMs(env));
@@ -2082,6 +2099,7 @@ async function fetchRepoMcpConfig(repo, opts = {}) {
  */
 async function fetchWhoAmI(token, { env = PROCESS_ENV, fetch = globalThis.fetch } = {}) {
   if (typeof token !== "string" || !token.trim()) return { error: "no token to verify" };
+  if (engineUrl(env) == null) return { error: NO_ENGINE_PROMPT };
   const url = `${engineUrl(env)}/whoami`;
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), timeoutMs(env));
@@ -2143,7 +2161,7 @@ async function revokeToken(id, opts = {}) {
   return r.error ? { error: r.error } : { ok: true };
 }
 
-module.exports = { fetchDesignDeck, fetchRetrying, RETRY_DELAY_MS, fetchPublicUrl, mintPhoneToken, fetchTokens, revokeToken, PAGE_ENV, setBearer, authHeaders, SIGN_IN_PROMPT, fetchWhoAmI, teachJudge, fetchRepoMcpServers, saveRepoMcpServer, deleteRepoMcpServer, testRepoMcpServer, fetchRepoMcpConfig, trustSystemCAs, fetchActiveBuilds, fetchIssues, fetchFlow, INSTANCE_ID, MAX_VARIABLE_CHARS, fetchAccounts, pickAccount, fetchRefinerTier, setRefinerTier, fetchSmithHosting, setSmithHosting, SMITH_HOSTINGS, fetchFirstMateHosting, setFirstMateHosting, FIRST_MATE_HOSTINGS, startFirstMateSession, sendFirstMateMessage, endFirstMateSession, fetchFirstMateTranscript, fetchFrakpanelTiles, setFrakpanelTiles, fetchTiers, fetchTierAccounts, setTier, fetchSecurityTier, setSecurityTier, fetchCheckTier, setCheckTier, accountAction, MAX_EMAIL_CHARS, sendJson, ACCOUNT_NAME, PROVIDERS, getJson, engineUrl, DEFAULT_ENGINE_URL, DEFAULT_TIMEOUT_SECS,
+module.exports = { fetchDesignDeck, fetchRetrying, RETRY_DELAY_MS, fetchPublicUrl, mintPhoneToken, fetchTokens, revokeToken, PAGE_ENV, setBearer, authHeaders, SIGN_IN_PROMPT, fetchWhoAmI, teachJudge, fetchRepoMcpServers, saveRepoMcpServer, deleteRepoMcpServer, testRepoMcpServer, fetchRepoMcpConfig, trustSystemCAs, fetchActiveBuilds, fetchIssues, fetchFlow, INSTANCE_ID, MAX_VARIABLE_CHARS, fetchAccounts, pickAccount, fetchRefinerTier, setRefinerTier, fetchSmithHosting, setSmithHosting, SMITH_HOSTINGS, fetchFirstMateHosting, setFirstMateHosting, FIRST_MATE_HOSTINGS, startFirstMateSession, sendFirstMateMessage, endFirstMateSession, fetchFirstMateTranscript, fetchFrakpanelTiles, setFrakpanelTiles, fetchTiers, fetchTierAccounts, setTier, fetchSecurityTier, setSecurityTier, fetchCheckTier, setCheckTier, accountAction, MAX_EMAIL_CHARS, sendJson, ACCOUNT_NAME, PROVIDERS, getJson, engineUrl, setEngineUrl, NO_ENGINE_PROMPT, DEFAULT_TIMEOUT_SECS,
   fetchProcessInstances, fetchProcessTree, fetchProcessXml, ISSUE_URL, DEFINITION_ID, retryIncident, cancelFlow, GITHUB_LOGIN,
   fetchIncidentFixes, fetchDoctorHistory, fetchDoctorRuns, fetchDoctorBugs, fetchConsumption, CONSUMPTION_WINDOWS, fetchCiRuns, ISO_INSTANT, startIncidentFix, startIncidentPropose, uploadAttachment,
   submitIntake, MAX_ASK_CHARS, fetchLineage,

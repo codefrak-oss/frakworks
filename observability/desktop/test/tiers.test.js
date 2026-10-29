@@ -2,6 +2,9 @@
 // read and written through src/engine-data.js (GET/PUT /tiers, GET/PUT
 // /security/tier), main's copy in src/engine-tiers.js, and tiers.jsx's section.
 "use strict";
+// Config > frakworks > Engine URL, as main sets it at launch (src/engine-url-setting.js).
+const TEST_ENGINE_URL = "http://engine.test";
+require("../src/engine-data").setEngineUrl(TEST_ENGINE_URL);
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
@@ -30,7 +33,7 @@ test("fetchTiers reads GET /tiers and gives the rows sorted, each model as its s
   const { calls, fetch } = recorder(200, JSON.stringify([...ENGINE_ROWS].reverse()));
   const r = await fetchTiers({ env: {}, fetch });
   assert.deepEqual(r.tiers, SEEDED_TIERS);
-  assert.equal(calls[0].url, "http://localhost:8090/tiers");
+  assert.equal(calls[0].url, "http://engine.test/tiers");
   assert.match((await fetchTiers({ env: {}, fetch: recorder(200, "{}").fetch })).error, /not a list/);
   assert.match((await fetchTiers({ env: {}, fetch: recorder(503, "down").fetch })).error, /503/);
 });
@@ -39,7 +42,7 @@ test("setTier sends PUT /tiers/<n> with the model and effort; a bad tier or an e
   const { calls, fetch } = recorder(200, JSON.stringify({ tier: 6, model: "claude-fable-5-1", effort: "max" }));
   const r = await accountAction({ op: "tier", tier: 6, model: "fable", effort: "max" }, { env: {}, fetch });
   assert.deepEqual(r, { ok: true, status: 200, row: { tier: 6, model: "fable", effort: "max" } });
-  assert.deepEqual(calls, [{ url: "http://localhost:8090/tiers/6", method: "PUT", body: { model: "fable", effort: "max" } }]);
+  assert.deepEqual(calls, [{ url: "http://engine.test/tiers/6", method: "PUT", body: { model: "fable", effort: "max" } }]);
   const none = recorder();
   for (const tier of [0, 11, 5.5, "5", null]) assert.match((await setTier(tier, "opus", "low", { env: {}, fetch: none.fetch })).error, /integer from 1 to 10/);
   assert.match((await setTier(3, "", "low", { env: {}, fetch: none.fetch })).error, /model is empty/);
@@ -55,18 +58,18 @@ test("the security tier is read from and written to /security/tier", async () =>
   const { calls, fetch } = recorder(200, JSON.stringify({ tier: 9, model: "claude-fable-5-1", effort: "medium" }));
   const r = await accountAction({ op: "security-tier", tier: 9 }, { env: {}, fetch });
   assert.equal(r.securityTier.tier, 9);
-  assert.deepEqual(calls, [{ url: "http://localhost:8090/security/tier", method: "PUT", body: { tier: 9 } }]);
+  assert.deepEqual(calls, [{ url: "http://engine.test/security/tier", method: "PUT", body: { tier: 9 } }]);
   assert.match((await setSecurityTier(11, { env: {}, fetch })).error, /integer from 1 to 10/);
 });
 
 test("the post-deployment check tier is read from and written to /check/tier", async () => {
   const read = recorder(200, JSON.stringify({ tier: 4, model: "claude-opus-5-5", effort: "low" }));
   assert.deepEqual((await fetchCheckTier({ env: {}, fetch: read.fetch })).checkTier, { tier: 4, model: "opus", effort: "low" });
-  assert.equal(read.calls[0].url, "http://localhost:8090/check/tier");
+  assert.equal(read.calls[0].url, "http://engine.test/check/tier");
   const { calls, fetch } = recorder(200, JSON.stringify({ tier: 2, model: "claude-sonnet-5", effort: "low" }));
   const r = await accountAction({ op: "check-tier", tier: 2 }, { env: {}, fetch });
   assert.equal(r.checkTier.tier, 2);
-  assert.deepEqual(calls, [{ url: "http://localhost:8090/check/tier", method: "PUT", body: { tier: 2 } }]);
+  assert.deepEqual(calls, [{ url: "http://engine.test/check/tier", method: "PUT", body: { tier: 2 } }]);
   assert.match((await setCheckTier(0, { env: {}, fetch })).error, /integer from 1 to 10/);
   assert.match((await fetchCheckTier({ env: {}, fetch: recorder(503, "down").fetch })).error, /503/);
 });

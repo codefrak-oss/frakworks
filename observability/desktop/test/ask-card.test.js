@@ -52,7 +52,7 @@ test("uploadAttachment posts name, mime, base64 content (no by) to /intake/<id>/
   const id = "0a1b2c3d-0000-0000-0000-000000000001";
   let seen;
   const fetch = async (url, init) => { seen = { url, init }; return { ok: true, status: 200, text: async () => "{}" }; };
-  const r = await uploadAttachment(id, { name: "spec.md", mime: "text/markdown", content: "IyBTcGVj" }, "lundmatt1", { env: { ENGINE_URL: "http://e:1" }, fetch });
+  const r = await uploadAttachment(id, { name: "spec.md", mime: "text/markdown", content: "IyBTcGVj" }, "lundmatt1", { env: { engineUrl: "http://e:1" }, fetch });
   assert.equal(r.ok, true);
   assert.equal(seen.url, `http://e:1/intake/${id}/attachments`);
   assert.deepEqual(JSON.parse(seen.init.body), { name: "spec.md", content: "IyBTcGVj", mime: "text/markdown" });

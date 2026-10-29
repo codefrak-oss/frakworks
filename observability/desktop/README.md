@@ -39,7 +39,7 @@ mate](#first-mate-a-persistent-chat-strip-on-every-screen-issue-100) and
 | Path | Purpose |
 |---|---|
 | `src/main.js` | Electron main process: one `BrowserWindow` (`contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`), the IPC handlers (the channels `test/navigation.test.js` lists, all but `fleet:rendered` and `log:error` an `invoke`) — `ticket:fetch`, `transcript:fetch`, `needs:fetch`, `tree:tickets`, `tree:done`, `repo:get`, `repo:set`, `app:initial-view`, `app:version`, `app:restart`, the seventy-seven `engine:*` reads and writes, the sixteen `firstMate:*` channels, the two `grafana:*` ones, the two `env:*` ones, `hitlp:call` (Utils > HITLP producer) the four `hitlp:surface-*` ones (the HITLP server, #2487) and `hitlp:tasks` (its task list, #100064) — external links opened in the browser |
-| `src/engine-data.js` | The engine as a data source ("Tickets > Tickets", below): `fetchIssues()` reads `GET /issues` `fetchAccounts()` reads `GET /accounts` + `GET /accounts/usage`, and `fetchRepos()` and `repoAction()` read and write the target repos ("Config > Repos", below), at `ENGINE_URL` and resolves to `{ issues, failures }` or `{ error }`, never rejects. No `gh`, no metrics store, no credential: the engine holds each target repo's token |
+| `src/engine-data.js` | The engine as a data source ("Tickets > Tickets", below): `fetchIssues()` reads `GET /issues` `fetchAccounts()` reads `GET /accounts` + `GET /accounts/usage`, and `fetchRepos()` and `repoAction()` read and write the target repos ("Config > Repos", below), at the engine URL and resolves to `{ issues, failures }` or `{ error }`, never rejects. No `gh`, no metrics store, no credential: the engine holds each target repo's token |
 | `src/fresh-code.js` | First mate's fresh clones ("First mate runs from fresh code", below): `createFreshCode`, one detached whole clone per target repo under `<userData>/first-mate/fresh/<owner>/<name>/`, fetched through the engine's git proxy on the stream's `push` frame and once per `hello`, `fresh.json`, `readRepoInstructions`, the one-time copy of the project directory. No timer |
 | `src/engine-token.js` | Sign in to the engine (#2206, "Sign in to the engine" below): the one bearer token, verified with `GET /whoami`, kept safeStorage-encrypted in `<userData>/engine-token.bin`, handed out as the `Authorization` header to main and `src/engine-data.js` only; `signIn`, `signOut`, `status`, `load` answer the login and the token's name |
 | `src/renderer/sign-in.jsx` | Config > frakworks > Sign in to the engine (`SignInPanel`): the token field (cleared after every submit), the signed-in line, Sign out, the engine's refusal; never holds a token prop |
@@ -134,7 +134,7 @@ named in full, in its Allowed scope.
 
 ## Dependencies
 
-- The engine at `ENGINE_URL`: the app reads GitHub only through it
+- The engine at the engine URL: the app reads GitHub only through it
   ("Reading GitHub: only through the engine", below). The app needs no `gh`
   at all: its login is the signed-in engine token's (`GET /whoami`).
 - Network reach to VictoriaMetrics and VictoriaLogs on the collector host
@@ -142,11 +142,27 @@ named in full, in its Allowed scope.
   values" below), for the transcript pane —
   from a laptop that usually means being on the tailnet.
 
+## Engine URL (#100144)
+
+Config > frakworks > **Engine URL** is where this install's engine is: the
+local stack's published port (`http://localhost:<port>`) or an engine
+elsewhere, e.g. `https://engine.k8s.example` on a cluster (any scheme and
+port; https with the system's trusted CAs). It is this machine's setting,
+kept in `<userData>/engine-url.json` (`src/engine-url-setting.js`), never in
+`agent-army.config.json` or the environment. There is no default: until the
+user enters one, the app makes no engine call (no reads, no event stream,
+no desktop channel, no engine-update check, no fresh-code clone, no MCP
+config for a session) and every engine view says `no engine URL set: enter
+the engine's URL under Config > frakworks > Engine URL`. A save relaunches
+the app, so every connection starts on the new URL. An engine not on this
+machine is not updated from the app ("Update engine", "An engine on a
+cluster"). The web version has no such setting: its engine is the page's
+own origin.
+
 ## Environment variables
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `ENGINE_URL` | `http://localhost:8090` | The engine ("Tickets > Tickets"): the local stack's published port, or an engine elsewhere, e.g. `https://engine.k8s.example` on a cluster (any scheme and port; https with the system's trusted CAs). An engine not on this machine is not updated from the app ("Update engine", "An engine on a cluster"). Main-process only |
 | `ENGINE_TIMEOUT_SECS` | `20` | Per-request timeout on engine reads |
 | `AGENT_ARMY_DOCKER_BIN` | (lookup) | The `docker` the Update engine button runs (`src/docker-bin.js`) |
 | `AGENT_ARMY_REPO_DIR` | unset | Packaged build only ("The packaged build"): the frakworks checkout First mate may read at its absolute path (the user's branch and uncommitted changes), named in its system prompt; unset, no checkout is named. First mate runs `claude` in the fresh clone of its repo under `userData`, not here ("First mate runs from fresh code"). In a checkout the app names the checkout it sits in |
@@ -274,7 +290,7 @@ differs.
   Ingress the engine Ingress's host, so the page and the API keep one origin and the
   URL is unchanged (`deploy/k8s/README.md`, "The overlay"). The files hold no data
   and need no token; every engine call the page makes needs one.
-- **Open.** `<engine URL>/web/` (the URL the desktop's `ENGINE_URL` names), sign in
+- **Open.** `<engine URL>/web/` (the desktop's Engine URL), sign in
   with a token. A ticket opens at `<engine URL>/web/#/ticket/<owner>/<name>/<n>`, and
   a `frakworks://ticket/...` link inside the page opens there instead of asking
   the OS.
@@ -435,12 +451,12 @@ an external Claude Code session in a worktree (`claude --worktree <name>`),
 not in this checkout.
 
 ```
-⎇ main · c4d787c · running                                                  engine ● localhost:8090   ⟳ Restart
-⎇ main · 9f1e2ab · running c4d787c +1 (engine)                              engine ● localhost:8090   ⟳ Restart
-⎇ main · 9f1e2ab · running c4d787c +2 (desktop changed)                     engine ● localhost:8090   ⟳ Restart   ← lit
-⎇ main · 9f1e2ab · dirty · running c4d787c +2 (desktop changed)             engine ○ localhost:8090   ⟳ Restart   ← lit
-⎇ main · c4d787c · running · behind origin 1 (engine)                       engine ● localhost:8090   ⟳ Restart
-⎇ main · c4d787c · running · behind origin 3 (desktop changed)              engine ● localhost:8090   ⟳ Restart   ← lit
+⎇ main · c4d787c · running                                                  engine ● engine.example   ⟳ Restart
+⎇ main · 9f1e2ab · running c4d787c +1 (engine)                              engine ● engine.example   ⟳ Restart
+⎇ main · 9f1e2ab · running c4d787c +2 (desktop changed)                     engine ● engine.example   ⟳ Restart   ← lit
+⎇ main · 9f1e2ab · dirty · running c4d787c +2 (desktop changed)             engine ○ engine.example   ⟳ Restart   ← lit
+⎇ main · c4d787c · running · behind origin 1 (engine)                       engine ● engine.example   ⟳ Restart
+⎇ main · c4d787c · running · behind origin 3 (desktop changed)              engine ● engine.example   ⟳ Restart   ← lit
 ⎇ main · c4d787c · dirty · running · behind origin 3 (desktop changed; won't pull: the checkout has uncommitted changes)   ⟳ Restart   ← lit
 ```
 
@@ -491,16 +507,16 @@ docker compose pull engine && docker compose up -d engine
 ```
 
 ```
-… engine ● localhost:8090   engine sha-c4d787c · main                    ⇪ Update engine   ⟳ Restart
-… engine ● localhost:8090   engine sha-c4d787c · main sha-9f1e2ab        ⇪ Update engine   ⟳ Restart   ← lit
-… engine ● localhost:8090   engine sha-c4d787c · main unknown: registry unreachable (…): ECONNREFUSED   ⇪ Update engine   ⟳ Restart   (red)
-… engine ● localhost:8090   engine sha-c4d787c · updating: pull…         pull…             ⟳ Restart
+… engine ● engine.example   engine sha-c4d787c · main                    ⇪ Update engine   ⟳ Restart
+… engine ● engine.example   engine sha-c4d787c · main sha-9f1e2ab        ⇪ Update engine   ⟳ Restart   ← lit
+… engine ● engine.example   engine sha-c4d787c · main unknown: registry unreachable (…): ECONNREFUSED   ⇪ Update engine   ⟳ Restart   (red)
+… engine ● engine.example   engine sha-c4d787c · updating: pull…         pull…             ⟳ Restart
 … engine ● https://engine.k8s.example   engine sha-c4d787c · main sha-9f1e2ab · 3 commits behind   ⇪ Update engine   ⟳ Restart   ← lit
 … engine ● https://engine.k8s.example   engine sha-c4d787c · updating: deploying…                  deploying…        ⟳ Restart
 ```
 
 **An engine on a cluster: the same button deploys it** (#2416). When
-`ENGINE_URL`'s host is not this machine, the app cannot docker-compose-update
+the engine URL's host is not this machine, the app cannot docker-compose-update
 the engine, and it does not need to know how the engine is hosted: the engine
 owns how, the app owns when. The 30 s check reads `/version`, `/metrics` and
 the engine's `GET /engine/update` (engine/README.md, "Deploying on
@@ -521,7 +537,7 @@ host updates it" and is not lit: only the machine running it can pull and
 recreate. A local Compose engine keeps the pull and recreate path below; its
 confirm names the open first-mate sessions too, from the same status.
 An `https:`
-`ENGINE_URL` is read like any other: at launch main adds the system's trusted
+the engine URL is read like any other: at launch main adds the system's trusted
 CAs (the macOS keychain) to Node's bundled list (`trustSystemCAs` in
 `src/engine-data.js`), so a lab CA the machine trusts signs it.
 
@@ -535,14 +551,14 @@ CAs (the macOS keychain) to Node's bundled list (`trustSystemCAs` in
   `docker pull` records), and the commit from its config's
   `org.opencontainers.image.revision` label (engine/Dockerfile, `GIT_SHA`);
 - **running**: the one container with the compose label
-  `com.docker.compose.service=engine` that publishes `ENGINE_URL`'s port
+  `com.docker.compose.service=engine` that publishes the engine URL's port
   (`docker ps`, `docker inspect`), its image's `RepoDigests` entry for the
   registry repo, and the engine's own `commit` on `GET /version`.
 
 The button is lit only when both digests are known and differ. When they
 match the phrase is grey. When either cannot be determined (the registry is
 down, no such container, an engine built locally as `frakworks-engine:local`,
-an `ENGINE_URL` that is not this machine) the phrase is red, with the
+an the engine URL that is not this machine) the phrase is red, with the
 reason on hover, and the button is not lit: never a guess. Its hover names
 both builds (commit and digest), the registry reference, the last check,
 the live runs and any error. Clicking it while unlit only checks again.
@@ -589,7 +605,7 @@ the exit `code` and, for a failure, the `failedStep` and its last output line
   never one in flight. The file is removed once reported.
 - **The backstop**, on launch and on every check with no update in flight:
   a container labelled `com.docker.compose.service=engine` in state Created
-  (`docker ps -a --filter status=created`) that publishes `ENGINE_URL`'s
+  (`docker ps -a --filter status=created`) that publishes the engine URL's
   port, and belongs to the engine's compose project when one is known
   (from the running container or the status file), is started with
   `docker start`, logged, and reported "engine started (left in Created)";
@@ -683,7 +699,7 @@ container's own labels, `com.docker.compose.project`,
 `.project.working_dir` and `.project.config_files`, passed as `-p`,
 `--project-directory` and one `-f` each, so it is the project the engine was
 started from, with its `.env`. So the button works only when the desktop and
-the engine share a Docker host (a remote `ENGINE_URL` is an error state), and
+the engine share a Docker host (a remote the engine URL is an error state), and
 the project directory must be on this machine. `docker` is found the way
 `claude` is (`src/docker-bin.js`): a Finder launch has no shell PATH.
 
@@ -770,10 +786,10 @@ is replaced, in `src/app-update.js`, by electron-updater's generic
 provider on the feed:
 
 ```
-⬇ v0.1.42 · running                                                         engine ● localhost:8090   ⟳ Restart
-⬇ v0.1.42 · downloading v0.1.43…                                            engine ● localhost:8090   ⟳ Restart
-⬇ v0.1.42 · v0.1.43 ready                                                   engine ● localhost:8090   ⟳ Restart   ← lit
-⬇ v0.1.42 · running · feed: ENOTFOUND releases.example                         engine ● localhost:8090   ⟳ Restart
+⬇ v0.1.42 · running                                                         engine ● engine.example   ⟳ Restart
+⬇ v0.1.42 · downloading v0.1.43…                                            engine ● engine.example   ⟳ Restart
+⬇ v0.1.42 · v0.1.43 ready                                                   engine ● engine.example   ⟳ Restart   ← lit
+⬇ v0.1.42 · running · feed: ENOTFOUND releases.example                         engine ● engine.example   ⟳ Restart
 ```
 
 Every 10 s (`CHECK_MS`) main asks the feed's `latest-mac.yml`; a newer
@@ -870,7 +886,7 @@ The engine pushes its state changes to the app over Server-Sent Events
 (the engine's half is `engine/README.md`,
 "Events"). The connection lives in the main process, `src/engine-events.js`
 (`EngineEventStream`), beside `src/engine-data.js`: main is where
-`ENGINE_URL` is resolved, and the renderer never names a host or a query. The
+the engine URL is resolved, and the renderer never names a host or a query. The
 views follow it through `src/renderer/engine-events.js`: `useEngineEvents(types,
 handler, filter)` hands a view the frames it cares about (by `number`,
 `instance`, `repo`, `issueUrl` or a predicate), `useRefetchOn(types, refetch,
@@ -1037,7 +1053,7 @@ relative to `src/`.
 | 26 | `first-mate.js` "Filed as #N" | — | — | `intake` `filed` in main (part 3) |
 
 `test/engine-events.test.js` runs the stream against a fake engine on
-`ENGINE_URL` (`http.createServer` on port 0) with the clock faked: frames reach the
+the engine URL (`http.createServer` on port 0) with the clock faked: frames reach the
 renderer in order after `hello`; a frame between `hello` and
 `engine:snapshotted` is delivered after the snapshot, not before; a dropped
 connection pushes `down`, `catching-up`, `live` and asks for no replay; the
@@ -1118,7 +1134,7 @@ before.
 
 Clicking a number opens the ticket detail ("One ticket detail", below); a
 modifier click opens GitHub in the browser. **Read-only**: the bridge exposes `issues()` and the
-main process's `ENGINE_URL`; nothing here writes.
+main process's the engine URL; nothing here writes.
 
 **Which repo** (#577): the view shows the repo switcher's choice (`GET
 /issues?repo=`), or every target repo in All repos. **New intake** files in
@@ -1209,7 +1225,7 @@ Headless, showing this view:
 ```bash
 AGENT_ARMY_ONCE=1 AGENT_ARMY_VIEW=issues AGENT_ARMY_SCREENSHOT=/tmp/issues.png \
   xvfb-run -a npx electron --no-sandbox .
-# [engine] issues (http://localhost:8090): 11 issue(s)
+# [engine] issues (http://engine.example): 11 issue(s)
 # [fleet] rendered: issues — 11 issue(s)
 ```
 
@@ -4210,7 +4226,7 @@ whatever branch the user had out, and no other target repo at all.
   decision for this build), single-branch on the default branch, no tags,
   detached at the head so no local branch exists to commit on. Made with
   `git -c credential.helper= clone --single-branch --branch <default> --no-tags
-  $ENGINE_URL/repos/<owner>/<name>/git <dir>` then `git checkout --detach
+  <engine URL>/repos/<owner>/<name>/git <dir>` then `git checkout --detach
   origin/<default>`: the engine's read-only git proxy authenticates to GitHub
   with the repo's token, so the desktop still carries no GitHub credential
   and names no GitHub host (`test/github-reads.test.js`). Beside the clones,
@@ -4357,7 +4373,7 @@ one line in the pane (`mcp_notice`, naming the repo); the next child start asks
 again. A server's secrets reach main only for that file, never the renderer.
 
 How the child reaches the engine: the engine's own `frakworks` MCP server,
-streamable HTTP at `<ENGINE_URL>/mcp/frakworks` (engine/README.md, "The
+streamable HTTP at `<engine URL>/mcp/frakworks` (engine/README.md, "The
 frakworks server"; issue #541, which moved it out of the app's `src/frakworks-mcp.js`).
 It exposes these tools to First mate: `submit_ask`,
 `cancel_intake`, `amend_intake`, `amend_ticket`, `approve`, `reauthorize`, `note_friction`, `read_version`, `screenshot_desktop` (the desktop's window, when allowed: "Let First mate screenshot this app"),
@@ -4478,8 +4494,8 @@ not authorize intakes.
 The child gets it through `--mcp-config <userData>/first-mate/first-mate/frakworks-mcp.json`
 (`writeFrakworksMcpConfig`, mode 0600), and `--strict-mcp-config` stays, so
 no other MCP server on the machine can load. It holds two `http` servers,
-`frakworks` at `<ENGINE_URL>/mcp/frakworks` and `frakworks-engine-diagnostics`
-at `<ENGINE_URL>/mcp/frakworks-engine-diagnostics` (issue #663), and each has
+`frakworks` at `<engine URL>/mcp/frakworks` and `frakworks-engine-diagnostics`
+at `<engine URL>/mcp/frakworks-engine-diagnostics` (issue #663), and each has
 the same one header,
 `Authorization: Bearer <token>`, the signed-in engine token, which is who the
 engine takes as acting; unsigned, the file is not written with one and the

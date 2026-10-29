@@ -168,7 +168,7 @@ test("Analytics has a Friction notes row after Doctor and before the Grafana row
 
 // ---- the engine client -------------------------------------------------------------
 
-const env = { ENGINE_URL: "http://engine.test:8090" };
+const env = { engineUrl: "http://engine.test:8090" };
 const fake = (status, body) => {
   const calls = [];
   return { calls, opts: { env, fetch: async (url) => { calls.push(url); return { ok: status < 400, status, text: async () => (typeof body === "string" ? body : JSON.stringify(body)) }; } } };
@@ -395,7 +395,7 @@ test("Not two things is wired: the page calls fleet.frictionNotTwoThings, main s
   assert.match(src("preload.js"), /frictionNotTwoThings: \(noteId\) => ipcRenderer\.invoke\("engine:friction-not-two-things", String\(noteId\)\)/);
   assert.match(src("main.js"), /ipcMain\.handle\("engine:friction-not-two-things", async \(_e, noteId\) => \{\n  const by = await signedInLogin\(\);\n  const r = await frictionNotTwoThings\(String\(noteId\), by\);/);
   const calls = [];
-  const env = { ENGINE_URL: "http://engine.test:8090" };
+  const env = { engineUrl: "http://engine.test:8090" };
   const fetch = async (url, init) => { calls.push({ url, init }); return { ok: true, status: 200, text: async () => "{}" }; };
   assert.deepEqual(await frictionNotTwoThings("b1", "someone", { env, fetch }), { ok: true, status: 200 });
   assert.deepEqual([calls[0].init.method, calls[0].url, JSON.parse(calls[0].init.body)], ["PATCH", "http://engine.test:8090/friction/notes/b1", { twoThings: null }]);

@@ -97,7 +97,7 @@ test("the updater reads the changes once per commit pair while the digests diffe
     return { code: 1, stdout: "", stderr: "" };
   };
   let asked = 0;
-  const u = createEngineUpdater({ run, fetch, engineUrl: "http://localhost:8090", registry: reg,
+  const u = createEngineUpdater({ run, fetch, engineUrl: "http://127.0.0.1:8090", registry: reg,
     changes: async ({ running, available }) => { asked++; return listChanges({ running, available, git: fakeGit().git }); } });
   await u.check();
   await u.check();

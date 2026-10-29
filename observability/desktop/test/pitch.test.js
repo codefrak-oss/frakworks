@@ -10,6 +10,9 @@
 // ticket.jsx) is tested at the end: the same read, always in the page's dark
 // scheme, with a full-window control, and no section for a ticket with none.
 "use strict";
+// Config > frakworks > Engine URL, as main sets it at launch (src/engine-url-setting.js).
+const TEST_ENGINE_URL = "http://engine.test";
+require("../src/engine-data").setEngineUrl(TEST_ENGINE_URL);
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");

@@ -29,11 +29,11 @@
 // the stream itself): First mate's "Filed as #N" row (src/first-mate.js) takes
 // `intake` frames here, with no IPC.
 //
-// Environment: ENGINE_URL, as src/engine-data.js reads it.
+// The engine: the Engine URL setting, as src/engine-data.js reads it; unset, no connection is opened.
 "use strict";
 
 const { EventEmitter } = require("node:events");
-const { engineUrl, REPO_FULL } = require("./engine-data");
+const { engineUrl, NO_ENGINE_PROMPT, REPO_FULL } = require("./engine-data");
 
 // The reconnect backoff's bounds, and how long a silent connection lives.
 const BACKOFF_MIN_MS = 1000;
@@ -219,6 +219,7 @@ class EngineEventStream extends EventEmitter {
 
   // The connection's life: connect, read until it ends, back off, again.
   async _run(c) {
+    if (engineUrl(this.env) == null) { this.log(`no connection for ${c.repo}: ${NO_ENGINE_PROMPT}`); return; }
     while (!c.closed) {
       await this._connectOnce(c);
       if (c.closed) return;

@@ -23,7 +23,7 @@ const OLD = D("a");
 const NEW = D("b");
 const OLD_SHA = "1111111aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const NEW_SHA = "2222222bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
-const ENGINE = "http://localhost:8090";
+const ENGINE = "http://127.0.0.1:8090";
 const METRICS = [
   "# HELP smith_run_active 1 while a Smith run is live",
   "# TYPE smith_run_active gauge",
@@ -140,7 +140,7 @@ test("reportUpdate: success names the new build, failure the step and its error,
 });
 
 test("localEngine: only an engine on this machine, and its port", () => {
-  assert.deepEqual(localEngine("http://localhost:8090"), { port: "8090" });
+  assert.deepEqual(localEngine("http://127.0.0.1:8090"), { port: "8090" });
   assert.deepEqual(localEngine("http://127.0.0.1:9000"), { port: "9000" });
   assert.match(localEngine("http://engine.example:8090").error, /not on this machine/);
 });
@@ -352,7 +352,7 @@ test("an engine not on this machine: its own GET /engine/update lights the butto
   assert.match(m.lines.join("\n"), /1 first-mate session is open/);
   assert.match(m.footer, /about 45 s/);
   assert.doesNotMatch(m.footer, /docker|kubectl|Deployment/i);
-  assert.equal(remoteEngine("http://localhost:8090"), false);
+  assert.equal(remoteEngine("http://127.0.0.1:8090"), false);
   assert.equal(remoteEngine("https://engine.k8s.example"), true);
 });
 

@@ -1,6 +1,6 @@
 // The engine's event stream in main (src/engine-events.js; docs/proposals/
 // engine-sse.md "The app side"): the SSE parser alone, then the stream against
-// a fake engine (`http.createServer` on port 0 as ENGINE_URL) that writes frames and drops connections on
+// a fake engine (`http.createServer` on port 0 as the engine URL) that writes frames and drops connections on
 // cue, with the clock faked so the backoff and the 45 s silence rule run in
 // no time.
 "use strict";
@@ -113,7 +113,7 @@ const make = async (opts = {}) => {
   const clock = fakeClock();
   const pushes = [];
   const stream = new EngineEventStream({
-    env: { ENGINE_URL: engine.url },
+    env: { engineUrl: engine.url },
     send: (channel, payload) => pushes.push([channel, payload]),
     now: clock.now, setTimeout: clock.setTimeout, clearTimeout: clock.clearTimeout,
     log: () => {},
@@ -126,7 +126,7 @@ const make = async (opts = {}) => {
   return { engine, clock, pushes, stream, channels, states, events, done };
 };
 
-test("the request is GET /events?repo= on ENGINE_URL with accept: text/event-stream and no Origin", async () => {
+test("the request is GET /events?repo= on the engine URL with accept: text/event-stream and no Origin", async () => {
   const { engine, stream, done } = await make();
   stream.setSelected("acme/widgets");
   await until(() => engine.requests.length === 1, "the request");
@@ -407,7 +407,7 @@ test("the default timers are called unbound, as a browser's clearTimeout needs (
     if (this !== undefined && this !== globalThis) throw new TypeError("Illegal invocation");
     return real(t);
   };
-  const stream = new EngineEventStream({ env: { ENGINE_URL: "http://127.0.0.1:1" }, send: () => {}, log: () => {} });
+  const stream = new EngineEventStream({ env: { engineUrl: "http://127.0.0.1:1" }, send: () => {}, log: () => {} });
   try {
     const t = stream.setTimeoutFn(() => {}, 60000);
     assert.doesNotThrow(() => stream.clearTimeoutFn(t));

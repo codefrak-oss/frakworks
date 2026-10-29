@@ -273,12 +273,12 @@ test("the bar lights the button only for a desktop change; the local check is of
   assert.ok(FETCH_MS >= 60000 && FETCH_MS > CHECK_MS);
   const render = (props) => renderToStaticMarkup(React.createElement(StatusBar, props));
   const running = "c4d787c9999";
-  const v = { sha: "9f1e2ab0123", branch: "main", dirty: false, running, engineUrl: "http://localhost:8090" };
-  const engine = { ok: true, url: "http://localhost:8090" };
+  const v = { sha: "9f1e2ab0123", branch: "main", dirty: false, running, engineUrl: "http://engine.test" };
+  const engine = { ok: true, url: "http://engine.test" };
   let html = render({ version: { ...v, sha: running, cmp: { ahead: 0, stale: false, changed: [] } }, engine });
   assert.match(html, /main · c4d787c · running/);
   assert.match(html, /⟳ Restart/); assert.doesNotMatch(html, /sbButton lit/);
-  assert.match(html, /engine ● localhost:8090/);
+  assert.match(html, /engine ● engine.test/);
 
   html = render({ version: { ...v, cmp: { ahead: 1, stale: false, changed: ["engine"] } }, engine });
   assert.match(html, /running c4d787c \+1 \(engine\)/); assert.doesNotMatch(html, /sbButton lit/, "engine only: not lit");
@@ -297,9 +297,9 @@ test("the bar lights the button only for a desktop change; the local check is of
   html = render({ version: v, engine, updating: { ok: false, steps: [{ step: "pull", ok: false, detail: "not pulled: the checkout has uncommitted changes" }] } });
   assert.match(html, /pull failed/); assert.match(html, /not pulled: the checkout has uncommitted changes/);
 
-  html = render({ version: { ...v, dirty: true, cmp: { ahead: 2, stale: true, changed: ["observability"] } }, engine: { ok: false, error: "ECONNREFUSED", url: "http://localhost:8090" } });
+  html = render({ version: { ...v, dirty: true, cmp: { ahead: 2, stale: true, changed: ["observability"] } }, engine: { ok: false, error: "ECONNREFUSED", url: "http://engine.test" } });
   assert.match(html, /dirty/); assert.match(html, /sbButton lit/, "dirty does not stop a restart");
-  assert.match(html, /engine ○ localhost:8090/); assert.match(html, /sb-bad/);
+  assert.match(html, /engine ○ engine.test/); assert.match(html, /sb-bad/);
 
   html = render({ version: v, engine, updating: { steps: [{ step: "npm ci", ok: true }] } });
   assert.match(html, /npm ci…/); assert.match(html, /disabled=""/);

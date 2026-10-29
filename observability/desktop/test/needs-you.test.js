@@ -136,7 +136,7 @@ test("a plain click on a row opens the in-app detail in that row's repo; a modif
 test("fetchNeeds reads GET /needs for every repo and keeps the selected repo's rows (#2423), all of them in All repos", async () => {
   const seen = [];
   const r = await fetchNeeds({
-    repo: "codefrak-oss/frakworks", now: NOW, env: { ENGINE_URL: "http://engine:8090" },
+    repo: "codefrak-oss/frakworks", now: NOW, env: { engineUrl: "http://engine:8090" },
     fetch: async (url, init) => { seen.push(url); return answering(200, JSON.stringify(fixture))(url, init); },
   });
   assert.deepEqual(seen, ["http://engine:8090/needs"]);
@@ -145,7 +145,7 @@ test("fetchNeeds reads GET /needs for every repo and keeps the selected repo's r
   assert.deepEqual(r.rows, rows.filter((x) => !HITLP_KINDS.includes(x.kind) && x.repo === "codefrak-oss/frakworks"),
     "no surface given: the engine's rows alone");
   const all = await fetchNeeds({
-    now: NOW, env: { ENGINE_URL: "http://engine:8090" },
+    now: NOW, env: { engineUrl: "http://engine:8090" },
     fetch: async (url, init) => { seen.push(url); return answering(200, JSON.stringify(fixture))(url, init); },
   });
   assert.equal(seen[1], "http://engine:8090/needs");
@@ -153,7 +153,7 @@ test("fetchNeeds reads GET /needs for every repo and keeps the selected repo's r
 });
 
 test("fetchNeeds is the engine's rows only; fetchHitlpTasks reads the surface once: open and closed, its error, or not set (#100064)", async () => {
-  const env = { ENGINE_URL: "http://engine:8090" };
+  const env = { engineUrl: "http://engine:8090" };
   const fetch = answering(200, JSON.stringify(fixture));
   const r = await fetchNeeds({ repo: "codefrak-oss/frakworks", now: NOW, env, fetch, surface: async () => ({ tasks }) });
   assert.equal(r.error, null);
@@ -174,7 +174,7 @@ test("fetchNeeds is the engine's rows only; fetchHitlpTasks reads the surface on
 });
 
 test("fetchNeeds passes the engine's errors through, and the view draws them", async () => {
-  const env = { ENGINE_URL: "http://engine:8090" };
+  const env = { engineUrl: "http://engine:8090" };
   const down = await fetchNeeds({ env, fetch: async () => { throw new Error("ECONNREFUSED"); } });
   assert.match(down.error, /engine unreachable at http:\/\/engine:8090\/needs: ECONNREFUSED/);
   assert.deepEqual(down.rows, []);
@@ -443,7 +443,7 @@ test("with a repo selected, its own rows show; the engine is read for every repo
     { repo: "o/other", number: 2, title: "t", kind: "question", wanted: "x", since: null, actionId: "q2" },
     { repo: null, number: null, title: "", kind: "approve", action: "host.patch", client: "login:b/token:1", since: null, actionId: "h1" },
   ]) }; };
-  const r = await fetchNeeds({ repo: A, fetch, env: { ENGINE_URL: "http://engine.test" } });
+  const r = await fetchNeeds({ repo: A, fetch, env: { engineUrl: "http://engine.test" } });
   assert.equal(r.error, null);
   assert.deepEqual(r.rows.map((x) => x.actionId).sort(), ["q1"]);
   assert.ok(urls.every((u) => !u.includes("repo=")));

@@ -4,6 +4,9 @@
 // are built here from the paths), one file call per click, ⟳ re-reads the open
 // repos, nothing on a timer; markdown drawn locally, binaries and big files cut.
 "use strict";
+// Config > frakworks > Engine URL, as main sets it at launch (src/engine-url-setting.js).
+const TEST_ENGINE_URL = "http://engine.test";
+require("../src/engine-data").setEngineUrl(TEST_ENGINE_URL);
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");

@@ -2,6 +2,9 @@
 // saving `GET`/`PUT /settings/smith-hosting` against a stand-in fetch, main's
 // and preload's IPC, and smith-hosting.jsx drawing and saving it.
 "use strict";
+// Config > frakworks > Engine URL, as main sets it at launch (src/engine-url-setting.js).
+const TEST_ENGINE_URL = "http://engine.test";
+require("../src/engine-data").setEngineUrl(TEST_ENGINE_URL);
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
@@ -32,7 +35,7 @@ const walk = (el, out = []) => {
 test("fetchSmithHosting reads GET /settings/smith-hosting; a failed or odd answer is the error", async () => {
   const { calls, fetch } = recorder(200, { ...SETTINGS, hosting: "kubernetes" });
   assert.deepEqual(await fetchSmithHosting({ env: {}, fetch }), { smithHosting: { hosting: "kubernetes" }, error: null });
-  assert.equal(calls[0].url, "http://localhost:8090/settings/smith-hosting");
+  assert.equal(calls[0].url, "http://engine.test/settings/smith-hosting");
   assert.match((await fetchSmithHosting({ env: {}, fetch: recorder(500, "boom").fetch })).error, /500/);
   assert.match((await fetchSmithHosting({ env: {}, fetch: recorder(200, { hosting: "vm" }).fetch })).error, /docker or kubernetes/);
   assert.ok((await fetchSmithHosting({ env: {}, fetch: recorder(0, new Error("ECONNREFUSED")).fetch })).error);
@@ -42,7 +45,7 @@ test("the smith-hosting action is PUT /settings/smith-hosting with the hosting a
   const { calls, fetch } = recorder(200, { ...SETTINGS, hosting: "kubernetes", namespace: "smiths" });
   const r = await accountAction({ op: "smith-hosting", hosting: "kubernetes" }, { env: {}, fetch });
   assert.deepEqual(r, { ok: true, status: 200, smithHosting: { hosting: "kubernetes" } });
-  assert.deepEqual(calls, [{ url: "http://localhost:8090/settings/smith-hosting", method: "PUT", body: { hosting: "kubernetes" } }]);
+  assert.deepEqual(calls, [{ url: "http://engine.test/settings/smith-hosting", method: "PUT", body: { hosting: "kubernetes" } }]);
 });
 
 test("a hosting that is neither docker nor kubernetes is refused before any request; the engine's 400 is said back", async () => {

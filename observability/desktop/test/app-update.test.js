@@ -121,7 +121,7 @@ test("describeUpdate says the one thing that matters, and the renderer's copy ag
 
 test("the packaged bar lights the button only for a downloaded update, and offers to install it", () => {
   const draw = (update) => renderToStaticMarkup(React.createElement(StatusBar, {
-    version: { packaged: true, version: "0.1.42", update }, engine: { ok: true, url: "http://localhost:8090" }, updating: null }));
+    version: { packaged: true, version: "0.1.42", update }, engine: { ok: true, url: "http://engine.test" }, updating: null }));
   const running = draw({ checkedAt: 1 });
   assert.doesNotMatch(running, /sbButton lit/);
   assert.match(running, /Check the release feed for a newer build, then relaunch/);
