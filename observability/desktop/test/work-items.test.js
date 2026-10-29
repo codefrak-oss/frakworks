@@ -15,7 +15,7 @@ const { listWorkItems, readWorkItem, replyToWorkItem, importIssue, probeImport, 
 const { loadAllRepos, importGate, ImportForm, WorkItemDetail, itemRows, closedRows, withExtra, Tickets } = require("../dist/work-items.cjs");
 
 const items = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "fixture-work-items.json"), "utf8"));
-const env = { ENGINE_URL: "http://engine.test" };
+const env = { engineUrl: "http://engine.test" };
 const fake = (status, body, calls = []) => async (url, init) => {
   calls.push({ url, init });
   return { ok: status >= 200 && status < 300, status, text: async () => (typeof body === "string" ? body : JSON.stringify(body)) };

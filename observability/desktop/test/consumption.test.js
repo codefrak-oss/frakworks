@@ -11,7 +11,7 @@ const { fetchConsumption, CONSUMPTION_WINDOWS } = require("../src/engine-data");
 
 const fake = (status, body) => {
   const urls = [];
-  return { urls, opts: { env: { ENGINE_URL: "http://engine.test" }, fetch: async (url) => {
+  return { urls, opts: { env: { engineUrl: "http://engine.test" }, fetch: async (url) => {
     urls.push(url);
     return { ok: status >= 200 && status < 300, status, text: async () => (typeof body === "string" ? body : JSON.stringify(body)) };
   } } };

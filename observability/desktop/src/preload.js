@@ -209,6 +209,9 @@ contextBridge.exposeInMainWorld("fleet", {
   // Whether the engine hosts frakpanel tiles; set with accountAction({ op: "frakpanel-tiles", enabled }).
   frakpanelTiles: () => ipcRenderer.invoke("engine:frakpanel-tiles"),
   // "Let First mate screenshot this app" (#100105): this machine's setting, kept by main under userData.
+  // Config > frakworks > Engine URL (#100144): this install's engine, kept by main under userData; a save relaunches the app.
+  engineUrlSetting: () => ipcRenderer.invoke("engine-url:setting"),
+  setEngineUrlSetting: (url) => ipcRenderer.invoke("engine-url:set", typeof url === "string" ? url : null),
   screenshotSetting: () => ipcRenderer.invoke("screenshot:setting"),
   setScreenshotSetting: (allowed) => ipcRenderer.invoke("screenshot:set-setting", allowed === true),
   // Where new Smith runs start (docker or kubernetes); set with accountAction({ op: "smith-hosting", hosting }).

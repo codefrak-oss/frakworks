@@ -18,7 +18,7 @@
 //     blob's `org.opencontainers.image.revision` label is the commit, for a
 //     person to read (engine/Dockerfile, GIT_SHA).
 //   - running: the engine container, found by its compose service label and
-//     the port ENGINE_URL names; its image's RepoDigests entry for the
+//     the port the engine URL names; its image's RepoDigests entry for the
 //     registry repo. `commit` is the engine's own answer on GET /version.
 // An image cannot hold its own digest (the digest is computed after the
 // build), so the engine reports its commit and Docker reports the digest.
@@ -52,7 +52,7 @@
 //     with none is a failed update with the log's last line, never in flight.
 //     The file is removed once reported.
 //   - The backstop, on every check() with no update in flight: a compose
-//     "engine" container in state Created that publishes ENGINE_URL's port
+//     "engine" container in state Created that publishes the engine URL's port
 //     (and belongs to the engine's compose project, when one is known) is
 //     started with `docker start`, logged, and reported "engine started (left
 //     in Created)". The detached runner dies with a logout, a reboot or
@@ -240,15 +240,15 @@ function reportUpdate(r) {
   return { text, level: "bad", detail: failed ? failed.detail : "" };
 }
 
-/** Whether ENGINE_URL is a URL whose host is not this machine: an engine the app cannot docker-compose-update, deployed through its own POST /engine/update. */
+/** Whether the engine URL is a URL whose host is not this machine: an engine the app cannot docker-compose-update, deployed through its own POST /engine/update. */
 function remoteEngine(engineUrl) {
   try { return !LOCAL_HOSTS.has(new URL(engineUrl).hostname); } catch (e) { return false; }
 }
 
-/** Whether ENGINE_URL is on this machine (and so on the Docker host `docker` talks to), and its port. */
+/** Whether the engine URL is on this machine (and so on the Docker host `docker` talks to), and its port. */
 function localEngine(engineUrl) {
   let u;
-  try { u = new URL(engineUrl); } catch (e) { return { error: `ENGINE_URL ${engineUrl} is not a URL` }; }
+  try { u = new URL(engineUrl); } catch (e) { return { error: `the engine URL ${engineUrl} is not a URL` }; }
   if (!LOCAL_HOSTS.has(u.hostname)) return { error: `the engine at ${engineUrl} is not on this machine; the button only updates a local engine` };
   return { port: u.port || (u.protocol === "https:" ? "443" : "80") };
 }

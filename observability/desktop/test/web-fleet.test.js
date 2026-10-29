@@ -6,6 +6,9 @@
 // a ticket link routes in the page. Plus the sha256 shim against node:crypto,
 // the grep for the engine's removed HITLP paths, and the build itself.
 "use strict";
+// Config > frakworks > Engine URL, as main sets it at launch (src/engine-url-setting.js).
+const TEST_ENGINE_URL = "http://engine.test";
+require("../src/engine-data").setEngineUrl(TEST_ENGINE_URL);
 
 const test = require("node:test");
 const assert = require("node:assert/strict");

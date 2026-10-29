@@ -25,8 +25,8 @@ component stays runnable from its own directory:
 | observability: VictoriaMetrics, VictoriaLogs, Grafana | `observability/compose.local.yaml` | 8428, 9428, 3000 |
 
 Services reach each other over the compose network by service name. The
-desktop app is not a container: run it from `observability/desktop/` against
-`ENGINE_URL=http://localhost:8090`.
+desktop app is not a container: run it from `observability/desktop/` and enter
+`http://localhost:8090` under Config > frakworks > Engine URL.
 
 ## Conventions
 

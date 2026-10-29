@@ -33,6 +33,7 @@ import { Accounts } from "./accounts.jsx";
 import { RefinerTierPanel } from "./refiner-tier.jsx";
 import { FrakpanelTilesPanel } from "./frakpanel-tiles.jsx";
 import { ScreenshotSettingPanel } from "./screenshot-setting.jsx";
+import { EngineUrlPanel } from "./engine-url-setting.jsx";
 import { SmithHostingPanel, FirstMateHostingPanel } from "./smith-hosting.jsx";
 import { PalettesView, applyPalette, loadPaletteId } from "./palettes.jsx";
 import { RepoNamePanel } from "./repo-name-form.jsx";
@@ -1655,6 +1656,8 @@ const App = () => {
               <RefinerTierPanel result={refinerTier || { loading: true }}
                 onRefresh={refreshRefinerTier}
                 tiers={tiers} onAction={(a) => window.fleet.accountAction(a)} />
+              {window.fleet.platform !== "web" && window.fleet.engineUrlSetting && <EngineUrlPanel onLoad={() => window.fleet.engineUrlSetting()}
+                onSave={(url) => window.fleet.setEngineUrlSetting(url)} />}
               {window.fleet.platform !== "web" && window.fleet.teachTokenStatus && <SignInPanel result={teachStatus || { loading: true }} onRefresh={refreshTeach}
                 title="Judge teach token" hint={TEACH_TOKEN_HINT} action="Save" signedInText="Set for"
                 onSignIn={(token) => window.fleet.teachTokenSet(token)} onSignOut={() => window.fleet.teachTokenClear()} />}

@@ -1,15 +1,18 @@
 // The Issues view, the first screen fed by the engine: src/engine-data.js
 // against a stand-in fetch (every way the engine can fail becomes `error`,
 // never a rejection), and issues.jsx against a board recorded from the local
-// stack (fixture-issues.json, `curl localhost:8090/issues`, 2026-09-24).
+// stack (fixture-issues.json, `curl engine.test/issues`, 2026-09-24).
 "use strict";
+// Config > frakworks > Engine URL, as main sets it at launch (src/engine-url-setting.js).
+const TEST_ENGINE_URL = "http://engine.test";
+require("../src/engine-data").setEngineUrl(TEST_ENGINE_URL);
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const React = require("react");
 const { renderToStaticMarkup } = require("react-dom/server");
-const { fetchIssues, getJson, engineUrl, DEFAULT_ENGINE_URL, submitIntake } = require("../src/engine-data");
+const { fetchIssues, getJson, engineUrl, submitIntake } = require("../src/engine-data");
 const { Issues, stateOf, withNeeds, needPhrase, STAGE_PHRASES, fmtAgo, fmtAgeClock, NewIntakeForm, runIntake, parseIssueUrl, issueUrlOf, buildIntakeBody, tierLabel, tieredAsk, intakeAsk, AUTO_TIER_LABEL, childrenSummary, filterIssues, BOARD_FILTERS } = require("../dist/issues.cjs");
 const { SEEDED_TIERS } = require("./seeded-tiers");
 
@@ -27,9 +30,9 @@ const stubFetch = (status, body, calls = []) => async (url, init) => {
   return { ok: status >= 200 && status < 300, status, text: async () => body };
 };
 
-test("the engine's address comes from ENGINE_URL, default the local stack's port", () => {
-  assert.equal(engineUrl({}), DEFAULT_ENGINE_URL);
-  assert.equal(engineUrl({ ENGINE_URL: "http://engine.local:8080/" }), "http://engine.local:8080");
+test("the engine's address is the Engine URL setting; there is no default", () => {
+  assert.equal(engineUrl({}), TEST_ENGINE_URL);
+  assert.equal(engineUrl({ engineUrl: "http://engine.local:8080/" }), "http://engine.local:8080");
 });
 
 test("fetchIssues returns the board the engine answered with", async () => {
@@ -38,7 +41,7 @@ test("fetchIssues returns the board the engine answered with", async () => {
   assert.equal(r.error, null);
   assert.equal(r.issues.length, board.issues.length);
   assert.deepEqual(r.failures, []);
-  assert.equal(calls[0].url, `${DEFAULT_ENGINE_URL}/issues`);
+  assert.equal(calls[0].url, `${TEST_ENGINE_URL}/issues`);
 });
 
 test("every way the engine can fail is an error, never a rejection", async () => {
@@ -46,7 +49,7 @@ test("every way the engine can fail is an error, never a rejection", async () =>
     [stubFetch(503, "down"), /engine answered 503 for \/issues: down/],
     [stubFetch(200, "<html>"), /produced no JSON/],
     [stubFetch(200, JSON.stringify({ nope: 1 })), /no `issues` list/],
-    [stubFetch(new Error("ECONNREFUSED")), /unreachable at http:\/\/localhost:8090\/issues: ECONNREFUSED/],
+    [stubFetch(new Error("ECONNREFUSED")), /unreachable at http:\/\/engine.test\/issues: ECONNREFUSED/],
   ];
   for (const [fetch, expect] of cases) {
     const r = await fetchIssues({ env: {}, fetch });
@@ -200,7 +203,7 @@ test("the by column never renders, whatever the authors on the board", () => {
 });
 
 test("an error from the engine draws the .err block, not a blank view", () => {
-  const html = render({ result: { error: "engine unreachable at http://localhost:8090/issues: ECONNREFUSED", issues: [] } });
+  const html = render({ result: { error: "engine unreachable at http://engine.test/issues: ECONNREFUSED", issues: [] } });
   assert.match(html, /class="err"/);
   assert.ok(html.includes("ECONNREFUSED"));
   assert.doesNotMatch(html, /<table/);
@@ -219,7 +222,7 @@ test("submitIntake posts { ask, submittedBy, repo } verbatim to POST /intake and
   const calls = [];
   const r = await submitIntake("do the thing", "lundmatt1", { env: {}, repo: "acme/widgets", fetch: stubFetch(202, JSON.stringify({ intakeId: "abc-123" }), calls) });
   assert.deepEqual(r, { ok: true, status: 202, intakeId: "abc-123" });
-  assert.equal(calls[0].url, `${DEFAULT_ENGINE_URL}/intake`);
+  assert.equal(calls[0].url, `${TEST_ENGINE_URL}/intake`);
   assert.equal(calls[0].init.method, "POST");
   assert.deepEqual(JSON.parse(calls[0].init.body), { ask: "do the thing", submittedBy: "lundmatt1", repo: "acme/widgets" });
 });

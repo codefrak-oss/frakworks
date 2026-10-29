@@ -161,7 +161,7 @@ test("remove and test go through the IPC, and a failed call is an error, not a t
 
 // ---- src/engine-data.js ----
 
-const env = { ENGINE_URL: "http://engine.test" };
+const env = { engineUrl: "http://engine.test" };
 const stub = (status, body) => {
   const calls = [];
   const fetch = async (url, init = {}) => { calls.push({ url, init }); return { ok: status < 300, status, text: async () => (typeof body === "string" ? body : JSON.stringify(body)) }; };

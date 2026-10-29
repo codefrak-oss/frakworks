@@ -16,7 +16,7 @@ const { Repos, HealthCheckButton, SetupChecklist, EngineAccessPanel, setupCheckl
   GITHUB_HOURLY_LIMIT, WARN_PCT, DANGER_PCT } = require("../dist/repos.cjs");
 const { WebhookInstructions } = require("../dist/repos.cjs");
 
-const env = { ENGINE_URL: "http://engine.test:8090/" };
+const env = { engineUrl: "http://engine.test:8090/" };
 
 const REPOS = [
   { fullName: "codefrak-oss/frakworks", addedAt: "2026-09-22T10:00:00Z", ciCheck: "engine", ciPaths: ["engine/"], hasToken: true, tokenSetAt: "2026-09-27T09:00:00Z" },

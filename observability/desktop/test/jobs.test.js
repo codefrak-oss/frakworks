@@ -191,7 +191,7 @@ test("Delete: a confirm naming the job, DELETE only on confirm, removed on 204, 
 });
 
 test("engine-data: GET /jobs needs a repo; the writes carry no X-Frakworks-Login and keep the engine's body", async () => {
-  const env = { ENGINE_URL: "http://engine.test:8090" };
+  const env = { engineUrl: "http://engine.test:8090" };
   const seen = [];
   const fetch = async (url, init) => {
     seen.push({ url, method: (init && init.method) || "GET", headers: (init && init.headers) || {}, body: init && init.body });
@@ -211,7 +211,7 @@ test("engine-data: GET /jobs needs a repo; the writes carry no X-Frakworks-Login
   assert.equal(ex.status, 409);
   assert.equal(ex.body, "already running");
   assert.equal((await deleteJob("j-1", "lundmatt1", { env, fetch })).ok, true);
-  assert.deepEqual(seen.slice(1).map((s) => [s.method, s.url.replace(env.ENGINE_URL, ""), s.headers["X-Frakworks-Login"]]),
+  assert.deepEqual(seen.slice(1).map((s) => [s.method, s.url.replace(env.engineUrl, ""), s.headers["X-Frakworks-Login"]]),
     [["POST", "/jobs", undefined], ["POST", "/jobs/j-1/execute", undefined], ["DELETE", "/jobs/j-1", undefined]]);
   assert.ok((await deleteJob("j-1", null, { env, fetch })).error, "no login, nothing sent");
   assert.equal(seen.length, 4);

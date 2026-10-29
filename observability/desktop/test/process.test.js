@@ -4,11 +4,14 @@
 // incident. bpmn-js itself is not exercised here: it needs a DOM, and the
 // view imports it lazily so this bundle never does.
 "use strict";
+// Config > frakworks > Engine URL, as main sets it at launch (src/engine-url-setting.js).
+const TEST_ENGINE_URL = "http://engine.test";
+require("../src/engine-data").setEngineUrl(TEST_ENGINE_URL);
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const React = require("react");
 const { renderToStaticMarkup } = require("react-dom/server");
-const { fetchProcessInstances, fetchProcessTree, fetchProcessXml, retryIncident, fetchTicketTimeline, DEFAULT_ENGINE_URL } = require("../src/engine-data");
+const { fetchProcessInstances, fetchProcessTree, fetchProcessXml, retryIncident, fetchTicketTimeline } = require("../src/engine-data");
 const { markersOf, instanceState, calledChild, pathTo, ProcessList, ElementPanel, ProcessSection, ProcessVariables, VariablesFold } = require("../dist/process.cjs");
 
 const ISSUE = "https://github.com/codefrak-oss/frakworks/issues/56";
@@ -44,7 +47,7 @@ test("fetchProcessInstances asks /camunda/instances for a GitHub issue URL and n
   const calls = [];
   const r = await fetchProcessInstances(ISSUE, { env: {}, fetch: stubFetch(200, JSON.stringify(instances), calls) });
   assert.equal(r.error, null);
-  assert.equal(calls[0], `${DEFAULT_ENGINE_URL}/camunda/instances?issueUrl=${encodeURIComponent(ISSUE)}`);
+  assert.equal(calls[0], `${TEST_ENGINE_URL}/camunda/instances?issueUrl=${encodeURIComponent(ISSUE)}`);
   assert.equal(r.instances.length, 2);
   for (const bad of ["codefrak-oss/frakworks#56", "http://github.com/o/r/issues/1", "https://github.com/o/r/pull/1", null]) {
     assert.match((await fetchProcessInstances(bad, { env: {}, fetch: stubFetch(200, "[]", calls) })).error, /not a GitHub issue URL/);
@@ -58,7 +61,7 @@ test("fetchProcessTree checks the id first, and says a 404 plainly", async () =>
   const calls = [];
   const r = await fetchProcessTree(ROOT, { env: {}, fetch: stubFetch(200, JSON.stringify(tree), calls) });
   assert.equal(r.error, null);
-  assert.equal(calls[0], `${DEFAULT_ENGINE_URL}/camunda/instances/${ROOT}`);
+  assert.equal(calls[0], `${TEST_ENGINE_URL}/camunda/instances/${ROOT}`);
   assert.equal(r.tree.nodes.length, 2);
   assert.match((await fetchProcessTree("../accounts", { env: {}, fetch: stubFetch(200, "{}", calls) })).error, /not a process instance id/);
   assert.equal(calls.length, 1);
@@ -72,7 +75,7 @@ test("fetchProcessXml takes a definition id, asks for XML and refuses anything t
   const r = await fetchProcessXml(DEF, { env: {}, fetch: stubFetch(200, xml, calls) });
   assert.equal(r.error, null);
   assert.equal(r.xml, xml);
-  assert.equal(calls[0], `${DEFAULT_ENGINE_URL}/camunda/definitions/${encodeURIComponent(DEF)}/xml`);
+  assert.equal(calls[0], `${TEST_ENGINE_URL}/camunda/definitions/${encodeURIComponent(DEF)}/xml`);
   assert.match((await fetchProcessXml("intake", { env: {}, fetch: stubFetch(200, xml, calls) })).error, /not a process definition id/);
   assert.equal(calls.length, 1);
   assert.match((await fetchProcessXml(DEF, { env: {}, fetch: stubFetch(404, "") })).error, /has no process definition/);
@@ -165,7 +168,7 @@ test("retryIncident posts an empty body (no by) to /camunda/incidents/<id>/retry
   const calls = [];
   const fetch = async (url, init) => { calls.push({ url, init }); return { ok: true, status: 200, text: async () => "{}" }; };
   assert.deepEqual(await retryIncident(INC, "lundmatt1", { env: {}, fetch }), { ok: true, status: 200 });
-  assert.equal(calls[0].url, `${DEFAULT_ENGINE_URL}/camunda/incidents/${INC}/retry`);
+  assert.equal(calls[0].url, `${TEST_ENGINE_URL}/camunda/incidents/${INC}/retry`);
   assert.equal(calls[0].init.method, "POST");
   assert.deepEqual(JSON.parse(calls[0].init.body), {});
   assert.match((await retryIncident("../accounts", "lundmatt1", { env: {}, fetch })).error, /not an incident id/);
@@ -184,7 +187,7 @@ test("fetchTicketTimeline asks /ticket/<owner>/<repo>/<n>/timeline, maps a 404 t
   const body = JSON.stringify({ ticket: { number: 101 }, steps: [], waits: [], totals: {} });
   const r = await fetchTicketTimeline("codefrak-oss", "frakworks", 101, { env: {}, fetch: stubFetch(200, body, calls) });
   assert.equal(r.error, null);
-  assert.equal(calls[0], `${DEFAULT_ENGINE_URL}/ticket/codefrak-oss/frakworks/101/timeline`);
+  assert.equal(calls[0], `${TEST_ENGINE_URL}/ticket/codefrak-oss/frakworks/101/timeline`);
   assert.equal(r.timeline.steps.length, 0);
   assert.deepEqual(await fetchTicketTimeline("codefrak-oss", "frakworks", 101, { env: {}, fetch: stubFetch(404, "") }), { notFound: true });
   assert.match((await fetchTicketTimeline("codefrak-oss", "frakworks", 101, { env: {}, fetch: stubFetch(new Error("ECONNREFUSED")) })).error, /unreachable/);

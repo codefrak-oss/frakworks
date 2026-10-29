@@ -271,7 +271,8 @@ const AUTHORIZATION_HEADER = "Authorization";
 // `GET /repos/{o}/{n}/mcp-servers/config` `mcpServers`, secrets opened) are
 // added beside the two; neither can be replaced by one.
 const ENGINE_MCP_SERVERS = Object.freeze([FRAKWORKS_MCP_SERVER, DIAGNOSTICS_MCP_SERVER]);
-function frakworksMcpConfigObject({ engineUrl = "http://localhost:8090", token = undefined, repoServers = null } = {}) {
+function frakworksMcpConfigObject({ engineUrl, token = undefined, repoServers = null } = {}) {
+  if (typeof engineUrl !== "string" || !engineUrl) throw new Error("no engine URL set: enter one under Config > frakworks > Engine URL");
   const base = String(engineUrl).replace(/\/+$/, "");
   const bearer = typeof token === "string" && token.trim() ? `Bearer ${token.trim()}` : "";
   const headers = bearer ? { [AUTHORIZATION_HEADER]: bearer } : {};

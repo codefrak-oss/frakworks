@@ -9,7 +9,7 @@ const { fetchNeeds, fetchClosedIssues, fetchTicketDetail, submitIntake,
   fetchSavedChats, fetchSavedChat, saveChat, deleteSavedChat, requestSetupCheck, fetchRepos,
   setBearer, authHeaders, fetchWhoAmI, getJson, sendJson, fetchProcessXml, fetchRepoFile, engineAccessAction, registerJob } = require("../src/engine-data");
 
-const env = { ENGINE_URL: "http://engine.test:8090/" };
+const env = { engineUrl: "http://engine.test:8090/" };
 
 /** A fake fetch answering `status` with `body` (a string is sent as-is), recording every URL. */
 function fake(status, body) {

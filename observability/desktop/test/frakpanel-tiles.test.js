@@ -1,4 +1,7 @@
 // frakpanel tiles (#1338): engine-data's read and write of the engine's switch, and Config > frakworks' section.
+// Config > frakworks > Engine URL, as main sets it at launch (src/engine-url-setting.js).
+const TEST_ENGINE_URL = "http://engine.test";
+require("../src/engine-data").setEngineUrl(TEST_ENGINE_URL);
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const React = require("react");
@@ -16,7 +19,7 @@ const routes = (table, calls = []) => async (url, init) => {
 };
 
 test("fetchFrakpanelTiles reads GET /frakpanel/tiles/enabled with the tile URL; an odd answer is the error", async () => {
-  const r = await fetchFrakpanelTiles({ env: { ENGINE_URL: "http://eng:9000/" }, fetch: routes({ "/frakpanel/tiles/enabled": [200, { enabled: false }] }) });
+  const r = await fetchFrakpanelTiles({ env: { engineUrl: "http://eng:9000/" }, fetch: routes({ "/frakpanel/tiles/enabled": [200, { enabled: false }] }) });
   assert.deepEqual(r, { frakpanelTiles: { enabled: false, url: "http://eng:9000/frakpanel/tiles/ai-accounts" }, error: null });
   assert.match((await fetchFrakpanelTiles({ env: {}, fetch: routes({ "/frakpanel/tiles/enabled": [200, { enabled: "yes" }] }) })).error, /boolean/);
   assert.ok((await fetchFrakpanelTiles({ env: {}, fetch: routes({ "/frakpanel/tiles/enabled": [500, "boom"] }) })).error);

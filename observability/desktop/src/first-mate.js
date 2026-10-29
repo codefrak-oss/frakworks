@@ -190,14 +190,12 @@ function itermSeed(history, { pod = false } = {}) {
   return seedPreamble({ title: null, messages: history }, undefined, { opening: pod ? ITERM_POD_SEED_HEAD : ITERM_SEED_HEAD });
 }
 
-// Where the engine is, when main passes no `engineEnvFn` (tests): this
-// process's own env.
+// Where the engine is, when main passes no `engineEnvFn` (tests): the
+// Engine URL setting as src/engine-data.js holds it.
 // `ENGINE_TOKEN` (#2206) is the desktop's engine token, which only main's
 // `engineEnvFn` supplies: it goes into the 0600 MCP config's `Authorization`
 // header and nowhere else, never into the child's environment or a log line.
-const envEngineEnv = () => ({
-  ENGINE_URL: process.env.ENGINE_URL,
-});
+const envEngineEnv = () => ({ engineUrl: engineUrl() });
 
 // A tool_result block's text, whether `content` is a string or text blocks.
 const toolResultText = (block) => {

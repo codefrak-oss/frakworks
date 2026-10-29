@@ -2,6 +2,9 @@
 // fetchTierAccounts against a stand-in fetch, the engine:tier-accounts channel
 // in main, and the tile asking once on open and once per Refresh, never on an event.
 "use strict";
+// Config > frakworks > Engine URL, as main sets it at launch (src/engine-url-setting.js).
+const TEST_ENGINE_URL = "http://engine.test";
+require("../src/engine-data").setEngineUrl(TEST_ENGINE_URL);
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
@@ -21,7 +24,7 @@ test("fetchTierAccounts reads GET /tiers/accounts once, sorted by tier; a failur
   const calls = [];
   const ok = async (url) => { calls.push(url); return { ok: true, status: 200, text: async () => JSON.stringify(ROWS) }; };
   const r = await fetchTierAccounts({ env: {}, fetch: ok });
-  assert.deepEqual(calls, ["http://localhost:8090/tiers/accounts"]);
+  assert.deepEqual(calls, ["http://engine.test/tiers/accounts"]);
   assert.equal(r.error, null);
   assert.deepEqual(r.rows.map((x) => x.tier), [1, 2, 10]);
   const odd = await fetchTierAccounts({ env: {}, fetch: async () => ({ ok: true, status: 200, text: async () => "{}" }) });

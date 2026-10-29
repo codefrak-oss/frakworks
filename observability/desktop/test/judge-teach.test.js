@@ -68,7 +68,7 @@ test("teachJudge posts to /judge/teach with the first-mate token, and refuses wi
   assert.match((await teachJudge("t1", "allow", null, null)).error, /first-mate token/);
   let seen;
   const fetch = async (url, init) => { seen = { url, init }; return new Response(JSON.stringify({ line: "- l", commit: "c" }), { status: 200 }); };
-  const r = await teachJudge("t1", "allow", "ok", "Bearer frk_fm", { fetch, env: { ENGINE_URL: "http://e" } });
+  const r = await teachJudge("t1", "allow", "ok", "Bearer frk_fm", { fetch, env: { engineUrl: "http://e" } });
   assert.deepEqual(r, { ok: true, line: "- l", commit: "c" });
   assert.equal(seen.url, "http://e/judge/teach");
   assert.equal(seen.init.headers.authorization, "Bearer frk_fm");

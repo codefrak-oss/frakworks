@@ -1,7 +1,7 @@
 // fresh-code.js — First mate's fresh clones (#960, built in part 2 of #973). Main keeps one detached whole
 // clone per target repo under `<userData>/first-mate/fresh/<owner>/<name>/`,
 // made and moved with plain `git` against the engine's read-only git proxy
-// (`$ENGINE_URL/repos/<owner>/<name>/git`, engine/README.md: `info/refs` and
+// (`<engine URL>/repos/<owner>/<name>/git`, engine/README.md: `info/refs` and
 // `git-upload-pack` forwarded with the repo's token, `receive-pack` 403), so
 // the desktop carries no GitHub credential and names no GitHub host. First
 // mate runs its `claude` child in the clone of the conversation's repo
@@ -121,7 +121,7 @@ class FreshCode extends EventEmitter {
     super();
     if (!freshDir) throw new Error("fresh-code needs a freshDir");
     this.freshDir = freshDir;
-    this.engineUrl = engineUrl || "http://localhost:8090";
+    this.engineUrl = engineUrl || null;
     // `() => "Bearer <token>" | null`, read per git run so a sign-in applies at once.
     this.bearerFn = typeof bearer === "function" ? bearer : () => null;
     this.spawnFn = spawn || nodeSpawn;
@@ -255,6 +255,7 @@ class FreshCode extends EventEmitter {
   ensureClone(repo) {
     if (!REPO_FULL.test(String(repo))) return Promise.resolve({ error: `not an owner/name repo: ${JSON.stringify(repo)}` });
     if (this.hasClone(repo)) return Promise.resolve(this.doc.repos[repo] || { commit: null });
+    if (!this.engineUrl) return Promise.resolve({ error: "no engine URL set: enter one under Config > frakworks > Engine URL" });
     this.cloning.add(repo);
     return this._queue(repo, () => this._clone(repo));
   }
@@ -316,12 +317,12 @@ class FreshCode extends EventEmitter {
   // rule, a checkout only when `origin/<branch>` is not HEAD already.
   async _refresh(repo, after, { onlyIfMoved = false } = {}) {
     const dir = this.cloneDir(repo);
-    if (!this.hasClone(repo)) return null;
+    if (!this.hasClone(repo) || !this.engineUrl) return null;
     const before = this._instructionKey(dir);
     const row = this.doc.repos[repo] || {};
     const branch = row.branch || (await this._defaultBranch(dir));
     // The clone's origin follows the engine: one made under an earlier
-    // ENGINE_URL (the local Compose stack) would otherwise fetch from a port
+    // engine URL (the local Compose stack) would otherwise fetch from a port
     // nothing listens on, forever.
     await this._git(["remote", "set-url", "origin", proxyUrl(this.engineUrl, repo)], dir);
     const f = await this._git(["fetch", "origin", ...(branch ? [branch] : [])], dir);

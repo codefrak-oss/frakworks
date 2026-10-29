@@ -138,7 +138,7 @@ test("an edited comment reads as a new revision", async () => {
 test("an engine failure sets issue_error and prs_error both", async () => {
   for (const r of [
     { error: "no such ticket in a target repo: o/r#1281" },
-    { error: "engine unreachable at http://localhost:8090/ticket/o/r/1281: ECONNREFUSED" },
+    { error: "engine unreachable at http://engine.test/ticket/o/r/1281: ECONNREFUSED" },
     new Error("boom"),
   ]) {
     const d = await fetchTicketData(1281, { repo: "o/r", fetchDetail: fakeDetail(r) });

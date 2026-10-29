@@ -1,4 +1,7 @@
 "use strict";
+// Config > frakworks > Engine URL, as main sets it at launch (src/engine-url-setting.js).
+const TEST_ENGINE_URL = "http://engine.test";
+require("../src/engine-data").setEngineUrl(TEST_ENGINE_URL);
 // The explorer's Proposals branch and the proposal view (#660): the merge in
 // src/proposal-list.js, its data path (src/engine-data.js, main, preload), and
 // the drawing in src/renderer/proposals.jsx, on test/fixture-proposals.json's

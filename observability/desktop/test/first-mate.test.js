@@ -3,6 +3,9 @@
 // test/chat-session.test.js — a real child process speaking stream-json over
 // a real pipe. No test in this file invokes the real `claude` binary.
 "use strict";
+// Config > frakworks > Engine URL, as main sets it at launch (src/engine-url-setting.js).
+const TEST_ENGINE_URL = "http://engine.test";
+require("../src/engine-data").setEngineUrl(TEST_ENGINE_URL);
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
@@ -205,7 +208,7 @@ test("argv, settings and MCP config allow exactly CHAT_READ_TOOLS, the filing to
   fs.mkdirSync(cwd);
   const m = fm({ argvDump: dump }, {
     dir, cwd,
-    engineEnvFn: async () => ({ ENGINE_URL: "http://127.0.0.1:9/", EXTRA: "dropped" }),
+    engineEnvFn: async () => ({ engineUrl: "http://127.0.0.1:9/", EXTRA: "dropped" }),
   });
   await m.send("hello");
   const argv = JSON.parse(fs.readFileSync(dump, "utf8"));
@@ -276,7 +279,7 @@ test("First mate's prompt sends proposal feedback to the HITLP server as a revis
 });
 
 test("the MCP config has no login header when no login is known", async () => {
-  const m = fm({}, { engineEnvFn: async () => ({ ENGINE_URL: "http://127.0.0.1:9" }) });
+  const m = fm({}, { engineEnvFn: async () => ({ engineUrl: "http://127.0.0.1:9" }) });
   await m.send("hello");
   m.stop();
   const servers = JSON.parse(fs.readFileSync(m.mcpConfigPath, "utf8")).mcpServers;

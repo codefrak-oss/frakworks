@@ -3,6 +3,9 @@
 // and accounts.jsx drawing the result. Shapes are the engine's AiAccount and
 // UsageView (engine/src/main/kotlin/com/codefrak/engine/accounts).
 "use strict";
+// Config > frakworks > Engine URL, as main sets it at launch (src/engine-url-setting.js).
+const TEST_ENGINE_URL = "http://engine.test";
+require("../src/engine-data").setEngineUrl(TEST_ENGINE_URL);
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
@@ -40,7 +43,7 @@ test("fetchAccounts joins each account's meter on by name", async () => {
   }, calls) });
   assert.equal(r.error, null);
   assert.equal(r.usageError, null);
-  assert.deepEqual(calls.sort(), ["http://localhost:8090/accounts", "http://localhost:8090/accounts/usage"]);
+  assert.deepEqual(calls.sort(), ["http://engine.test/accounts", "http://engine.test/accounts/usage"]);
   assert.equal(r.accounts[0].usage.sevenDayUtilization, 0.48);
   assert.equal(r.accounts[1].usage, null);
 });
@@ -182,7 +185,7 @@ test("each account action is the engine's request for it", async () => {
     const { calls, fetch } = recorder();
     const r = await accountAction(action, { env: {}, fetch });
     assert.deepEqual(r, { ok: true, status: 204 });
-    assert.deepEqual(calls, [{ url: `http://localhost:8090${p}`, method, body }]);
+    assert.deepEqual(calls, [{ url: `http://engine.test${p}`, method, body }]);
   }
 });
 
@@ -436,7 +439,7 @@ test("the add form offers Codex beside the existing providers", async () => {
   assert.deepEqual(r, { ok: true, status: 201 });
   const codex = recorder(201);
   assert.deepEqual(await accountAction({ op: "add", name: "codex-1", provider: "codex" }, { env: {}, fetch: codex.fetch }), { ok: true, status: 201 });
-  assert.deepEqual(codex.calls, [{ url: "http://localhost:8090/accounts", method: "POST", body: { name: "codex-1", provider: "codex" } }]);
+  assert.deepEqual(codex.calls, [{ url: "http://engine.test/accounts", method: "POST", body: { name: "codex-1", provider: "codex" } }]);
 });
 
 test("Codex accounts import a bounded auth.json blob but remain unavailable to Smith runs", async () => {
@@ -456,7 +459,7 @@ test("Codex accounts import a bounded auth.json blob but remain unavailable to S
   const { calls, fetch } = recorder();
   const auth = "{\n\"auth_mode\":\"chatgpt\",\"tokens\":{\"refresh_token\":\"secret\"}}\n";
   assert.deepEqual(await accountAction({ op: "credential", name: "codex-1", provider: "codex", token: auth }, { env: {}, fetch }), { ok: true, status: 204 });
-  assert.deepEqual(calls, [{ url: "http://localhost:8090/accounts/codex-1/credential", method: "PUT", body: { token: auth } }]);
+  assert.deepEqual(calls, [{ url: "http://engine.test/accounts/codex-1/credential", method: "PUT", body: { token: auth } }]);
   const tooLarge = await accountAction({ op: "credential", name: "codex-1", provider: "codex", token: "x".repeat(65537) }, { env: {}, fetch });
   assert.match(tooLarge.error, /over 65536 bytes/);
   assert.equal(calls.length, 1);
@@ -472,14 +475,14 @@ test("a jev key gets the whitespace rule and no prefix rule, here and before a r
   assert.match((await accountAction({ op: "credential", name: "jev-1", provider: "jev", token: "ab\ncd" }, { env: {}, fetch })).error, /whitespace/);
   assert.equal(calls.length, 0);
   assert.deepEqual(await accountAction({ op: "credential", name: "jev-1", provider: "jev", token: "anykey123" }, { env: {}, fetch }), { ok: true, status: 204 });
-  assert.deepEqual(calls, [{ url: "http://localhost:8090/accounts/jev-1/credential", method: "PUT", body: { token: "anykey123" } }]);
+  assert.deepEqual(calls, [{ url: "http://engine.test/accounts/jev-1/credential", method: "PUT", body: { token: "anykey123" } }]);
 });
 
 test("verify asks the engine to try the stored credential and brings back its verdict", async () => {
   const good = recorder(200, JSON.stringify({ valid: true, reachable: true, detail: "jev accepted it" }));
   assert.deepEqual(await accountAction({ op: "verify", name: "jev-1" }, { env: {}, fetch: good.fetch }),
     { ok: true, status: 200, verdict: { valid: true, reachable: true, detail: "jev accepted it" } });
-  assert.deepEqual(good.calls, [{ url: "http://localhost:8090/accounts/jev-1/verify", method: "POST", body: undefined }]);
+  assert.deepEqual(good.calls, [{ url: "http://engine.test/accounts/jev-1/verify", method: "POST", body: undefined }]);
   const bad = recorder(200, JSON.stringify({ valid: false, reachable: true, detail: "jev refused it (401): Invalid API key" }));
   const refused = await accountAction({ op: "verify", name: "jev-1" }, { env: {}, fetch: bad.fetch });
   assert.equal(refused.verdict.valid, false);
@@ -497,7 +500,7 @@ test("an account with a credential offers Verify in its credential tab, one with
 test("refreshUsage POSTs /accounts/<name>/usage/refresh; the engine's refusal is the error", async () => {
   const good = recorder(200, JSON.stringify(meter("max-1")));
   assert.deepEqual(await accountAction({ op: "refreshUsage", name: "max-1" }, { env: {}, fetch: good.fetch }), { ok: true, status: 200 });
-  assert.deepEqual(good.calls, [{ url: "http://localhost:8090/accounts/max-1/usage/refresh", method: "POST", body: undefined }]);
+  assert.deepEqual(good.calls, [{ url: "http://engine.test/accounts/max-1/usage/refresh", method: "POST", body: undefined }]);
   const conflict = recorder(409, JSON.stringify({ status: 409, message: "a jev account has no usage meter to refresh" }));
   assert.match((await accountAction({ op: "refreshUsage", name: "jev-1" }, { env: {}, fetch: conflict.fetch })).error,
     /409 for POST \/accounts\/jev-1\/usage\/refresh: a jev account has no usage meter to refresh/);
@@ -540,7 +543,7 @@ test("fetchRefinerTier reads GET /intake/tier; a failed or odd answer is the err
   const calls = [];
   const r = await fetchRefinerTier({ env: {}, fetch: routes({ "/intake/tier": [200, { tier: 5, model: "claude-opus-5-5", effort: "medium" }] }, calls) });
   assert.deepEqual(r, { refinerTier: { tier: 5, model: "claude-opus-5-5", effort: "medium" }, error: null });
-  assert.deepEqual(calls, ["http://localhost:8090/intake/tier"]);
+  assert.deepEqual(calls, ["http://engine.test/intake/tier"]);
   for (const [a, expect] of [
     [[500, "boom"], /engine answered 500 for \/intake\/tier/],
     [[200, { tier: "5" }], /no integer `tier`/],
@@ -552,7 +555,7 @@ test("the refiner-tier action is PUT /intake/tier with the tier, and answers the
   const { calls, fetch } = recorder(200, JSON.stringify({ tier: 8, model: "claude-fable-5-1", effort: "low" }));
   const r = await accountAction({ op: "refiner-tier", tier: 8 }, { env: {}, fetch });
   assert.deepEqual(r, { ok: true, status: 200, refinerTier: { tier: 8, model: "claude-fable-5-1", effort: "low" } });
-  assert.deepEqual(calls, [{ url: "http://localhost:8090/intake/tier", method: "PUT", body: { tier: 8 } }]);
+  assert.deepEqual(calls, [{ url: "http://engine.test/intake/tier", method: "PUT", body: { tier: 8 } }]);
 });
 
 test("a refiner tier that is no integer 1-10 is refused before any request; the engine's 400 is said back", async () => {
@@ -752,7 +755,7 @@ test("pickAccount asks the engine for the model's account and returns its token"
     { account: "anthropic-primary", provider: "anthropic", env: "CLAUDE_CODE_OAUTH_TOKEN", token: "sk-ant-oat01-x" }));
   const r = await pickAccount("fable", { env: {}, fetch });
   assert.deepEqual(r, { ok: true, account: "anthropic-primary", envVar: "CLAUDE_CODE_OAUTH_TOKEN", token: "sk-ant-oat01-x" });
-  assert.deepEqual(calls, [{ url: "http://localhost:8090/accounts/pick", method: "POST", body: { model: "fable" } }]);
+  assert.deepEqual(calls, [{ url: "http://engine.test/accounts/pick", method: "POST", body: { model: "fable" } }]);
 });
 
 test("pickAccount is an error, never a throw, on a refusal, a tokenless answer or no model", async () => {
@@ -841,7 +844,7 @@ test("the key, billing and credit actions are the engine's requests for them", a
   for (const [action, method, p, body] of cases) {
     const { calls, fetch } = recorder();
     assert.deepEqual(await accountAction(action, { env: {}, fetch }), { ok: true, status: 204 });
-    assert.deepEqual(calls, [{ url: `http://localhost:8090${p}`, method, body }]);
+    assert.deepEqual(calls, [{ url: `http://engine.test${p}`, method, body }]);
   }
 });
 

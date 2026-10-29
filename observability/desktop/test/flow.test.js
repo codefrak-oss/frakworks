@@ -1,17 +1,20 @@
 // The issue detail the Issues board opens: src/engine-data.js fetchFlow
 // against a stand-in fetch, and flow.jsx against a flow recorded from the
-// local stack (fixture-flow.json, `curl localhost:8090/intake/<id>`,
+// local stack (fixture-flow.json, `curl engine.test/intake/<id>`,
 // 2026-09-24: intake #28 waiting on its question; the base64 run log
 // was cut to 4100 characters, still over the limit fetchFlow drops at).
 // That engine predates the steps' times, so the times are tested inline.
 "use strict";
+// Config > frakworks > Engine URL, as main sets it at launch (src/engine-url-setting.js).
+const TEST_ENGINE_URL = "http://engine.test";
+require("../src/engine-data").setEngineUrl(TEST_ENGINE_URL);
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const React = require("react");
 const { renderToStaticMarkup } = require("react-dom/server");
-const { fetchFlow, DEFAULT_ENGINE_URL } = require("../src/engine-data");
+const { fetchFlow } = require("../src/engine-data");
 const { instanceOf, stepRows, DoctorRuns, DoctorTranscript, issueNumberOf } = require("../dist/flow.cjs");
 const { TicketDetail } = require("../dist/index.cjs");
 
@@ -29,7 +32,7 @@ test("fetchFlow reads /intake/<id> and keeps the blobs in the main process", asy
   const calls = [];
   const r = await fetchFlow(ID, { env: {}, fetch: stubFetch(200, raw, calls) });
   assert.equal(r.error, null);
-  assert.equal(calls[0], `${DEFAULT_ENGINE_URL}/intake/${ID}`);
+  assert.equal(calls[0], `${TEST_ENGINE_URL}/intake/${ID}`);
   assert.deepEqual(r.flow.omitted, ["log"]);
   assert.equal(r.flow.variables.log, undefined);
   assert.equal(r.flow.variables.outcome, "ask");

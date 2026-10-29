@@ -369,17 +369,17 @@ test("the running step's mark carries the class the CSS spins; pending/done/fail
 
 test("the connectivity indicator: restarting for update, muted, during an update; red when the engine is down with none", () => {
   const down = { repo: "*", state: "down", since: 1000, lastFrameAt: 1000 };
-  const engine = { ok: false, error: "fetch failed", url: "http://localhost:8090" };
+  const engine = { ok: false, error: "fetch failed", url: "http://engine.test" };
   const html = (restarting) => renderToStaticMarkup(React.createElement(StatusBar, { version: null, engine, stream: down, now: 5000, restarting }));
   const during = html(true);
-  assert.match(during, /class="sbEngine sb-muted"[^>]*>engine ◌ restarting for update localhost:8090/);
+  assert.match(during, /class="sbEngine sb-muted"[^>]*>engine ◌ restarting for update engine.test/);
   assert.match(during, /class="sbStream sb-muted"[^>]*>stream ◌ restarting for update/);
   assert.doesNotMatch(during, /sb-bad/);
   const after = html(false);
-  assert.match(after, /class="sbEngine sb-bad"[^>]*>engine ○ localhost:8090/);
+  assert.match(after, /class="sbEngine sb-bad"[^>]*>engine ○ engine.test/);
   assert.match(after, /class="sbStream sb-bad"[^>]*>stream ○ down/);
   assert.equal(engineDot(engine, false).level, "bad");
-  assert.equal(engineDot({ ok: true, url: "http://localhost:8090" }, false).text, "engine ● localhost:8090");
+  assert.equal(engineDot({ ok: true, url: "http://engine.test" }, false).text, "engine ● engine.test");
   // The stale line, and the stream's phrase, outside the bar.
   assert.equal(ev.staleText(down, true), "engine restarting for update; the views catch up when it is back");
   assert.match(ev.staleText(down, false), /^stale since/);

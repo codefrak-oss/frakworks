@@ -58,7 +58,7 @@ test("no builds says so; a failed read is an error line; before the first read i
 });
 
 test("fetchActiveBuilds reads GET /builds/active and never rejects", async () => {
-  const env = { ENGINE_URL: "http://engine.test" };
+  const env = { engineUrl: "http://engine.test" };
   const answer = (status, body) => async (url) => {
     assert.equal(url, "http://engine.test/builds/active");
     return { ok: status === 200, status, text: async () => body };

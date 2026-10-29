@@ -3,6 +3,9 @@
 // src/first-mate-remote.js's RemoteSession over the session API, against a
 // recording fetch and a fake event stream, never a local `claude` child.
 "use strict";
+// Config > frakworks > Engine URL, as main sets it at launch (src/engine-url-setting.js).
+const TEST_ENGINE_URL = "http://engine.test";
+require("../src/engine-data").setEngineUrl(TEST_ENGINE_URL);
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");

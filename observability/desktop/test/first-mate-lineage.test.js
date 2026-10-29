@@ -29,7 +29,7 @@ const start = async (lineageFn) => {
     submitIntakeFn: async () => ({ ok: true, intakeId: "intake-1" }),
     resolveTierFn: () => ({ model: "sonnet", effort: "medium" }),
     fetchFlowFn: async () => ({ error: "no engine in tests" }),
-    engineEnvFn: async () => ({ ENGINE_URL: "http://127.0.0.1:9" }),
+    engineEnvFn: async () => ({ engineUrl: "http://127.0.0.1:9" }),
     lineageFn: lineageFn && (async (ask) => { asked.push(ask); return lineageFn(ask); }),
   }).init();
   const prompt = () => {

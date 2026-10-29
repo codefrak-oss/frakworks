@@ -7,7 +7,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const { getJson, sendJson } = require("../src/engine-data");
 
-const env = { ENGINE_URL: "http://engine.test" };
+const env = { engineUrl: "http://engine.test" };
 const ok = (body) => ({ ok: true, status: 200, text: async () => JSON.stringify(body) });
 const fail = (status) => ({ ok: false, status, text: async () => "" });
 const refusedError = () => { const e = new TypeError("fetch failed"); e.cause = { code: "ECONNREFUSED" }; return e; };
