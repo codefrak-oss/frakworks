@@ -94,7 +94,7 @@ class HttpCredentialVerifier(
         val sent = System.nanoTime()
         val response = try { client.send(request, HttpResponse.BodyHandlers.ofString()) }
             catch (e: Exception) { return Verdict(false, false, "could not reach anthropic: ${e.message ?: e.javaClass.simpleName}") }
-        if (kind == ApiKeyKind.API) recordProbe("api-key-verify", sent, response.body())
+        if (kind == ApiKeyKind.API) recordProbe("credential-verify", sent, response.body())
         val status = response.statusCode()
         return when {
             status in 200..299 -> Verdict(true, true, "anthropic accepted the ${kind.label}")
