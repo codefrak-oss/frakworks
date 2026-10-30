@@ -39,10 +39,11 @@ later poll answers another, so an open tile picks up a newly deployed engine.
   to it either). An account with a billing-cycle date and a grant (engine/docs/ai-accounts.md,
   "API keys and credit") also carries `credit` {`grantCents`, `usedCents`,
   `remainingCents`, `cycleStart`, `cycleEnd`, `refreshedAt`, `error`}, the
-  figures `GET /accounts` reports, and the row ends with an "API" bar: dollars
-  used of the grant, then "API credit: $x left · Nd left in cycle (ends
-  date)". A `creditError` shows as "credit error" and its text, no reading yet
-  as "no reading", never a stale or zero figure. An account without a cycle
+  figures `GET /accounts` reports, and the row ends with an "API" bar, same
+  width and layout as the others: percent of the grant used, then the time
+  left until `cycleEnd` 00:00 UTC in the same format (e.g. "0% · 4d 12h"). A
+  `creditError` shows as "credit error" and its text, no reading yet as "no
+  reading" with the time left, never a stale or zero figure. An account without a cycle
   and grant carries `credit: null` and has no such bar; no key or key-set flag
   reaches the state. No tier-to-account section, and never a
   credential or an email note: the state is its own DTO.
